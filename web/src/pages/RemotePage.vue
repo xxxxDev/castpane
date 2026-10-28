@@ -95,11 +95,31 @@
           <div v-if="mode === 'trackpad' && isTouch && hasPicture" class="remote-pad-hint">{{ ct('觸控板：滑動移動游標，點一下按一下，兩指滑動捲動') }}</div>
         </div>
 
+        <!-- The pencil's field: text written on the phone, input method and all, and sent
+             to where the Mac's cursor is in one go (the owner's request, 2026-10-29). -->
+        <div v-if="compose" class="remote-compose" @pointerdown.stop>
+          <input ref="composeField" v-model="composeText" class="remote-compose-field" type="text" enterkeyhint="send" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" :placeholder="ct('打好字，送到 Mac 的游標位置')" @keydown="composeKey">
+          <button type="button" class="remote-compose-send" :disabled="!composeText" @pointerdown.prevent @mousedown.prevent @click="sendCompose">{{ ct('送出') }}</button>
+        </div>
         <!-- The keys a phone's keyboard lacks; ⇧ ⌃ ⌥ ⌘ hold for the next key. -->
-        <div v-if="keyboardOpen || !isTouch" class="remote-keys" :class="{desk: !isTouch}">
+        <div v-if="keyboardOpen || panel || compose || !isTouch" class="remote-keys" :class="{desk: !isTouch}">
+          <template v-if="isTouch">
+            <button type="button" class="remote-key tool compose-btn" :class="{on: compose}" :title="ct('輸入文字')" @pointerdown.prevent @mousedown.prevent @click="toggleCompose"><f7-icon f7="pencil" :size="17"/></button>
+            <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :title="panel ? ct('鍵盤') : ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon :f7="panel ? 'keyboard' : 'square_grid_2x2'" :size="17"/></button>
+          </template>
           <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
           <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
           <span class="remote-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
+        </div>
+        <!-- In the phone keyboard's place: pages of keys, swiped sideways (the owner's request,
+             2026-10-29). -->
+        <div v-if="panel" class="remote-panel" @pointerdown.stop>
+          <div ref="pagesEl" class="remote-pages" @scroll.passive="pageScroll">
+            <div v-for="pg in PAGES" :key="pg.id" class="remote-page-grid" :class="['cols-' + pg.cols, 'page-' + pg.id]">
+              <button v-for="k in pg.keys" :key="k.label" type="button" class="remote-pkey" @pointerdown.prevent @mousedown.prevent @click="press(k)">{{ ct(k.label) }}</button>
+            </div>
+          </div>
+          <div class="remote-dots"><button v-for="(pg, i) in PAGES" :key="pg.id" type="button" :class="{on: i === pageNo}" :aria-label="ct(pg.name)" @click="goPage(i)"></button></div>
         </div>
         <textarea ref="typing" class="remote-typing" :inputmode="isTouch && !keyboardOpen ? 'none' : 'text'" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="keyboard" @beforeinput="beforeInput" @compositionend="compositionEnd" @keydown="keyDown" @keyup="keyUp" @blur="typingBlur"></textarea>
 
@@ -121,11 +141,28 @@ const machines = ref([]), error = ref(''), streaming = ref(false), items = ref([
 const hasPicture = ref(false), notice = ref(''), permission = ref(''), stats = reactive({ fps: 0, mbps: 0 });
 const keyHint = ref(false), keyboardOpen = ref(false), settingsOpen = ref(false), menuOpen = ref(false), held = reactive(new Set());
 const canvas = ref(null), area = ref(null), typing = ref(null);
+const panel = ref(false), pageNo = ref(0), pagesEl = ref(null), compose = ref(false), composeText = ref(''), composeField = ref(null);
 const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 const mode = ref(isTouch ? (localGet('castpane-remote-mode') || 'direct') : 'direct');
 const QUALITY_LABEL = { low: '低', standard: '標準', high: '高', max: '最高' };
 const KEYS = [{ code: 'Escape', label: 'esc' }, { code: 'Tab', label: 'tab' }, { code: 'ArrowLeft', label: '←' }, { code: 'ArrowUp', label: '↑' }, { code: 'ArrowDown', label: '↓' }, { code: 'ArrowRight', label: '→' }, { code: 'Backspace', label: '⌫' }, { code: 'Enter', label: '⏎' }];
 const MODS = [{ id: 'shift', label: '⇧' }, { id: 'ctrl', label: '⌃' }, { id: 'alt', label: '⌥' }, { id: 'meta', label: '⌘' }];
+// The key panel's pages. A Mac has no Insert, so Tab sits there; the shortcuts are the
+// Mac's own (Mission Control ⌃↑, Show Desktop F11); the number pad types its characters.
+const PAGES = [
+  { id: 'edit', name: '編輯鍵', cols: 4, keys: [
+    { code: 'Home', label: 'Home' }, { code: 'End', label: 'End' }, { code: 'PageUp', label: 'PgUp' }, { code: 'Backspace', label: '⌫' },
+    { code: 'Tab', label: 'Tab' }, { code: 'ArrowUp', label: '↑' }, { code: 'PageDown', label: 'PgDn' }, { code: 'Delete', label: 'Del' },
+    { code: 'ArrowLeft', label: '←' }, { code: 'ArrowDown', label: '↓' }, { code: 'ArrowRight', label: '→' }, { code: 'Enter', label: 'Enter' }] },
+  { id: 'shortcuts', name: '快捷鍵', cols: 3, keys: [
+    { code: 'KeyC', mods: ['meta'], label: '拷貝' }, { code: 'KeyV', mods: ['meta'], label: '貼上' }, { code: 'KeyX', mods: ['meta'], label: '剪下' },
+    { code: 'KeyZ', mods: ['meta'], label: '復原' }, { code: 'KeyZ', mods: ['shift', 'meta'], label: '重做' }, { code: 'KeyA', mods: ['meta'], label: '全選' },
+    { code: 'KeyF', mods: ['meta'], label: '尋找' }, { code: 'KeyM', mods: ['meta'], label: '縮到 Dock' }, { code: 'KeyW', mods: ['meta'], label: '關閉視窗' },
+    { code: 'Space', mods: ['meta'], label: 'Spotlight' }, { code: 'ArrowUp', mods: ['ctrl'], label: '指揮中心' }, { code: 'F11', mods: [], label: '顯示桌面' }] },
+  { id: 'numbers', name: '數字鍵', cols: 4, keys: [
+    ...'789-456*123/'.split('').map((c) => ({ text: c, label: c })), { text: '0', label: '0' }, { text: '.', label: '.' }, { code: 'Backspace', label: '⌫' }, { text: '+', label: '+' }] },
+  { id: 'fn', name: '功能鍵', cols: 4, keys: Array.from({ length: 12 }, (_, i) => ({ code: 'F' + (i + 1), label: 'F' + (i + 1) })) },
+];
 const prefs = reactive({ quality: 'standard', resolution: '1920', fps: 60, ...(JSON.parse(localGet('castpane-remote-prefs') || '{}')) });
 const lastShot = ref(localGet('castpane-remote-shot') || '');
 let link = null;
@@ -289,7 +326,7 @@ function disconnect() {
   if (!streaming.value && !link) return;
   saveShot();
   try { link?.send({ t: 'stop' }); } catch {}
-  link?.close();link = null;streaming.value = false;keyboardOpen.value = false;settingsOpen.value = false;menuOpen.value = false;held.clear();
+  link?.close();link = null;streaming.value = false;keyboardOpen.value = false;settingsOpen.value = false;menuOpen.value = false;held.clear();panel.value = false;compose.value = false;composeText.value = '';
 }
 const headCollapsed = ref(localGet('castpane-remote-head') === 'folded');
 function toggleHead() { headCollapsed.value = !headCollapsed.value;localSet('castpane-remote-head', headCollapsed.value ? 'folded' : 'open');menuOpen.value = false;settingsOpen.value = false; }
@@ -590,6 +627,40 @@ function beforeInput(e) {
   else if (e.inputType === 'deleteContentForward') tap('Delete');
   else if (e.inputType === 'insertFromPaste') sendText(e.dataTransfer?.getData('text') || '');
 }
+// The panel takes the phone keyboard's place; closing it brings the keyboard back.
+function togglePanel() {
+  compose.value = false;
+  if (panel.value) { panel.value = false;keyboardOpen.value = true;typing.value?.focus({ preventScroll: true });return; }
+  panel.value = true;typing.value?.blur();composeField.value?.blur();
+  nextTick(() => goPage(pageNo.value, false));
+}
+function goPage(i, smooth = true) { pageNo.value = i;const el = pagesEl.value;if (el) el.scrollTo({ left: i * el.clientWidth, behavior: smooth ? 'smooth' : 'auto' }); }
+function pageScroll() { const el = pagesEl.value;if (el && el.clientWidth) pageNo.value = Math.round(el.scrollLeft / el.clientWidth); }
+function press(k) {
+  if (k.text) return sendText(k.text);
+  if (!k.mods) return tap(k.code);
+  const m = [...new Set([...k.mods, ...held])];
+  link?.send({ t: 'key', code: k.code, down: true, mods: m });link?.send({ t: 'key', code: k.code, down: false, mods: m });releaseMods();
+}
+function toggleCompose() {
+  panel.value = false;
+  if (compose.value) { compose.value = false;composeField.value?.blur();return; }
+  compose.value = true;
+  nextTick(() => composeField.value?.focus({ preventScroll: true }));
+}
+function sendCompose() {
+  const s = composeText.value;
+  if (!s) return;
+  const chars = [...s];
+  for (let i = 0; i < chars.length; i += 1000) link?.send({ t: 'text', s: chars.slice(i, i + 1000).join('') });
+  composeText.value = '';releaseMods();
+  composeField.value?.focus({ preventScroll: true });
+}
+// Return sends, except while the input method is still choosing characters.
+function composeKey(e) {
+  if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
+  e.preventDefault();sendCompose();
+}
 function compositionEnd(e) { sendText(e.data || '');if (typing.value) typing.value.value = ''; }
 const sentDown = new Set();
 // A hardware keyboard: shortcuts and keys that type nothing go as keys; what types
@@ -673,7 +744,23 @@ function keyUp(e) {
 .remote-keys::-webkit-scrollbar {display:none;}
 .remote-keys.desk .remote-key {display:none;}
 .remote-stage .remote-key {display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:auto;min-width:36px;height:30px;padding:0 8px;margin:0;border-radius:7px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:13px;line-height:1;cursor:pointer;}
-.remote-key.mod.on {background:#0a84ff;}
+.remote-key.mod.on, .remote-key.tool.on {background:#0a84ff;}
+.remote-compose {display:flex;gap:6px;padding:6px 8px;background:rgba(28,28,30,.96);border-top:1px solid rgba(255,255,255,.08);}
+.remote-compose-field {flex:1;min-width:0;height:36px;box-sizing:border-box;padding:0 10px;border-radius:9px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.5);color:#fff;font-size:16px;-webkit-user-select:text;user-select:text;}
+.remote-stage .remote-compose-send {flex:0 0 auto;width:auto;height:36px;margin:0;padding:0 14px;border:0;border-radius:9px;background:#0a84ff;color:#fff;font-size:14px;cursor:pointer;}
+.remote-stage .remote-compose-send:disabled {opacity:.4;}
+.remote-panel {background:rgba(28,28,30,.96);}
+.remote-pages {display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;}
+.remote-pages::-webkit-scrollbar {display:none;}
+.remote-page-grid {flex:0 0 100%;scroll-snap-align:start;display:grid;grid-template-rows:repeat(4,46px);gap:1px;background:rgba(255,255,255,.08);}
+.remote-page-grid.cols-3 {grid-template-columns:repeat(3,1fr);}
+.remote-page-grid.cols-4 {grid-template-columns:repeat(4,1fr);}
+.remote-page-grid.page-edit, .remote-page-grid.page-fn {grid-template-rows:repeat(3,61px);padding-bottom:2px;}
+.remote-stage .remote-pkey {width:auto;height:auto;margin:0;padding:0;border:0;border-radius:0;background:#1c1c1e;color:#fff;font-size:15px;cursor:pointer;}
+.remote-stage .remote-pkey:active {background:#3a3a3c;}
+.remote-dots {display:flex;justify-content:center;gap:10px;padding:7px 0 5px;}
+.remote-stage .remote-dots button {width:7px;height:7px;margin:0;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.3);cursor:pointer;}
+.remote-stage .remote-dots button.on {background:#fff;}
 .remote-stats {flex:0 0 auto;padding-left:6px;margin-left:auto;font-size:11px;color:#8e8e93;font-variant-numeric:tabular-nums;}
 .remote-typing {position:absolute;left:-1000px;top:0;width:10px;height:10px;opacity:0;}
 .remote-settings {position:absolute;right:8px;top:calc(100% + 6px);width:min(320px,calc(100vw - 16px));background:rgba(44,44,46,.98);border-radius:16px;padding:12px 14px;box-shadow:0 8px 30px rgba(0,0,0,.5);}
