@@ -57,6 +57,9 @@ final class Windows: NSObject, NSWindowDelegate {
 
     func show<V: View>(_ id: String, title: String, size: NSSize, resizable: Bool = false, bare: Bool = false,
                        @ViewBuilder _ view: () -> V) {
+        // While one of its windows is open, Castpane is in the Dock and the app switcher,
+        // so the window is easy to find again; with none open, the menu bar alone.
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         if let w = open[id] { w.makeKeyAndOrderFront(nil); return }
         var style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable]
@@ -84,6 +87,7 @@ final class Windows: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         guard let w = notification.object as? NSWindow, let id = w.identifier?.rawValue else { return }
         open[id] = nil
+        if open.isEmpty { NSApp.setActivationPolicy(.accessory) }
     }
 
     func showWizard(_ model: AppModel) {
