@@ -17,7 +17,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
 cd "$here"
 
-version=0.1.0
+version=0.1.1
 arch=$(uname -m)
 
 echo "== swift build (release, $arch)"

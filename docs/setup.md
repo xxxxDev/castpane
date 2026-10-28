@@ -118,8 +118,7 @@ pick up the new version).
 
 ### Tailscale
 
-Castpane does not manage Tailscale; it takes the address you type. This mode has not yet been tried end to
-end on real devices for v0.1; the quick tunnel and your own domain have.
+Castpane does not manage Tailscale; it takes the address you type.
 
 1. Install Tailscale on the Mac and on the phone, and sign both in to the same tailnet.
 2. On the Mac, publish the server over HTTPS on your tailnet:

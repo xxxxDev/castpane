@@ -298,7 +298,7 @@ actor Session {
             windowFrame = nil
             frameCheckedAt = 0
             if let pid = found.pid, let wid = found.windowID {
-                await MainActor.run { Catalog.bringForward(wid, pid: pid) }
+                Catalog.bringForward(wid, pid: pid)
                 // On another desktop or in the Dock: wait for macOS to bring it here.
                 if !found.here { for _ in 0..<20 where !Catalog.isHere(wid) { try? await Task.sleep(nanoseconds: 100_000_000) } }
             }

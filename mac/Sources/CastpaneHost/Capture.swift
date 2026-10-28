@@ -74,8 +74,16 @@ enum Catalog {
 
     /// Brings a window forward: out of the Dock if it was there, raised, its app in
     /// front, which also takes the Mac to the desktop (Space) the window is on.
+    ///
+    /// Each Accessibility call waits for the window's app to answer. It runs off the main
+    /// thread, and waits a second at most: an app that hangs (found on a tester's Mac) must
+    /// not freeze Castpane's menu, nor keep the viewer at "Switching…".
     static func bringForward(_ id: CGWindowID, pid: pid_t) {
+        // Castpane's own windows (the setup assistant, Settings) are in the list too; they
+        // need no raising, and activating Castpane would only pull its windows in front.
+        guard pid != ProcessInfo.processInfo.processIdentifier else { return }
         let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 1)
         var value: CFTypeRef?
         if AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success, let list = value as? [AXUIElement] {
             for w in list {
@@ -87,7 +95,7 @@ enum Catalog {
                 break
             }
         }
-        NSRunningApplication(processIdentifier: pid)?.activate()
+        DispatchQueue.main.async { _ = NSRunningApplication(processIdentifier: pid)?.activate() }
     }
 
     /// Whether a window is on the screen now (after a switch of desktops).

@@ -260,11 +260,13 @@ const groups = computed(() => {
 });
 const groupKey = ref('');
 const shownItems = computed(() => (groups.value.find((g) => g.key === groupKey.value) || groups.value[0])?.items || []);
-// Opening, the desktop shown now; later, whichever holds what is shown.
+// Whichever holds what is shown, so the highlighted group matches the picture (opening,
+// the whole screen is shown while the current desktop's tab used to be highlighted; a
+// tester's report, 2026-10-29); the desktop shown now when nothing is shown yet.
 watch(groups, (gs) => {
   if (gs.some((g) => g.key === groupKey.value)) return;
   const holding = current.value && gs.find((g) => g.items.some((w) => w.kind === current.value.kind && w.id === current.value.id));
-  groupKey.value = (gs.find((g) => g.current) || holding || gs[0])?.key || '';
+  groupKey.value = (holding || gs.find((g) => g.current) || gs[0])?.key || '';
 });
 function list() { link?.send({ t: 'list' }); }
 function show(w) {
@@ -475,8 +477,15 @@ function move(e) {
     // Which it is shows once the fingers have moved: apart or together zooms, both the
     // same way scrolls (or moves a zoomed picture).
     if (!['zoom', 'pan', 'scroll2'].includes(gesture.kind)) {
-      if (Math.abs(now.d - last.d0) > 24) gesture.kind = 'zoom';
-      else if (Math.hypot(now.cx - last.cx0, now.cy - last.cy0) > 16) gesture.kind = 'scroll2';
+      const spread = Math.abs(now.d - last.d0), travel = Math.hypot(now.cx - last.cx0, now.cy - last.cy0);
+      if (spread > 24 && spread > travel) gesture.kind = 'zoom';
+      else if (travel > 16) {
+        gesture.kind = 'scroll2';
+        // One axis for the whole scroll, the one it started along, as a Mac trackpad
+        // does: a slightly slanted two-finger drag used to scroll nothing in many apps
+        // (a tester's report, 2026-10-29).
+        gesture.axis = Math.abs(now.cx - last.cx0) > Math.abs(now.cy - last.cy0) ? 'x' : 'y';
+      }
     }
     if (gesture.kind === 'zoom' || gesture.kind === 'pan') {
       const z = view.z, nz = Math.min(5, Math.max(1, z * (gesture.kind === 'zoom' ? now.d / Math.max(1, last.d) : 1)));
@@ -485,7 +494,8 @@ function move(e) {
       clampView();
     } else if (gesture.kind === 'scroll2') {
       const at = mode.value === 'trackpad' ? cursor : toPicture(canvas.value, now.cx, now.cy);
-      link.send({ t: 'scroll', dx: -(now.cx - last.cx) * scale, dy: -(now.cy - last.cy) * scale, x: at.x, y: at.y });
+      const sx = gesture.axis === 'y' ? 0 : -(now.cx - last.cx) * scale, sy = gesture.axis === 'x' ? 0 : -(now.cy - last.cy) * scale;
+      link.send({ t: 'scroll', dx: sx, dy: sy, x: at.x, y: at.y });
     }
     gesture.pinch = { ...last, d: now.d, cx: now.cx, cy: now.cy };
     clearTimeout(longTimer);
@@ -497,9 +507,9 @@ function move(e) {
     clearTimeout(longTimer);
   } else if (mode.value !== 'trackpad' && gesture.moved > 10 && gesture.kind !== 'done') {
     // One finger dragged in direct mode scrolls, as on an iPhone.
-    if (gesture.kind === 'tap') gesture.kind = 'scroll';
+    if (gesture.kind === 'tap') { gesture.kind = 'scroll';gesture.axis = Math.abs(e.clientX - t.sx) > Math.abs(e.clientY - t.sy) ? 'x' : 'y'; }
     const at = toPicture(canvas.value, t.sx, t.sy);
-    link.send({ t: 'scroll', dx: -dx * scale, dy: -dy * scale, x: at.x, y: at.y });
+    link.send({ t: 'scroll', dx: gesture.axis === 'y' ? 0 : -dx * scale, dy: gesture.axis === 'x' ? 0 : -dy * scale, x: at.x, y: at.y });
     clearTimeout(longTimer);
   } else if (mode.value === 'trackpad' && gesture.moved > 3 && gesture.kind !== 'done') {
     gesture.kind = 'pad';

@@ -12,6 +12,7 @@ final class Input {
     private var keysDown: Set<CGKeyCode> = []
     private var lastClick: (time: TimeInterval, button: Int, point: CGPoint, count: Int64) = (0, -1, .zero, 0)
     private var flags: CGEventFlags = []
+    private var scrollRest = CGPoint.zero
 
     func point(_ x: Double, _ y: Double, in rect: CGRect) -> CGPoint {
         CGPoint(x: rect.minX + max(0, min(1, x)) * rect.width, y: rect.minY + max(0, min(1, y)) * rect.height)
@@ -44,8 +45,14 @@ final class Input {
 
     func scroll(dx: Double, dy: Double, at p: CGPoint) {
         move(to: p)
+        // Whole pixels go out; the fractions are kept for the next scroll, so a slow drag
+        // (many moves of under a pixel) still scrolls.
+        let x = max(-2000, min(2000, -dx + scrollRest.x)), y = max(-2000, min(2000, -dy + scrollRest.y))
+        let wx = Int32(x.rounded(.towardZero)), wy = Int32(y.rounded(.towardZero))
+        scrollRest = CGPoint(x: x - Double(wx), y: y - Double(wy))
+        guard wx != 0 || wy != 0 else { return }
         guard let e = CGEvent(scrollWheelEvent2Source: source, units: .pixel, wheelCount: 2,
-                              wheel1: Int32(max(-2000, min(2000, -dy))), wheel2: Int32(max(-2000, min(2000, -dx))), wheel3: 0) else { return }
+                              wheel1: wy, wheel2: wx, wheel3: 0) else { return }
         e.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
         post(e)
     }
@@ -80,7 +87,7 @@ final class Input {
     /// Whether the thing at this point takes typing: a text field, text area, search or
     /// combo box, in an app or a web page (Accessibility's own roles).
     func editable(at p: CGPoint) -> Bool {
-        let system = AXUIElementCreateSystemWide()
+        let system = Self.systemWide()
         var element: AXUIElement?
         guard AXUIElementCopyElementAtPosition(system, Float(p.x), Float(p.y), &element) == .success, var e = element else { return false }
         // The point often answers with the text inside a field (web pages): its parents too.
@@ -92,9 +99,16 @@ final class Input {
         }
         return false
     }
+    /// The system-wide element, asking the focused app for a second at most: a hung app
+    /// must not stall the viewer's session.
+    static func systemWide() -> AXUIElement {
+        let system = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(system, 1)
+        return system
+    }
     /// Whether what has the keyboard focus now takes typing.
     func focusEditable() -> Bool {
-        let system = AXUIElementCreateSystemWide()
+        let system = Self.systemWide()
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &value) == .success, let value else { return false }
         return Self.isEditable(value as! AXUIElement)
@@ -102,7 +116,7 @@ final class Input {
     /// Where the text cursor is now, on screen (global, top-left): the bounds of the
     /// selection in the focused field, or the field itself when it does not say.
     func caret() -> CGRect? {
-        let system = AXUIElementCreateSystemWide()
+        let system = Self.systemWide()
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &value) == .success, let value else { return nil }
         let field = value as! AXUIElement
