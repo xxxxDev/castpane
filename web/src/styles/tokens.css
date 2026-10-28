@@ -1,0 +1,134 @@
+/*
+ * Semantic design tokens.
+ *
+ * Default mode is light; html.dark switches to the dark values.
+ * Keep component CSS dependent on these semantic names rather than raw colours.
+ */
+:root {
+  color-scheme: light;
+
+  /* Brand and text */
+  --cc-color-accent: #000000;
+  --cc-color-accent-rgb: 0, 0, 0;
+  --cc-color-accent-shade: #000000;
+  --cc-color-accent-tint: #292929;
+  --cc-color-on-accent: #ffffff;
+  --cc-color-text: #111111;
+  --cc-color-text-secondary: rgba(17, 17, 17, 0.62);
+  --cc-color-text-tertiary: rgba(17, 17, 17, 0.42);
+  --cc-color-page: #f2f2f7;
+  --cc-color-bars: #f8f8fa;
+  --cc-color-panel: #ffffff;
+
+  /* Surfaces and material */
+  --cc-surface-card: rgba(255, 255, 255, 0.82);
+  --cc-surface-floating: rgba(246, 246, 248, 0.9);
+  --cc-surface-strong: rgba(255, 255, 255, 0.96);
+  --cc-surface-popup-handle: rgba(248, 248, 250, 0.92);
+  --cc-glass-ring: rgba(17, 17, 17, 0.14);
+  --cc-glass-ring-soft: rgba(17, 17, 17, 0.14);
+  --cc-state-selected: rgba(17, 17, 17, 0.1);
+  --cc-icon-ring: rgba(17, 17, 17, 0.18);
+  --cc-shadow-soft: rgba(60, 60, 67, 0.18);
+  --cc-shadow-navbar: rgba(60, 60, 67, 0.2);
+  --cc-shadow-strong: rgba(0, 0, 0, 0.18);
+  --cc-shadow-ring-inset: inset 0 0 2px 0 var(--cc-glass-ring);
+
+  /* Custom accent surfaces. Default accents keep the neutral semantic surfaces above. */
+  --cc-accent-list-alpha: 0.15;
+  --cc-accent-card-alpha: 0.08;
+  --cc-accent-pressed-alpha: 0.1;
+  --cc-accent-selected-alpha: 0.2;
+  --cc-accent-chip-active-alpha: 0.4;
+  --cc-accent-inactive-alpha: 0.55;
+
+  /* Aliases the skin (skin.css) uses. */
+  --cc-color-text-on-dark: var(--cc-color-text);
+  --cc-glass-fill-subtle: var(--cc-surface-card);
+  --cc-glass-dark-fill: var(--cc-surface-floating);
+
+  /* Blur recipes */
+  --cc-blur-lg: saturate(180%) blur(20px);
+  --cc-blur-md: blur(14px);
+  --cc-blur-sm: blur(5px);
+
+  /* Radius */
+  --cc-radius-card: 24px;
+  --cc-radius-control: 16px;
+  --cc-radius-pill: 100px;
+  --cc-radius-pill-alt: 1000px;
+
+  /* Size */
+  --cc-size-control-sm: 28px;
+  --cc-size-control-md: 44px;
+  --cc-size-icon-lg: 28px;
+  --cc-size-icon-md: 42px;
+  --cc-size-tabbar: 60px;
+  --cc-size-segment: 53px;
+
+  /* Spacing */
+  --cc-space-xs: 4px;
+  --cc-space-5: 5px;
+  --cc-space-sm: 8px;
+  --cc-space-10: 10px;
+  --cc-space-tabbar-inset: 14px;
+  --cc-space-md: 16px;
+  --cc-space-lg: 24px;
+  --cc-space-xl: 32px;
+
+  /* Layout and typography */
+  --cc-container-col: 860px;
+  --cc-font-label-sm: 12px;
+  --cc-font-body-sm: 14px;
+  --cc-font-body: 17px;
+  --cc-font-title: 22px;
+  --cc-font-display: 30px;
+  --cc-weight-medium: 500;
+  --cc-weight-semibold: 600;
+  --cc-weight-bold: 700;
+
+  /* Motion */
+  --cc-duration-fast: 160ms;
+  --cc-duration-base: 230ms;
+  --cc-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:root.dark {
+  /* Native scrollbars follow the dark OS/browser treatment. Light mode returns to the light
+   * scrollbar through :root above. */
+  color-scheme: dark;
+
+  --cc-color-accent: #ffffff;
+  --cc-color-accent-rgb: 255, 255, 255;
+  --cc-color-accent-shade: #ebebeb;
+  --cc-color-accent-tint: #ffffff;
+  --cc-color-on-accent: #000000;
+  --cc-color-text: #ffffff;
+  --cc-color-text-secondary: rgba(255, 255, 255, 0.6);
+  --cc-color-text-tertiary: rgba(255, 255, 255, 0.35);
+  --cc-color-page: #121212;
+  --cc-color-bars: #121212;
+  --cc-color-panel: #252525;
+
+  --cc-surface-card: rgba(255, 255, 255, 0.08);
+  --cc-surface-floating: rgba(30, 30, 30, 0.8);
+  --cc-surface-strong: rgba(22, 22, 22, 0.8);
+  --cc-surface-popup-handle: rgba(18, 18, 18, 0.8);
+  --cc-glass-ring: rgba(255, 255, 255, 0.4);
+  --cc-glass-ring-soft: rgba(255, 255, 255, 0.2);
+  --cc-state-selected: rgba(255, 255, 255, 0.14);
+  --cc-icon-ring: rgba(85, 85, 85, 0.4);
+  --cc-shadow-soft: rgba(100, 100, 111, 0.2);
+  --cc-shadow-navbar: rgba(100, 100, 111, 0.25);
+  --cc-shadow-strong: rgba(0, 0, 0, 0.2);
+
+  --cc-accent-list-alpha: 0.08;
+  --cc-accent-card-alpha: 0.08;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --cc-duration-fast: 0ms;
+    --cc-duration-base: 0ms;
+  }
+}

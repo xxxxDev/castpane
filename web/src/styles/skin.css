@@ -1,0 +1,780 @@
+/* The app's skin on top of Framework7 v9: screens are built from native f7-vue components and
+ * F7 variables; this file holds the iOS-PWA document lock, safe-area wiring, and the thin theme
+ * layer for what F7 variables cannot express.
+ */
+
+/* iOS standalone-PWA document lock (pin html/body; in-page .page-content still scrolls) */
+html,
+body {
+  overscroll-behavior: none;
+  height: 100%;
+  overflow: hidden;
+}
+body {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+/* Safe-area inset wiring (iOS PWA) */
+@supports (top: env(safe-area-inset-top)) {
+  .cc-app,
+  .cc-app .framework7-root {
+    --f7-safe-area-top: env(safe-area-inset-top);
+  }
+}
+
+/* ============================================================================================
+ * Thin theme, F7-vars-first.
+ * Everything that F7 already exposes as a variable goes here (scoped to .cc-app); only
+ * shapes/layouts F7 can't express get a scoped selector.
+ * ============================================================================================ */
+
+/* ---- White brand accent ----
+ * F7's default iOS blue is replaced by the accent (F7 v9 has no color-theme-white).
+ * F7's fill-button text defaults to #fff, so on a white accent we set the fill text dark to keep
+ * CTAs readable — a white pill with a black label. */
+.cc-app,
+.cc-app .framework7-root {
+  --f7-theme-color: var(--cc-color-accent);
+  --f7-theme-color-rgb: var(--cc-color-accent-rgb);
+  --f7-theme-color-shade: var(--cc-color-accent-shade);
+  --f7-theme-color-tint: var(--cc-color-accent-tint);
+  --f7-button-fill-text-color: var(--cc-color-on-accent);
+  --f7-list-bg-color: var(--cc-glass-fill-subtle); /* rgba(theme,.08), not F7 core #1c1c1d */
+  /* A conversation sits on the page colour in both themes. F7's white field in the
+   * light theme stops where the messages do, with the grey page showing around the
+   * composer and under a short conversation, and white chips vanish on it. A received
+   * bubble is the panel colour on that page: white here, #252525 (F7's own) in dark. */
+  --f7-messages-content-bg-color: transparent;
+  --f7-message-received-bg-color: var(--cc-color-panel);
+  --f7-list-item-min-height: var(--cc-size-control-md); /* compact iOS list metrics */
+  --f7-list-item-padding-vertical: var(--cc-space-sm);
+  --f7-block-title-text-color: var(--cc-color-text-on-dark);
+  --f7-block-title-font-size: 16px; /* F7 v9 default 17px */
+  --f7-card-bg-color: var(--cc-glass-fill-subtle);
+  --f7-list-item-footer-text-color: var(--cc-color-text-tertiary);
+  --f7-block-margin-vertical: 35px; /* F7 v9 defaults to less */
+  /* The dark page + bars are #121212: F7 v9's dark default leaves page-bg pure #000, which reads
+   * too black and over-contrasts the cards. */
+  --f7-page-bg-color: var(--cc-color-page);
+  --f7-bars-bg-color: var(--cc-color-bars);
+  /* Navbar geometry. */
+  --f7-navbar-large-title-height: 30px;
+  --f7-tabbar-labels-height: var(--cc-size-tabbar);
+  --f7-tabbar-label-font-size: var(--cc-font-label-sm);
+  /* Search radius: the search field rounds at 24px; F7 v9 defaults the inline searchbar to 44px.
+   * Only the BASE var sets BOTH the input-wrap and the input to 24px — the inline var moves the
+   * input alone and leaves the wrap at 44px. */
+  --f7-searchbar-input-border-radius: var(--cc-radius-card);
+  /* Search bg: F7 v9 defaults the searchbar input to its glass color (rgba(50,50,50,.5), a dark
+   * fill); here the input is transparent and the tint is drawn on the wrap. */
+  --f7-searchbar-input-bg-color: transparent; /* the pill is drawn on the wrap */
+  --f7-searchbar-placeholder-color: var(--cc-color-text-secondary);
+  /* Chip radius: chips round at 25px; F7 v9 defaults --f7-chip-border-radius to 28px. */
+  --f7-chip-border-radius: 25px;
+}
+
+/* A user/project custom accent is a full colour theme, not only a link/button colour: list, card,
+ * pressed, selected, chip, and inactive chrome are all derived from the theme RGB. The
+ * mode-default black/white accents intentionally keep the neutral semantic surfaces. */
+.cc-app.accent-custom,
+.cc-app.accent-custom .framework7-root {
+  --f7-list-bg-color: rgba(var(--cc-color-accent-rgb), var(--cc-accent-list-alpha));
+  --f7-card-bg-color: rgba(var(--cc-color-accent-rgb), var(--cc-accent-card-alpha));
+  --f7-list-link-pressed-bg-color: rgba(var(--cc-color-accent-rgb), var(--cc-accent-pressed-alpha));
+  --f7-list-group-title-bg-color: rgba(var(--cc-color-accent-rgb), 0.15);
+  --f7-tabbar-link-inactive-color: rgba(var(--cc-color-accent-rgb), var(--cc-accent-inactive-alpha));
+}
+
+.cc-app.accent-custom .chip:not(.chip-outline) {
+  background: rgba(var(--cc-color-accent-rgb), var(--cc-accent-chip-active-alpha));
+}
+.cc-app.accent-custom .chip.chip-outline {
+  background: rgba(var(--cc-color-accent-rgb), var(--cc-accent-list-alpha));
+}
+
+/* Search pill: the capsule is painted on the WRAP — white-8% fill + inset white-40% ring +
+ * blur(5px) backdrop — with a transparent input inside. */
+.cc-app .searchbar .searchbar-input-wrap {
+  background: var(--cc-glass-fill-subtle);
+  border-radius: var(--cc-radius-card);
+  box-shadow: var(--cc-shadow-ring-inset);
+  -webkit-backdrop-filter: var(--cc-blur-sm);
+  backdrop-filter: var(--cc-blur-sm);
+}
+.cc-app .searchbar .searchbar-input-wrap input[type="search"] {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding-left: 60px;  /* icon 28 at x16 + 16 gap -> text starts 60 from the field edge */
+  padding-right: var(--cc-space-md);
+}
+
+/* Search icon size: a 28px f7-icons magnifier; F7 v9 draws a 13px box with the glyph in
+ * `.searchbar-icon::after` (framework7-core-icons "search_ios", 20px). Scale the box + glyph to
+ * 28px. The override (0,3,1) beats F7's `.ios .searchbar-icon::after` (0,2,1). Icon size only;
+ * input padding / searchbar height / placeholder untouched. */
+.cc-app .searchbar .searchbar-icon {
+  width: var(--cc-size-icon-lg);
+  height: var(--cc-size-icon-lg);
+  font-size: var(--cc-size-icon-lg);
+  top: 8px; /* (44-28)/2 — a fixed value, so it does not stack with F7's own positioning/transform */
+  margin-top: 0;
+}
+.cc-app .searchbar .searchbar-icon::after {
+  content: 'search';
+  font-family: 'Framework7 Icons';
+  font-size: var(--cc-size-icon-lg);
+  line-height: var(--cc-size-icon-lg); /* overrides the line height F7 gives small icons, so the glyph centres in the 28px box */
+  display: block;
+}
+
+/* Chip size: chips are content-driven via font-size 18px, padding 8px 20px, font-weight 500, and
+ * an auto height; F7 v9's chip is a fixed 28px-tall pill at 14px/weight 400 with 0 10px padding.
+ * Text-driven sizing on the chip + its label. */
+.cc-app .chip {
+  height: auto;
+  padding: var(--cc-space-sm) 20px;
+  font-size: 18px;
+  font-weight: var(--cc-weight-medium);
+}
+.cc-app .chip .chip-label {
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: var(--cc-weight-medium);
+}
+/* Chip active/inactive treatment: the active chip is filled white-40% and the inactive white-8%,
+ * both borderless. F7 v9's active chip is solid #333 and the inactive (`:outline` -> .chip-outline)
+ * is transparent with a 1px border that pads the box. Scoped to .cc-app's chips, not the global
+ * --f7-chip-* vars. */
+.cc-app .chip:not(.chip-outline) {
+  background: var(--cc-glass-ring);
+}
+.cc-app .chip.chip-outline {
+  background: var(--cc-glass-fill-subtle);
+  border: none;
+}
+/* Chip inset glass highlight: every chip (active + inactive alike) gets a subtle inset white-40%
+ * edge highlight; F7 v9's chip has no shadow. Inset shadow doesn't affect layout, so
+ * size/bg/border/typography are untouched. */
+.cc-app .chip {
+  box-shadow: var(--cc-glass-ring) 2px 2px 2px -2px inset,
+              var(--cc-glass-ring) -2px -2px 2px -2px inset;
+}
+
+/* ---- Inset lists: per-item rounded cards ----
+ * F7's inset list renders one grouped card; here each row is its own rounded card with a gap.
+ * Non-inset lists are untouched. Scoped to .cc-app so it's not a bare global selector. */
+.cc-app .list.inset > ul {
+  background: transparent;
+}
+.cc-app .list.inset > ul > li {
+  background: var(--f7-list-bg-color);
+  border-radius: var(--cc-radius-card); /* 24px cards */
+  overflow: hidden;
+  margin-bottom: var(--cc-space-10);
+}
+.cc-app .list.inset > ul > li:last-child {
+  margin-bottom: 0;
+}
+
+/* ---- Grouped / per-item boundary ----
+ * The per-item card look above applies to every inset list, but a few lists stay GROUPED (one
+ * card with rows inside), such as the install-gate steps. `.cc-grouped` opts a list back into the
+ * grouped card. Higher specificity (.list.inset.cc-grouped) than the per-item
+ * rule so it wins; the rows go transparent inside the single card. */
+.cc-app .list.inset.cc-grouped > ul {
+  background: var(--f7-list-bg-color);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.cc-app .list.inset.cc-grouped > ul > li {
+  background: transparent;
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+/* ---- Media-list rows vertically center text against the icon ----
+ * F7 v9 media-list top-aligns the title/subtitle block, which leaves the text sitting high.
+ * Centering item-content centers multi-line rows. Single-line rows are unaffected. */
+.cc-app .list.inset .item-content {
+  align-items: center;
+}
+/* The real centering knob: v9 media-list stretches .item-inner to the full row height
+ * (align-self:stretch) so justify-content:space-between spreads title→footer top-to-bottom;
+ * align-self:center at natural height keeps the text block centered. */
+.cc-app .list.inset .item-inner {
+  align-self: center;
+}
+
+/* Desktop: the left panel is the navigation (see the floating tabbar section below). */
+@media (min-width: 1024px) {
+  .cc-app,
+  .cc-app .framework7-root {
+    --f7-panel-width: 260px;
+  }
+
+  /* Desktop centers tab content in a medium column inside the sidebar layout. Without this,
+   * v9 stretches page content across the whole remaining viewport, which makes list cards and
+   * header-to-content rhythm read too large. */
+  .cc-app .page-large-static > .page-content > :is(.block-title, .searchbar) {
+    /* 860 col minus 16px side margins. A desktop window only a
+     * little wider than the column keeps the 16px sides rather than touching its
+     * edges. */
+    max-width: min(828px, calc(100% - 32px));
+    box-sizing: border-box;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .cc-app .page-large-static > .page-content > :is(.block, .block-footer) {
+    max-width: var(--cc-container-col); /* .block carries its own 16px padding -> text 828 */
+    box-sizing: border-box;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .cc-app .page-large-static > .page-content > :is(.list.inset, .card) {
+    max-width: min(828px, calc(100% - 32px));
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Settings rows use the compact iOS list metrics (44px min-height, 8px vertical padding).
+ * F7 v9 defaults to 52px/12px, making every Settings item visibly taller. */
+.cc-app .cc-settings-list {
+  --f7-list-item-min-height: var(--cc-size-control-md);
+  --f7-list-item-padding-vertical: var(--cc-space-sm);
+}
+.cc-app .cc-settings-list > ul > li {
+  margin-left: var(--cc-space-5);
+  margin-right: var(--cc-space-5);
+}
+
+/* ============================================================================================
+ * Structural layer — containers and menus pure F7 v9 does not provide.
+ * ============================================================================================ */
+
+/* Spacing the tabbar fade keys off (below). */
+.cc-app,
+.cc-app .framework7-root {
+  --f7-typography-margin: var(--cc-space-md);
+}
+
+/* Page content sits in a centered medium column (860px) on desktop; inert on mobile. */
+.cc-app .page-col-medium {
+  max-width: var(--cc-container-col);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---- Desktop left panel: menu-list look ----
+ * Panel surface #252525 (the page inside goes transparent so it doesn't paint over), selected
+ * item = white-20% pill (radius 15, 8px side margins), 28px white icons, 14px/500 titles,
+ * compact 36px rows, no chevron/hairline. */
+.cc-app .panel-left {
+  background: var(--cc-color-panel);
+}
+.cc-app .panel-left .page,
+.cc-app .panel-left .page-content {
+  background: transparent;
+}
+.cc-app .panel-left .menu-list ul {
+  background: transparent;
+}
+.cc-app .panel-left .menu-list .item-link {
+  border-radius: 15px;
+  margin-left: var(--cc-space-sm);
+  margin-right: var(--cc-space-sm);
+}
+.cc-app .panel-left .menu-list .item-link.item-selected {
+  /* Selected fill: white 14%, a little darker than the 20% above. */
+  background-color: var(--cc-state-selected);
+}
+.cc-app .panel-left .menu-list .item-content {
+  min-height: 36px;
+  padding-left: var(--cc-space-sm);
+}
+.cc-app .panel-left .menu-list .item-inner {
+  padding-top: var(--cc-space-sm);
+  padding-bottom: var(--cc-space-sm);
+  padding-right: var(--cc-space-sm);
+}
+.cc-app .panel-left .menu-list .item-inner::after {
+  display: none;
+}
+.cc-app .panel-left .menu-list .item-title {
+  font-size: var(--cc-font-body-sm);
+  font-weight: var(--cc-weight-medium);
+  color: var(--cc-color-text-on-dark);
+}
+.cc-app .panel-left .menu-list .icon {
+  font-size: var(--cc-size-icon-lg);
+  width: var(--cc-size-icon-lg);
+  height: var(--cc-size-icon-lg);
+  color: var(--cc-color-text-on-dark);
+}
+
+/* The panel's inner page reserves no navbar space. */
+.cc-app .panel .page-content {
+  padding-top: 0;
+}
+
+/* ---- Button metrics ----
+ * Compact iOS button metrics (height 28/fs 14/weight 600, large 44) where F7 v9 defaults to
+ * 34/15/500, large 48, plus border-radius 16 and padding-horizontal 16. .button-round still
+ * yields stadium pills (radius = height), and the tabbar segments set their own height/radius,
+ * so both are unaffected. */
+.cc-app,
+.cc-app .framework7-root {
+  --f7-button-height: 28px;
+  --f7-button-font-size: var(--cc-font-body-sm);
+  --f7-button-font-weight: var(--cc-weight-semibold);
+  --f7-button-border-radius: var(--cc-radius-control);
+  --f7-button-padding-horizontal: var(--cc-space-md);
+  --f7-button-large-height: var(--cc-size-control-md);
+  --f7-button-large-font-size: 17px;
+  --f7-button-large-font-weight: var(--cc-weight-medium);
+}
+
+/* Button icons render at the button font-size (17px; F7 v9 bumps icons to 18). */
+.cc-app .button i.icon {
+  font-size: 17px;
+}
+
+/* Section headers on tab pages (such as Settings) are indented 16px inside the margin — glyphs
+ * at 32. Scoped to the tab pages only. */
+.cc-app .page-large-static .block-title {
+  padding-left: var(--cc-space-md);
+}
+
+/* Install gate title at 30px (F7 v9 block-title-large = 22px), which also sets the header line
+ * box every element below keys off. */
+.cc-app .block-title-large {
+  font-size: 30px;
+}
+
+/* The search magnifier is white; F7 v9's default is grey. */
+.cc-app .searchbar .searchbar-icon,
+.cc-app .searchbar .searchbar-icon::after {
+  color: var(--cc-color-text-on-dark);
+}
+/* Menu-list vertical rhythm: rows padded 4, first/last get the full 8. */
+.cc-app .panel-left .menu-list li {
+  padding-top: var(--cc-space-xs);
+  padding-bottom: var(--cc-space-xs);
+}
+.cc-app .panel-left .menu-list li:first-child {
+  padding-top: var(--cc-space-sm);
+}
+.cc-app .panel-left .menu-list li:last-child {
+  padding-bottom: var(--cc-space-sm);
+}
+/* ---- Source dropdown ----
+ * Teleported to <body>, i.e. OUTSIDE .cc-app — these rules are intentionally unscoped.
+ * Click-anchored absolute panel, 24px radius, dialog-dark 80% + saturate/blur(6px)
+ * glass, inset white ring, 0.23s scale-in from the trigger origin. */
+.dropdown-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0);
+  z-index: 99999;
+}
+.dropdown-content {
+  position: absolute;
+  animation: modalInAnimation var(--cc-duration-base) ease-out forwards;
+  border-radius: var(--cc-radius-card);
+  overflow: hidden;
+  min-width: 240px;
+  background-color: var(--cc-glass-dark-fill);
+  -webkit-backdrop-filter: saturate(180%) blur(6px);
+  backdrop-filter: saturate(180%) blur(6px);
+  box-shadow: inset 0 0 2px var(--cc-glass-ring-soft), 0 15px 45px var(--cc-shadow-strong);
+}
+.dropdown-content.modal-out {
+  animation: modalOutAnimation var(--cc-duration-base) ease-out forwards;
+}
+@keyframes modalInAnimation {
+  0% { transform: scale(0); opacity: 0; }
+  70% { transform: scale(1.05); opacity: 1; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes modalOutAnimation {
+  0% { transform: scale(1); opacity: 1; }
+  to { transform: scale(0); opacity: 0; }
+}
+.dropdown-content .list ul {
+  background: transparent;
+  margin: var(--cc-space-md);
+}
+.search-apps-ui__sources-list__source-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  background: #c8c7cc;
+  border-radius: 24%;
+}
+/* A ring drawn outside the icon, so the selected source's name lines up with the rest. */
+.search-apps-ui__sources-list__source-icon.source-selected {
+  box-shadow: 0 0 0 2px var(--cc-color-page, #121212), 0 0 0 3px var(--cc-color-accent);
+}
+/* Claude Native's black logo gets a faint edge on the dark page, drawn by CSS so it
+   follows each place's rounding: a circle beside the search, squares elsewhere. */
+img[src$="/sources/anthropic-native.svg"] {
+  outline: 1px solid rgba(255, 255, 255, .3);
+  outline-offset: -1px;
+}
+.dropdown-content .list .item-title {
+  color: var(--cc-color-text-on-dark);
+}
+
+/* Large title glyphs: F7 v9 draws them about 4px high. */
+.cc-app .title-large-text {
+  position: relative;
+  top: 2px; /* padding is cancelled by the zone's bottom anchoring; offset the rendering directly */
+}
+.dropdown-content .list {
+  --f7-list-item-min-height: var(--cc-size-control-md); /* 44px rows */
+  --f7-list-item-padding-vertical: var(--cc-space-sm);
+}
+.dropdown-content .list .item-content {
+  padding: 0 0 0 var(--cc-space-sm); /* content pad-left 8 */
+  min-height: var(--cc-size-control-md);
+}
+.dropdown-content .list .item-inner {
+  padding-top: 0;
+  padding-bottom: 0;
+  min-height: var(--cc-size-control-md);
+}
+
+/* ---- Floating glass tabbar ----
+ * The bottom bar floats as a glass pill (an F7 segmented-strong) inset from the edges, over a
+ * blurred, page-coloured fade. The active tab gets a subtle highlight pill that F7 slides between
+ * segments. Desktop (>=1024px) uses the left panel instead, so neither the bar nor its fade is
+ * painted there, and content reserves no room for it.
+ */
+
+.cc-app .toolbar-layout-wrapper {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: calc(100px + var(--f7-safe-area-bottom, 0px) * 1.5);
+  z-index: 5001;
+  /* The transparent fade must not intercept page touches. */
+  pointer-events: none;
+}
+
+.cc-app .toolbar-views__toolbar-sticky__bg {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transition-property: transform;
+  -webkit-mask: linear-gradient(
+    transparent calc(var(--f7-safe-area-bottom, 0px) + var(--f7-typography-margin)),
+    black,
+    black
+  );
+  mask: linear-gradient(
+    transparent calc(var(--f7-safe-area-bottom, 0px) + var(--f7-typography-margin)),
+    black,
+    black
+  );
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  background: transparent;
+}
+
+.cc-app .toolbar-views__toolbar-sticky__gradient-bg {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transition-property: transform;
+  background: linear-gradient(
+    transparent calc(var(--f7-safe-area-bottom, 0px) + var(--f7-typography-margin)),
+    var(--f7-page-bg-color)
+  );
+}
+
+.cc-app .toolbar-views-ui__segmented-toolbar {
+  --f7-segmented-strong-padding: 4px;
+  --f7-segmented-strong-between-buttons: 2px;
+  --f7-button-border-radius: 100px;
+  --f7-button-font-size: var(--f7-tabbar-label-font-size) !important;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(14px + var(--f7-safe-area-bottom, 0px) * 0.6);
+  z-index: 5002;
+  margin: 0 14px;
+  width: auto;
+  height: 60px;
+  border-radius: 100px;
+  background-color: var(--cc-glass-dark-fill);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  box-shadow:
+    var(--cc-glass-ring) 2px 2px 2px -2px inset,
+    var(--cc-glass-ring) -2px -2px 2px -2px inset,
+    var(--cc-glass-ring) 0 0 1px 0 inset,
+    var(--cc-shadow-soft) 0 7px 29px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  /* Restore interaction only on the painted tab pill. */
+  pointer-events: auto;
+}
+
+.cc-app .toolbar-views-ui__segmented-toolbar .button {
+  --f7-button-height: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  height: 53px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border: none;
+  border-radius: 100px;
+  background: transparent;
+  color: var(--cc-color-text-secondary);
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.cc-app .toolbar-views-ui__segmented-toolbar .button.tab-link-active {
+  color: var(--cc-color-text-on-dark);
+  font-weight: 600;
+}
+
+.cc-app .toolbar-views-ui__segmented-toolbar .button i.icon {
+  font-size: 28px;
+}
+
+.cc-app .toolbar-views-ui__segmented-toolbar .button .tabbar-label {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.cc-app .toolbar-views-ui__segmented-toolbar .segmented-highlight {
+  background: var(--cc-state-selected);
+  border-radius: 100px;
+  height: 53px;
+  box-shadow: none;
+}
+
+@media (min-width: 1024px) {
+  .cc-app .toolbar-layout-wrapper {
+    display: none;
+  }
+}
+
+/* Page content clears the floating bar (F7 only reserves the bar's own height). */
+.cc-app .page-content {
+  padding-bottom: calc(
+    var(--f7-tabbar-labels-height, 56px) + 28px + var(--f7-safe-area-bottom, 0px)
+  );
+}
+
+@media (min-width: 1024px) {
+  .cc-app .page-content {
+    padding-bottom: var(--f7-safe-area-bottom, 0px);
+  }
+}
+
+/* ---- Navbar glass ----
+ * Pages decide only the left/title/right slot content; the transparent expanded background,
+ * top-row geometry, and the glass link capsules live here. F7 v9.1 also paints a glass capsule
+ * on the .left/.right containers, under the link's own; that one is stripped so the glass is
+ * drawn once, on the link.
+ */
+.cc-app .navbar-large:not(.navbar-large-collapsed) .navbar-bg {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.cc-app .navbar .navbar-bg {
+  background-color: var(--f7-page-bg-color);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+.cc-app .navbar .navbar-bg::after {
+  display: none;
+}
+
+.cc-app .navbar-inner > .left,
+.cc-app .navbar-inner > .right {
+  transform: translateY(-9px);
+}
+
+.cc-app .navbar-inner > .left,
+.cc-app .navbar-inner > .right {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.cc-app .navbar a.link {
+  background-color: var(--f7-list-bg-color);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  box-shadow:
+    var(--cc-glass-ring) 2px 2px 2px -2px inset,
+    var(--cc-glass-ring) -2px -2px 2px -2px inset,
+    var(--cc-glass-ring) 0 0 1px 0 inset,
+    var(--cc-shadow-navbar) 0 0 29px;
+  border-radius: 1000px;
+  padding: 0 16px;
+  min-width: 48px;
+  height: 44px;
+}
+
+/* On an iOS Home Screen app the page starts right under the status bar, and the wide
+   glow above these buttons was cut off in a straight line there. iOS's own buttons carry no such glow: here they keep only the ring. */
+@media (display-mode: standalone) {
+  @supports (-webkit-touch-callout: none) {
+    .cc-app .navbar a.link {
+      box-shadow:
+        var(--cc-glass-ring) 2px 2px 2px -2px inset,
+        var(--cc-glass-ring) -2px -2px 2px -2px inset,
+        var(--cc-glass-ring) 0 0 1px 0 inset;
+    }
+  }
+}
+
+.cc-app .navbar a.link.icon-only {
+  width: 44px;
+  min-width: 44px;
+  padding: 0; /* a 44x44 circle */
+}
+
+/* The attachment dialog titles a file name, which may be one long unbroken word. */
+.dialog.attachment-dialog .dialog-title {overflow-wrap:anywhere;}
+/* The wrap-up check's words: several lines, so a wider dialog and a
+   field tall enough to read them in. */
+.dialog.wrap-up-dialog {--f7-dialog-width:min(560px,calc(100vw - 32px));}
+.dialog.wrap-up-dialog textarea.dialog-input {width:100%;box-sizing:border-box;height:min(300px,40vh);padding:8px 10px;line-height:1.5;resize:none;text-align:left;}
+
+/* While the divider between the conversation and its terminal is dragged, nothing
+   is selected and the pointer stays a column-resize one. */
+body.col-resizing, body.col-resizing * {-webkit-user-select:none;user-select:none;cursor:col-resize !important;}
+
+/* Every dialog shows plain text (js/safeDialog.js escapes it), so a line break in
+   that text is kept rather than run into one line. */
+.dialog-text {
+  white-space: pre-line;
+}
+
+/* Scrollbars only while their area scrolls, on a computer (js/scrollbars.js): a mouse
+ * or trackpad showed every bar all the time, where a phone shows one only while it
+ * moves. Colours only: the width, and so the
+ * layout, stay as they were. A touch screen keeps its own overlay bars. */
+@media (hover: hover) and (pointer: fine) {
+  * { scrollbar-color: transparent transparent; }
+  [data-scrolling] { scrollbar-color: color-mix(in srgb, currentColor 38%, transparent) transparent; }
+}
+
+/* A toast at the bottom stays on the visible screen when an installed app's page is
+   taller than it (src/js/tabbarViewport.js sets the shortfall). */
+html .ios .toast.toast-bottom {bottom:var(--viewport-overflow,0px);}
+
+/* The ant glyph is tall and narrow, so at the size of its neighbours it reads larger
+ * than they do: drawn a little smaller wherever it is used. */
+.cc-app .f7-icons.ant-icon,
+.cc-app .ant-icon > .f7-icons {
+  transform: scale(0.82);
+}
+
+/* A phone held sideways (short, and not wide enough for the computer's layout): a rail
+   of icons on the right (App.vue .landscape-rail) instead of the bottom bar, which is
+   only hidden, never rearranged, so it works as before once upright; the pages sit
+   between the notch insets and the rail. */
+.cc-app .landscape-rail { display: none; }
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 1023px) {
+  .cc-app .toolbar-layout-wrapper {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .cc-app .toolbar-layout-wrapper * { pointer-events: none !important; }
+  .cc-app .landscape-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: absolute;
+    top: 50%;
+    right: calc(8px + var(--f7-safe-area-right, 0px));
+    transform: translateY(-50%);
+    z-index: 5002;
+    width: 60px;
+    padding: 4px 0;
+    align-items: center;
+    border-radius: 30px;
+    background-color: var(--dp-glass-dark-fill);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    box-shadow:
+      var(--dp-glass-ring) 2px 2px 2px -2px inset,
+      var(--dp-glass-ring) -2px -2px 2px -2px inset,
+      var(--dp-glass-ring) 0 0 1px 0 inset,
+      var(--dp-shadow-soft) 0 7px 29px;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .cc-app .landscape-rail-tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 46px;
+    border-radius: 23px;
+    color: var(--dp-color-text-secondary);
+  }
+  .cc-app .landscape-rail-tab.active {
+    background: var(--dp-state-selected);
+    color: var(--dp-color-text-on-dark);
+  }
+  .cc-app .landscape-rail-tab i.icon { font-size: 24px; }
+  .cc-app .rail-unread { position: absolute; top: 3px; right: 3px; min-width: 16px; height: 16px; font-size: 10px; padding: 0 4px; }
+  /* Clear of the notch on both sides (it is on the left or the right, as the phone is
+     turned): the pages sit between the left inset and the rail, and inside them nothing
+     adds the insets again (the app's own cards would otherwise run under the notch). */
+  .cc-app .views:has(> .landscape-rail:not([style*="display: none"])) {
+    --cc-inset-left: var(--f7-safe-area-left, 0px);
+    --cc-inset-right: var(--f7-safe-area-right, 0px);
+  }
+  .cc-app .views:has(> .landscape-rail:not([style*="display: none"])) > .view {
+    left: var(--cc-inset-left);
+    width: calc(100% - 76px - var(--cc-inset-left) - var(--cc-inset-right)) !important;
+    right: auto;
+    --f7-safe-area-left: 0px;
+    --f7-safe-area-right: 0px;
+    --f7-safe-area-outer-left: 0px;
+    --f7-safe-area-outer-right: 0px;
+  }
+  .cc-app .page-content {
+    padding-bottom: calc(16px + var(--f7-safe-area-bottom, 0px));
+  }
+}

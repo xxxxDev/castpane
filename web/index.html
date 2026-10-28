@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html data-default-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#121212" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="msapplication-tap-highlight" content="no" />
+    <title>Castpane</title>
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- iOS 26: black-translucent with viewport-fit=cover puts a Liquid Glass blur over the
+         top that no CSS can cover, so the status bar stays default (confirmed on an
+         iPhone). Do not change it back. The floating tabbar is kept on screen by
+         src/js/tabbarViewport.js. After changing this line, confirm the new version in Safari
+         before re-adding the home-screen icon (the service worker can serve the old page). -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Castpane" />
+    <link rel="apple-touch-icon" href="/castpane-app-1024.png" />
+    <link rel="icon" type="image/png" href="/castpane-64.png">
+
+    <!-- Styling loads from main.js (framework7/css/bundle + framework7-icons + scoped skin.css). -->
+
+    <!-- Boot background + splash: before Vue mounts there is no CSS, so the
+         document paints browser-default WHITE — very visible on iOS PWA cold boots / resumes.
+         Set the dark app background on html/body/#app and show a spinner so the boot gap reads
+         as the app loading, not a broken white screen. Vue replaces #app's contents on mount. -->
+    <style>
+      /* A device that chose light gets the light page and spinner from the first paint
+         (the script below sets the class before anything paints). Once the styles are in, the theme's own variable. */
+      html.light { --cc-color-page: #f2f2f7; }
+      html, body { margin: 0; height: 100%; background-color: var(--cc-color-page, #121212); }
+      /* 100%, not 100vh: in the installed app with the default status bar, 100vh is the
+         whole screen, taller than the page, and the extra height pushed the tab bar and
+         toasts off screen and let iOS scroll the page when the keyboard opened. */
+      #app { min-height: 100%; background-color: var(--cc-color-page, #121212); }
+      .app-boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--cc-color-page, #121212); }
+      .app-boot__spinner { width: 28px; height: 28px; border-radius: 50%;
+        border: 3px solid rgba(255, 255, 255, 0.22); border-top-color: rgba(255, 255, 255, 0.9);
+        animation: app-boot-spin 0.8s linear infinite; }
+      html.light .app-boot__spinner { border-color: rgba(0, 0, 0, 0.16); border-top-color: rgba(0, 0, 0, 0.7); }
+      @keyframes app-boot-spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div id="app" class="cc-app">
+      <div class="app-boot"><div class="app-boot__spinner"></div></div>
+    </div>
+    <script>
+      (() => {
+        let theme = document.documentElement.dataset.defaultTheme === 'light' ? 'light' : 'dark';
+        try {
+          const saved = localStorage.getItem('castpane-theme');
+          if (saved === 'light' || saved === 'dark') theme = saved;
+        } catch (error) {
+          /* Storage is optional; dark remains the compatibility default. */
+        }
+        document.documentElement.classList.add('ios', theme);
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

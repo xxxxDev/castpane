@@ -1,0 +1,149 @@
+# Development
+
+## Layout
+
+| Path                                                         | What                                                                                                                                                  |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/`                                                    | The web service (Node ≥ 22.18, CommonJS, Express). Its own `package.json` and lockfile, so Castpane.app can bundle it with only its runtime packages. |
+| `server/start.js`                                            | The entry point Castpane.app runs. Sets up `$CASTPANE_HOME/data`, then starts the service.                                                            |
+| `server/app.js`                                              | The Express app: Host, Origin and CSRF guards, the API, the PWA.                                                                                      |
+| `server/remote.js`                                           | The `/remote` relay to the capture core, and the remote pass.                                                                                         |
+| `server/localApi.js`                                         | `/api/local/*`, the app's channel.                                                                                                                    |
+| `server/siteConfig.js`                                       | The `CASTPANE_*` settings and every Host and Origin rule, in one place.                                                                               |
+| `server/controllers`, `routes`, `services`, `middlewares`    | Sign-in, passkeys, two-step, QR sign-in, users and their lifecycle, devices and sessions, push, the sign-in defence, the audit log.                   |
+| `web/`                                                       | The PWA: Vue 3 and Framework7, built by Vite into `web/dist`.                                                                                         |
+| `web/src/pages/RemotePage.vue`, `web/src/js/remoteStream.js` | The Remote page: WebCodecs decoding, touch modes, keyboard, zoom.                                                                                     |
+| `mac/`                                                       | Castpane.app (see [mac/README.md](../mac/README.md)).                                                                                                 |
+| `tools/`                                                     | The screenshot and diagram scripts, the icon renderer.                                                                                                |
+
+`server/` and `web/` grew from an MIT-licensed shared PWA base. Everything that base had for
+AI agents (chats, groups, schedules, terminals, attachments, checklists, the peer link,
+command agents, usage meters) is left out; `server/productAccountHooks.js` and
+`server/pushEvents.js` are where a product plugs into the account and push code.
+
+## Setup
+
+```sh
+npm run setup      # npm ci at the root (web, tools) and in server/
+```
+
+`.npmrc` holds `min-release-age=14` and `save-exact=true`: new dependency versions are taken
+only once they are two weeks old, and pinned.
+
+## Running from source
+
+The server needs a folder of its own. Keep it out of `~/Library/Application Support/Castpane`
+while developing:
+
+```sh
+npm run build
+CASTPANE_HOME=$PWD/.castpane CASTPANE_PORT=47910 npm run server
+```
+
+`.castpane/` is ignored by git. The server prints its address and makes `.castpane/local.token`.
+Make the first admin through the local API:
+
+```sh
+curl -s -X POST http://127.0.0.1:47910/api/local/setup \
+  -H "Authorization: Bearer $(cat .castpane/local.token)" -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"choose a long one"}'
+```
+
+then open `http://127.0.0.1:47910`. Remote needs a capture core on `.castpane/host.sock`: run
+Castpane.app with `CASTPANE_HOME` pointing there, or a fake one that speaks the protocol in
+[protocol.md](protocol.md).
+
+For the web app with hot reload, run the server on its default port (47900) with the
+development ports turned on, and `npm run dev`:
+
+```sh
+NODE_ENV=development CASTPANE_DEV=1 CASTPANE_HOME=$PWD/.castpane npm run server
+npm run dev
+```
+
+Vite serves the page on `127.0.0.1:47902` and passes `/api`, `/live` and `/remote` on to the
+server. Without both settings the server trusts no page on 47901 or 47902 (docs/security.md);
+the app never sets them. Passkeys cannot be added there: only the public HTTPS address may add
+one.
+
+`CASTPANE_PUBLIC_ORIGIN` sets the public address; leave it empty for this Mac only.
+
+## Checking a change
+
+```sh
+npm run lint           # oxlint
+```
+
+The project's test suites are maintained separately and are not part of this repository. In a
+pull request, describe how you checked the change: what you ran, on which Mac and macOS, and
+what you saw. Never capture a screen or post input you have not meant to, and keep checks away
+from a Castpane you use.
+
+## Screenshots, the diagram and the icons
+
+```sh
+npm run shots          # docs/assets/shot-phone-*.png and shot-desktop-*.png, from fixtures
+npm run diagram        # docs/assets/architecture-{dark,light}.png
+node tools/icons.mjs   # web/public/castpane-*.png and mac/Resources (app and menu bar icons), from the SVGs
+```
+
+The web app's screenshots are fixtures only: the "Mac screen" in them is drawn by
+`tools/shots.mjs`. The Mac app's (`docs/assets/shot-mac-*.png`) are the setup assistant's
+Connection step and Settings › Activity, taken from a debug build's snapshots (see Packaging),
+which use a made-up address and sample entries: copy `dark-wizard-2.png`,
+`light-wizard-2.png`, `dark-settings-activity.png` and `light-settings-activity.png` to
+`shot-mac-setup-{dark,light}.png` and `shot-mac-activity-{dark,light}.png`.
+
+## Builds for checking
+
+`npm run build` writes `web/dist`, which a running server serves. To check that a change builds
+without touching it, build into a scratch folder:
+
+```sh
+npx vite build --config web/vite.config.js --outDir /tmp/castpane-check
+```
+
+The build id (`web/buildId.js`) is `git describe` of the last commit that touched `web/` or
+what it reads; the running app compares it with `/version.json` to offer an update.
+
+## Packaging
+
+`mac/build-app.sh` copies `server/` (with its `node_modules`, without tests) to
+`Contents/Resources/server` and `web/dist` to `Contents/Resources/web`. Run `npm run setup`
+and `npm run build` first.
+
+The app's windows can be checked without opening the real app. A debug build draws the setup
+assistant and Settings to PNG files and quits, without starting the server, the capture core
+or a tunnel (the pictures show the layout, not the glass, which the window server adds):
+
+```sh
+cd mac && swift build && CASTPANE_SNAPSHOT=/tmp/castpane-shots "$(swift build --show-bin-path)/Castpane"
+```
+
+## Releasing
+
+1. Set the version in `package.json` and in `mac/build-app.sh` (`version=`).
+2. Build and pack it on a Mac with Apple silicon, from a clean checkout:
+
+   ```sh
+   npm run setup && npm run lint
+   npm run build && mac/build-app.sh && mac/make-dmg.sh
+   ```
+
+3. Open the image on a Mac, install from it and go through the setup assistant once.
+4. Tag the commit `v<version>` and make a GitHub release from the tag. Attach
+   `mac/build/Castpane-<version>-arm64.dmg`, and put the SHA-256 that `make-dmg.sh` prints,
+   and the install steps from docs/setup.md ("From a release"), in the notes.
+
+The image is not signed with a Developer ID or notarized, so the first launch on another Mac
+needs **Open Anyway**, and each new version asks for the permissions again.
+
+## Conventions
+
+- Comments say why, in plain English. The Remote page's comments record what was found on a
+  real iPhone; keep them when you change the code they explain.
+- One place for each rule: Host and Origin in `server/siteConfig.js`, product names and
+  storage keys in `server/siteConfig.js` (`PRODUCT`), `web/src/js/productConfig.js` and
+  `web/public/push-config.js`.
+- The page's words are written in Traditional Chinese where they are used (`ct('…')`) with
+  their English in `web/src/js/text.js`, or as keys in `web/src/js/i18n.js`.

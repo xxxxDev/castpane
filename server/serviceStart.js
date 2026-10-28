@@ -1,0 +1,65 @@
+// Generic service start. The launcher (server/start.js) sets the environment and data
+// up, then calls migrateSessions() and startService(). What runs beside the web
+// service (the remote relay) it starts in `product(server)`.
+const path = require('node:path');
+
+// Logins are stored as token hashes; any row still holding a raw
+// token is converted, and the push subscriptions bound to it re-pointed, before
+// serving. A push key that cannot be read stops the rewrite part-way (it goes row by
+// row). The site still comes up: rows left holding a raw token have no hash and so
+// sign nobody in until a later start gets through, which is better than a service
+// that restarts for ever.
+async function migrateSessions({ sessionsDB, subscriptionsDB }) {
+  let migrated = { sessions: 0, subscriptions: 0 };
+  try {
+    migrated = await require('./services/sessionTokens').migrateRawSessionTokens({ sessionsDB, subscriptionsDB });
+  } catch (error) {
+    console.error('sessions: old rows were not rewritten:', error.message);
+    return { ...migrated, failed: true };
+  }
+  if (migrated.sessions) console.log(`sessions: now stored as hashes (${migrated.sessions} login(s), ${migrated.subscriptions} push subscription(s) re-pointed)`);
+  return migrated;
+}
+
+// app: the Express app. port: servicePort() of siteConfig.js. host: where it listens,
+// this Mac's loopback (siteConfig.bindHost); a tunnel or a proxy brings the public
+// address here.
+// onListening(server): what is said once it listens.
+// product(server): starts what the product runs beside it and returns
+//   { stop(): ms to give it before the process ends (0: none), finish() }, or nothing.
+// live: options for installLiveUpdates.
+// exit: process.exit (a test passes its own). Returns { server, stop }.
+const STOP_GRACE_MS = 3000;
+
+function startService({ app, port, host = '127.0.0.1', live: liveOptions = {}, onListening = () => {}, product = () => null, exit = (code) => process.exit(code), signals = ['SIGINT', 'SIGTERM'] }) {
+  const server = app.listen(port, host, () => onListening(server));
+  server.on('error', (error) => { console.error(error.message); exit(1); });
+  // The audit logs beside this instance's own (services/audit.js) are moved to
+  // archive/ once their first line is a week old, and kept a year: at start, then
+  // daily. A move is a rename, so even a large first one takes no time.
+  const stopLogRotation = require('./services/logRotation').startLogRotation({ logsDir: path.dirname(require('./services/audit').AUDIT_LOG) });
+  const own = product(server) || {};
+  // Which build is served and who is there, to open pages (liveUpdates.js).
+  const live = require('./liveUpdates').installLiveUpdates(server, liveOptions);
+  let stopping = false;
+  function stop() {
+    if (stopping) return;
+    stopping = true;
+    stopLogRotation();
+    let wait = 0;
+    try { wait = Number(own.stop?.()) || 0; } catch (error) { console.error('stopping:', error.message); }
+    live.close();
+    let left = false;
+    const leave = () => { if (left) return; left = true; try { own.finish?.(); } catch {} exit(0); };
+    // What the product asked time for has it, twice over at most if the server
+    // does not close. Whatever it asked, a request or a socket that hangs on gets
+    // STOP_GRACE_MS, then is cut, so the process ends here and not by the app's
+    // SIGKILL, which would lose what finish() still writes (a hung request kept an old stop() running past ten seconds).
+    setTimeout(() => { try { server.closeAllConnections?.(); } catch {} leave(); }, Math.max(wait * 2, STOP_GRACE_MS)).unref?.();
+    server.close(() => (wait ? setTimeout(leave, wait) : leave()));
+  }
+  for (const signal of signals) process.on(signal, stop);
+  return { server, stop };
+}
+
+module.exports = { migrateSessions, startService };

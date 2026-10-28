@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Castpane Reset</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #121212;
+        color: #fff;
+        font: 16px -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        text-align: center;
+      }
+      main {
+        width: min(320px, calc(100vw - 48px));
+      }
+      .status {
+        color: rgba(255, 255, 255, 0.65);
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Castpane</h1>
+      <div class="status" id="status">Clearing app cache...</div>
+    </main>
+    <script>
+      async function reset() {
+        try {
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((reg) => reg.unregister()));
+          }
+          if (window.caches && caches.keys) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((key) => caches.delete(key)));
+          }
+          document.getElementById('status').textContent = 'Done. Opening latest app...';
+        } catch (err) {
+          document.getElementById('status').textContent = 'Cache reset failed; opening app anyway...';
+        }
+        setTimeout(() => {
+          window.location.replace('/?cache_reset=' + Date.now());
+        }, 500);
+      }
+      reset();
+    </script>
+  </body>
+</html>

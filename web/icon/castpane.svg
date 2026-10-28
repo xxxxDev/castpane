@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Castpane's mark: a desktop screen with a blue pointer cutting in from its corner.
+       Rendered to PNG by tools/icons.mjs; the same drawing is in castpane-mark.svg and mac/AppIcon.svg. -->
+  <rect width="1024" height="1024" fill="#232830"/>
+  <g transform="translate(184.32 239.86) scale(1.5868) translate(-90 -157)">
+    <path d="M372 440 L125 440 L90 405 L90 195 L128 157 L470 157 L503 190 L503 400 L490 412 L472 395 L472 233 L435 195 L123 195 L123 365 L162 405 L357 405 Z" fill="#ffffff"/>
+    <path d="M265 438 H325 V470 H388 L418 500 H175 L205 470 H265 Z" fill="#ffffff"/>
+    <path d="M320 293 L445 362 L413 362 L483 425 L470 438 L390 438 Z" fill="#0866ff"/>
+  </g>
+</svg>

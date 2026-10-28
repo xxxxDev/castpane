@@ -1,0 +1,33 @@
+node_modules/
+server/node_modules/
+
+# Builds
+web/dist/
+dist/
+
+# The capture core's SwiftPM build and the app bundle (mac/)
+.build/
+mac/.build/
+mac/build/
+
+# A data folder made by running the server from the checkout (CASTPANE_HOME=.castpane)
+.castpane/
+
+# Playwright output
+test-results/
+
+# Personal Claude Code settings for this checkout
+.claude/settings.local.json
+.DS_Store
+
+# Working notes kept out of the repository
+.local/
+server/logs/
+
+# The test suites are kept privately and not published.
+/server/tests/
+/web/tests/
+/mac/Tests/
+/mac/test.sh
+/tools/run-tests.mjs
+/tools/page-tests.mjs

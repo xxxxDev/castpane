@@ -1,0 +1,22 @@
+{
+  "name": "castpane-server",
+  "version": "0.1.0",
+  "description": "Castpane's web service: accounts, sign-in, notifications and the remote relay",
+  "license": "MIT",
+  "private": true,
+  "type": "commonjs",
+  "main": "start.js",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "dependencies": {
+    "@seald-io/nedb": "4.1.2",
+    "bcryptjs": "2.4.3",
+    "cookie-parser": "1.4.7",
+    "cors": "2.8.6",
+    "express": "4.22.2",
+    "jsonwebtoken": "9.0.3",
+    "web-push": "3.6.7",
+    "ws": "8.21.3"
+  }
+}
