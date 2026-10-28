@@ -1,2 +1,4 @@
 .build/
 build/
+# This Mac's signing settings for build-app.sh (paths only; see docs/development.md)
+signing.env

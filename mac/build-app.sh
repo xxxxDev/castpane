@@ -5,19 +5,36 @@
 #
 # The app holds the Swift menu-bar app, a copy of this Mac's Node (same architecture),
 # and, when they have been built, the castpane server (../server) and the web app
-# (../web/dist). Everything is signed ad hoc with the hardened runtime, so no library
-# can be loaded into it through DYLD_* variables. Node gets the JIT entitlements V8
-# needs on its own signature; the app itself gets none. An ad hoc signature changes
-# with each build, so macOS asks again for Screen Recording and Accessibility after
-# every new build.
+# (../web/dist). Everything is signed with the hardened runtime, so no library can be
+# loaded into it through DYLD_* variables. Node gets the JIT entitlements V8 needs on
+# its own signature; the app itself gets none.
+#
+# The signature is ad hoc unless a signing identity is given. An ad hoc signature
+# changes with each build, so macOS asks again for Screen Recording and Accessibility
+# after every new build. Signed with the same certificate each time (a self-signed one
+# is enough, see docs/development.md), the permissions stay across builds.
 #
 # CASTPANE_NODE_BIN=/path/to/node picks another Node binary (22.18 or later).
+# CASTPANE_SIGN_IDENTITY=<name or SHA-1>   the certificate to sign with
+# CASTPANE_SIGN_KEYCHAIN=<path>            the keychain that holds it (optional)
+# CASTPANE_SIGN_KEYCHAIN_PASSWORD_FILE=<path>  unlocks that keychain first (optional)
+# mac/signing.env (not in git), when present, is read for these.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
 cd "$here"
 
 version=0.1.1
+
+[ -f "$here/signing.env" ] && . "$here/signing.env"
+identity=${CASTPANE_SIGN_IDENTITY:--}
+keychain_args=""
+if [ "$identity" != "-" ] && [ -n "${CASTPANE_SIGN_KEYCHAIN:-}" ]; then
+  if [ -n "${CASTPANE_SIGN_KEYCHAIN_PASSWORD_FILE:-}" ]; then
+    security unlock-keychain -p "$(cat "$CASTPANE_SIGN_KEYCHAIN_PASSWORD_FILE")" "$CASTPANE_SIGN_KEYCHAIN"
+  fi
+  keychain_args="--keychain $CASTPANE_SIGN_KEYCHAIN"
+fi
 arch=$(uname -m)
 
 echo "== swift build (release, $arch)"
@@ -85,20 +102,21 @@ else
 fi
 cp "$root/LICENSE" "$app/Contents/Resources/LICENSE" 2>/dev/null || true
 
-echo "== sign (ad hoc, hardened runtime)"
+if [ "$identity" = "-" ]; then echo "== sign (ad hoc, hardened runtime)"; else echo "== sign (with the signing identity, hardened runtime)"; fi
 entitlements="$here/node.entitlements"
-# A native addon in the server cannot be checked against an ad hoc signature, so Node
-# then also needs library validation off. Without addons it keeps it on.
+# A native addon in the server cannot pass library validation under an ad hoc or a
+# self-signed signature (no team), so Node then also needs it off. Without addons it
+# keeps it on.
 addons=$(find "$app/Contents/Resources" -name '*.node' -type f 2>/dev/null || true)
 if [ -n "$addons" ]; then
   entitlements="$here/build/node-addons.entitlements"
   cp "$here/node.entitlements" "$entitlements"
   /usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.disable-library-validation bool true" "$entitlements"
-  echo "$addons" | while IFS= read -r f; do codesign --force --sign - "$f"; done
+  echo "$addons" | while IFS= read -r f; do codesign --force $keychain_args --sign "$identity" "$f"; done
 fi
-codesign --force --options runtime --sign - --identifier io.github.castpane.node \
+codesign --force --options runtime $keychain_args --sign "$identity" --identifier io.github.castpane.node \
   --entitlements "$entitlements" "$app/Contents/Resources/node/bin/node"
-codesign --force --options runtime --sign - --identifier io.github.castpane "$app"
+codesign --force --options runtime $keychain_args --sign "$identity" --identifier io.github.castpane "$app"
 codesign --verify --strict --deep "$app"
 echo "built: $app"
 echo "Not installed or opened. To try it: open \"$app\" (macOS will ask for Screen Recording and Accessibility)."

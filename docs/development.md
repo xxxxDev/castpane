@@ -120,6 +120,27 @@ or a tunnel (the pictures show the layout, not the glass, which the window serve
 cd mac && swift build && CASTPANE_SNAPSHOT=/tmp/castpane-shots "$(swift build --show-bin-path)/Castpane"
 ```
 
+## Signing
+
+`mac/build-app.sh` signs ad hoc unless it is given a certificate. With an ad hoc signature
+macOS asks again for Screen Recording and Accessibility after every build, because each
+build is a different app to it. Signed with the same certificate every time, the app keeps
+one identity (`identifier "io.github.castpane" and certificate root = …`) and the
+permissions stay. A self-signed code-signing certificate is enough for that; it does not
+remove **Open Anyway** for a downloaded app, which needs a Developer ID and notarization.
+
+To use one, put it in a keychain of its own and tell the script where it is, in
+`mac/signing.env` (not in git) or the environment:
+
+```sh
+CASTPANE_SIGN_IDENTITY=<the certificate's SHA-1 or name>
+CASTPANE_SIGN_KEYCHAIN=<path to the keychain>
+CASTPANE_SIGN_KEYCHAIN_PASSWORD_FILE=<a file holding its password>
+```
+
+Keep a backup of the certificate and its key: a release signed with another one is a new
+app again, and every user grants the permissions once more.
+
 ## Releasing
 
 1. Set the version in `package.json` and in `mac/build-app.sh` (`version=`).
