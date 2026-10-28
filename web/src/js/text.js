@@ -112,6 +112,7 @@ const english = {
 "改用其他帳號登入":"Sign in as someone else",
 "改用手機掃碼登入":"Scan with a phone instead",
 "整個螢幕":"Whole screen",
+"所有螢幕":"All displays",
 "數字不對，這次登入已被拒絕":"Wrong number; this sign-in was refused",
 "時間軸":"Timeline",
 "暫時無法產生 QR code":"Could not make a QR code right now",

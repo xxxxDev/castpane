@@ -32,7 +32,7 @@
           <div v-if="!headCollapsed" class="remote-thumbs" role="tablist">
             <button v-for="w in shownItems" :key="w.kind + w.id" type="button" class="remote-thumb" :class="{active: current && current.kind === w.kind && current.id === w.id}" :title="w.app ? w.app + ' · ' + w.title : w.title" @click="show(w)">
               <img v-if="w.thumb" :src="w.thumb" alt=""/><f7-icon v-else :f7="w.kind === 'display' ? 'desktopcomputer' : 'macwindow'" :size="20"/>
-              <span>{{ w.kind === 'display' ? ct('整個螢幕') + (w.title.match(/\d+$/) ? ' ' + w.title.match(/\d+$/)[0] : '') : (w.app || w.title) }}</span>
+              <span>{{ w.kind === 'display' ? (w.all ? ct('所有螢幕') : ct('整個螢幕') + (w.title.match(/\d+$/) ? ' ' + w.title.match(/\d+$/)[0] : '')) : (w.app || w.title) }}</span>
               <small v-if="w.kind === 'window' && w.here === false" class="remote-away">{{ ct('不在畫面上') }}</small>
             </button>
           </div>

@@ -284,7 +284,7 @@ actor Session {
             }
             // Pixels, not points: a Retina display's full detail, scaled down to fit maxWidth.
             let backing = await MainActor.run { NSScreen.main?.backingScaleFactor ?? 2 }
-            let scale = kind == "display" ? CGFloat(CGDisplayPixelsWide(CGDirectDisplayID(id))) / max(1, found.size.width) : backing
+            let scale = kind == "display" && id != Catalog.allDisplays ? CGFloat(CGDisplayPixelsWide(CGDirectDisplayID(id))) / max(1, found.size.width) : backing
             var w = found.size.width * max(1, scale), h = found.size.height * max(1, scale)
             if w > CGFloat(maxWidth) { h = h * CGFloat(maxWidth) / w; w = CGFloat(maxWidth) }
             guard w.isFinite, h.isFinite else { link.send(json: ["t": "error", "where": "start", "message": "gone"]); return }

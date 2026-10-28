@@ -114,7 +114,7 @@ closing the session.
 | `t`       | Fields                                                                                                          | Meaning                                                                     |
 | --------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | `status`  | `screen`, `accessibility`, `version`                                                                            | Which permissions it has. Sent after the hello.                             |
-| `list`    | `items: [{kind, id, title, app, width, height, thumb, here, desk: {id, number, display, fullscreen, current}}]` | Displays and windows, by desktop.                                           |
+| `list`    | `items: [{kind, id, title, app, width, height, thumb, here, desk: {id, number, display, fullscreen, current}}]` | Displays and windows, by desktop. With several displays, one more `display` item, `id` 0 and `all: true`: every display at once, side by side as arranged. |
 | `started` | `kind`, `id`, `width`, `height`, `fps`                                                                          | The picture started.                                                        |
 | `config`  | `codec`, `width`, `height`                                                                                      | The decoder configuration, before the first key frame.                      |
 | `stopped` | `reason`                                                                                                        | The picture stopped (the window closed, …).                                 |
