@@ -26,7 +26,8 @@ const MAX_MEMBERS = 32;
 // own must always get back in.
 const JOIN_FAILS_PER_MINUTE = 20;
 const JOIN_FAILS_PER_ADDRESS = 5;
-// Connections that have not said hello yet, in all and from one address.
+// Connections that have not said hello yet, from one address, and in all: past that the
+// oldest waiting is let go, so others filling the slots cannot keep a member out.
 const WAITING_MAX = 64;
 const WAITING_PER_ADDRESS = 8;
 // What one link may send a second, in bytes (video at the highest bitrate is 5 MB).
@@ -40,7 +41,7 @@ const MAX_MESSAGE = 2 * 1024 * 1024;
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
 const sameHash = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 // A Mac's name as shown: no control or direction-changing characters, 64 at most.
-const cleanName = (s) => (typeof s === 'string' ? s.replace(/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u2028-\u202e\u2066-\u2069]/g, '').trim().slice(0, 64) : '') || 'Mac';
+const cleanName = (s) => (typeof s === 'string' ? s.replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/g, '').trim().slice(0, 64) : '') || 'Mac';
 const notRunning = () => Object.assign(new Error('Castpane is not running there'), { status: 503, code: 'NOT_RUNNING' });
 
 function newCode() {
@@ -54,7 +55,7 @@ function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openM
   let list = load();
   const codes = new Map();
   const links = new Map();
-  const waiting = new Map();
+  const waiting = new Map(), queue = new Set();
   let failMinute = 0, joinFails = new Map();
   const minute = () => { const m = Math.floor(now() / 60000); if (m !== failMinute) { failMinute = m; joinFails = new Map(); } };
   const joinsBlocked = (ip) => { minute(); let all = 0; for (const n of joinFails.values()) all += n; return all >= JOIN_FAILS_PER_MINUTE || (joinFails.get(ip) || 0) >= JOIN_FAILS_PER_ADDRESS; };
@@ -66,7 +67,7 @@ function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openM
   // owner's, cut short) is set aside, not trusted: the Macs in it join again.
   function load() {
     let st;
-    try { st = fs.lstatSync(file); } catch (e) { if (e.code === 'ENOENT') return []; throw e; }
+    try { st = fs.lstatSync(file); } catch (e) { if (e.code !== 'ENOENT') console.error(`members: ${file} cannot be read (${e.code}); no Macs until it can`); return []; }
     try {
       if (!st.isFile() || (st.mode & 0o077) !== 0 || (typeof process.getuid === 'function' && st.uid !== process.getuid())) throw new Error('not a private file');
       const rows = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -103,15 +104,17 @@ function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openM
     const refuse = (status) => socket.end(`HTTP/1.1 ${status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
     if (req.headers.origin !== undefined || req.headers.cookie !== undefined) return refuse(403);
     const ip = resolveClientIp(req);
-    let all = 0; for (const n of waiting.values()) all += n;
-    if (all >= WAITING_MAX || (waiting.get(ip) || 0) >= WAITING_PER_ADDRESS) return refuse(429);
+    if ((waiting.get(ip) || 0) >= WAITING_PER_ADDRESS) return refuse(429);
+    if (queue.size >= WAITING_MAX) { const oldest = queue.values().next().value; queue.delete(oldest); oldest(); }
     wss.handleUpgrade(req, socket, head, (ws) => attach(ws, ip));
   }
 
   function attach(ws, ip) {
     let link = null, count = 0, windowStart = now(), counted = true;
     waiting.set(ip, (waiting.get(ip) || 0) + 1);
-    const said = () => { if (!counted) return; counted = false; const n = (waiting.get(ip) || 1) - 1; if (n > 0) waiting.set(ip, n); else waiting.delete(ip); };
+    const evict = () => { try { ws.terminate(); } catch { /* gone */ } };
+    queue.add(evict);
+    const said = () => { if (!counted) return; counted = false; queue.delete(evict); const n = (waiting.get(ip) || 1) - 1; if (n > 0) waiting.set(ip, n); else waiting.delete(ip); };
     const send = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
     const out = (reason) => { try { ws.close(1008, reason); } catch { /* gone */ } setTimeout(() => { try { ws.terminate(); } catch { /* gone */ } }, 2000).unref?.(); };
     const timer = setTimeout(() => out('no hello'), helloMs);
@@ -286,6 +289,7 @@ const SHAPES = {
   error: (m) => pick({ where: str(m.where, 32) ?? '', message: str(m.message, 200) ?? '', code: str(m.code, 32) }),
   clipboard: (m) => pick({ s: str(m.s, 100000), truncated: bool(m.truncated), empty: bool(m.empty), concealed: bool(m.concealed), notAllowed: bool(m.notAllowed), denied: bool(m.denied), error: bool(m.error) }),
   'clipboard-set': () => ({}),
+  'clipboard-busy': () => ({}),
 };
 function vetFromMember(text) {
   try {

@@ -68,7 +68,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
   async function openSession(n, by) {
     endSession();
     if (blocked()) return sendJson(ws, { t: 'failed', n });
-    const s = { n, by: String(by || '').slice(0, 64), since: new Date().toISOString(), sock: null, pieces: [], held: 0, lastClipboard: 0 };
+    const s = { n, by: typeof by === 'string' ? by.slice(0, 64) : '', since: new Date().toISOString(), sock: null, pieces: [], held: 0, lastClipboard: 0 };
     session = s;
     try {
       const token = tokenOf();
@@ -92,6 +92,13 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     }
   }
 
+  // Told to the page as the hub tells it, through the session's stream.
+  function busy(s) {
+    if (ws?.readyState !== 1) return;
+    const head = Buffer.alloc(4); head.writeUInt32BE(s.n);
+    ws.send(Buffer.concat([head, frame(1, Buffer.from('{"t":"clipboard-busy"}'))]), { binary: true });
+  }
+
   // What the hub sends for the capture core, checked here as the hub checks a page's: the
   // same allow-list, the clipboard at most once a second and in this Mac's log too.
   function fromHub(s, chunk) {
@@ -108,7 +115,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
       const clean = fromPage(msg);
       if (!clean) continue;
       if (clean.t.startsWith('clipboard-')) {
-        if (Date.now() - s.lastClipboard < 1000) continue;
+        if (Date.now() - s.lastClipboard < 1000) { busy(s); continue; }
         s.lastClipboard = Date.now();
         if (mayAudit()) audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: s.by, via: config?.hub || '', ...(clean.s ? { chars: clean.s.length } : {}) });
       }
@@ -188,7 +195,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
           if (m?.t === 'refused') return done(Object.assign(new Error('The code was not accepted: it is wrong, used or out of date'), { status: 403, code: 'REFUSED' }));
           // Too late (timed out, left or joined again meanwhile): not kept.
           if (over || mine !== joinGen) return;
-          if (m?.t === 'joined' && /^[0-9a-f]{12}$/.test(m.id) && /^[0-9a-f]{64}$/.test(m.secret)) {
+          if (m?.t === 'joined' && typeof m.id === 'string' && typeof m.secret === 'string' && /^[0-9a-f]{12}$/.test(m.id) && /^[0-9a-f]{64}$/.test(m.secret)) {
             endSession(); stopped = true; try { ws?.close(); } catch { /* gone */ } ws = null;
             config = { hub: origin, id: m.id, secret: m.secret, hubName: new URL(origin).hostname };
             try { save(config); } catch (e) { config = null; return done(Object.assign(new Error(`Could not keep the link: ${e.message}`), { status: 500, code: 'NOT_SAVED' })); }
