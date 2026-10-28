@@ -49,8 +49,7 @@ struct UpdateView: View {
             VStack(alignment: .leading, spacing: 10) {
                 if u.prerelease { Label("A beta version.", systemImage: "flask").font(.callout).foregroundStyle(.secondary) }
                 ScrollView {
-                    Text(u.notes.isEmpty ? "No notes for this release." : u.notes)
-                        .font(.callout).textSelection(.enabled)
+                    NotesView(markdown: u.notes)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxHeight: 170)
@@ -90,5 +89,33 @@ struct UpdateView: View {
             Button("Check Again") { model.checkForUpdates() }.secondaryButtonStyle()
             Button("Done") { Windows.shared.close("update") }.primaryButtonStyle().keyboardShortcut(.defaultAction)
         }
+    }
+}
+
+/// The release's notes, laid out: headings, bullets, paragraphs, code (ReleaseNotes).
+private struct NotesView: View {
+    let markdown: String
+
+    private func inline(_ s: String) -> Text {
+        let a = (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
+        return Text(a)
+    }
+
+    var body: some View {
+        let blocks = ReleaseNotes.blocks(markdown)
+        VStack(alignment: .leading, spacing: 6) {
+            if blocks.isEmpty { Text("No notes for this release.").foregroundStyle(.secondary) }
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                switch block {
+                case .heading(let s): inline(s).font(.callout.bold()).padding(.top, 4)
+                case .bullet(let s):
+                    HStack(alignment: .firstTextBaseline, spacing: 6) { Text("•"); inline(s).fixedSize(horizontal: false, vertical: true) }
+                case .paragraph(let s): inline(s).fixedSize(horizontal: false, vertical: true)
+                case .code(let s): Text(s).font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .font(.callout)
+        .textSelection(.enabled)
     }
 }

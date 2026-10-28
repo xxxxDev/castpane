@@ -97,3 +97,40 @@ public enum UpdateCheck {
         return URL(string: "https://api.github.com/repos/\(parts[0])/\(parts[1])/releases?per_page=20")
     }
 }
+
+/// A release's notes as the update window shows them: the Markdown GitHub keeps, cut to
+/// what is new. The install instructions and the table of checksums are for someone
+/// downloading by hand, so they are left out.
+public enum ReleaseNotes {
+    public enum Block: Equatable, Sendable { case heading(String), bullet(String), paragraph(String), code(String) }
+
+    public static func blocks(_ markdown: String) -> [Block] {
+        var out: [Block] = [], inCode = false, skipping = false, code: [String] = [], para: [String] = []
+        func flush() { if !para.isEmpty { out.append(.paragraph(para.joined(separator: " "))); para = [] } }
+        for raw in markdown.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("```") {
+                if inCode { if !skipping && !code.isEmpty { out.append(.code(code.joined(separator: "\n"))) }; code = [] } else { flush() }
+                inCode.toggle(); continue
+            }
+            if inCode { code.append(raw); continue }
+            // A heading: "#…", or a line that is all bold.
+            var heading: String?
+            if line.hasPrefix("#") { heading = line.drop(while: { $0 == "#" }).trimmingCharacters(in: .whitespaces) }
+            else if line.count > 4, line.hasPrefix("**"), line.hasSuffix("**"), !line.dropFirst(2).dropLast(2).contains("**") { heading = String(line.dropFirst(2).dropLast(2)) }
+            if let heading {
+                flush()
+                skipping = heading.lowercased().hasPrefix("install")
+                if !skipping { out.append(.heading(heading)) }
+                continue
+            }
+            if line.hasPrefix("|") { flush(); continue }
+            if skipping { continue }
+            if line.isEmpty { flush(); continue }
+            if line.hasPrefix("- ") || line.hasPrefix("* ") { flush(); out.append(.bullet(String(line.dropFirst(2)))); continue }
+            para.append(line)
+        }
+        flush()
+        return out
+    }
+}
