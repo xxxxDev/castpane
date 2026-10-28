@@ -100,9 +100,11 @@ final class Updater: ObservableObject {
                 state = .failed("GitHub answered \((response as? HTTPURLResponse)?.statusCode ?? 0).")
                 return
             }
+            // An install started while this check waited for GitHub goes on undisturbed.
+            if case .working = state { return }
             lastChecked = Date()
             UserDefaults.standard.set(lastChecked, forKey: Self.lastCheckKey)
-            if let update = UpdateCheck.newest(in: data, current: Self.currentVersion, arch: Self.arch, includeBeta: includeBeta) {
+            if let update = UpdateCheck.newest(in: data, current: Self.currentVersion, arch: Self.arch, includeBeta: includeBeta, repo: Self.repo) {
                 state = .available(update)
                 if automatic, UserDefaults.standard.string(forKey: Self.offeredKey) != update.version {
                     UserDefaults.standard.set(update.version, forKey: Self.offeredKey)
@@ -112,6 +114,7 @@ final class Updater: ObservableObject {
                 state = .upToDate
             }
         } catch {
+            if case .working = state { return }
             state = .failed("Could not reach GitHub: \(error.localizedDescription)")
         }
     }
@@ -124,16 +127,20 @@ final class Updater: ObservableObject {
     /// `image`: an image already on disk (debug self-test), instead of the download.
     /// `relaunch`: false keeps the script from opening the new app (debug self-test).
     func install(_ update: AvailableUpdate, image local: URL?, relaunch: Bool) async {
+        if case .working = state { return }
         if let reason = Self.cannotUpdate { state = .failed(reason); return }
         guard let requirement = Self.ownRequirement() else { state = .failed("Castpane could not read its own signature."); return }
         let dir = paths.home.appendingPathComponent("updates", isDirectory: true)
         let dest = Bundle.main.bundleURL
-        let staged = dest.deletingLastPathComponent().appendingPathComponent(".Castpane-update.app", isDirectory: true)
+        // Staged in Castpane's own folder (0700), not next to the app: nobody else can put
+        // anything at that path before the copy, or change it after the check.
+        let staged = dir.appendingPathComponent("new", isDirectory: true).appendingPathComponent("Castpane.app", isDirectory: true)
         let fm = FileManager.default
+        state = .working("Starting…")
         do {
             try? fm.removeItem(at: dir)
             try SecureFiles.ensureDirectory(dir)
-            try? fm.removeItem(at: staged)
+            try SecureFiles.ensureDirectory(staged.deletingLastPathComponent())
 
             let image = dir.appendingPathComponent("update.dmg")
             if let local {
@@ -158,13 +165,16 @@ final class Updater: ObservableObject {
             let copied: Result<Void, Error>
             if values?.isDirectory == true, values?.isSymbolicLink != true {
                 state = .working("Checking the new version…")
-                do { try await Self.run("/usr/bin/ditto", [source.path, staged.path]); copied = .success(()) } catch { copied = .failure(error) }
+                do { try await Self.run("/usr/bin/ditto", ["--noacl", source.path, staged.path]); copied = .success(()) } catch { copied = .failure(error) }
             } else {
                 copied = .failure(Failure("the disk image holds no Castpane.app"))
             }
             // The image is no longer needed, whatever happened.
             try? await Self.run("/usr/bin/hdiutil", ["detach", "-force", mount.path])
             try copied.get()
+            // The signature covers the contents, not who may write them: the copy is made
+            // this user's alone before it is checked.
+            try Self.tighten(staged)
             // The copy, not the image, is what will run: it is the one checked.
             guard Self.satisfies(staged, requirement) else {
                 try? fm.removeItem(at: staged)
@@ -200,7 +210,9 @@ final class Updater: ObservableObject {
     pid=$1; dest=$2; staged=$3; reopen=$4
     i=0
     while kill -0 "$pid" 2>/dev/null; do i=$((i+1)); [ "$i" -gt 600 ] && exit 1; sleep 0.1; done
-    old="$dest.previous"
+    [ -d "$staged" ] && [ ! -L "$staged" ] || exit 1
+    # The old app waits in Castpane's own folder (beside the staged one) until the new one is in.
+    old="$(dirname "$staged")/previous.app"
     rm -rf "$old"
     if mv "$dest" "$old"; then
       if mv "$staged" "$dest"; then rm -rf "$old"; else mv "$old" "$dest"; fi
@@ -211,6 +223,27 @@ final class Updater: ObservableObject {
     """
 
     nonisolated struct Failure: Error { let text: String; init(_ t: String) { text = t } }
+
+    /// Every item must be this user's own directory, file or symbolic link; group and others
+    /// lose write access, and set-id bits go.
+    nonisolated static func tighten(_ root: URL) throws {
+        var paths = [root.path]
+        if let e = FileManager.default.enumerator(atPath: root.path) {
+            while let rel = e.nextObject() as? String { paths.append(root.path + "/" + rel) }
+        }
+        let uid = getuid()
+        for path in paths {
+            var st = stat()
+            guard lstat(path, &st) == 0 else { throw Failure("could not read \(path)") }
+            let kind = st.st_mode & S_IFMT
+            guard kind == S_IFDIR || kind == S_IFREG || kind == S_IFLNK else { throw Failure("the new app holds a special file") }
+            guard st.st_uid == uid else { throw Failure("the new app holds a file owned by someone else") }
+            if kind != S_IFLNK {
+                let mode = st.st_mode & 0o7777 & ~mode_t(0o6022)
+                guard chmod(path, mode) == 0 else { throw Failure("could not set permissions in the new app") }
+            }
+        }
+    }
 
     nonisolated static func sha256(of file: URL) throws -> String {
         let handle = try FileHandle(forReadingFrom: file)

@@ -55,8 +55,8 @@ public struct AvailableUpdate: Equatable, Sendable {
 public enum UpdateCheck {
     /// The newest release newer than `current` with a disk image for `arch` (arm64 or
     /// x86_64) and a SHA-256 digest; betas only when `includeBeta`. Drafts never count, and
-    /// only `https://github.com/` image addresses are taken.
-    public static func newest(in json: Data, current: String, arch: String, includeBeta: Bool) -> AvailableUpdate? {
+    /// only image addresses under `https://github.com/<repo>/releases/download/` are taken.
+    public static func newest(in json: Data, current: String, arch: String, includeBeta: Bool, repo: String) -> AvailableUpdate? {
         guard let now = ReleaseVersion(current),
               let list = (try? JSONSerialization.jsonObject(with: json)) as? [[String: Any]] else { return nil }
         var best: (ReleaseVersion, AvailableUpdate)?
@@ -70,16 +70,22 @@ public enum UpdateCheck {
             guard let a = assets.first(where: { ($0["name"] as? String)?.hasPrefix("Castpane-") == true && ($0["name"] as? String)?.hasSuffix(suffix) == true }),
                   let name = a["name"] as? String,
                   let link = a["browser_download_url"] as? String, let url = URL(string: link),
-                  url.scheme == "https", url.host == "github.com",
+                  url.scheme == "https", url.host == "github.com", url.path.hasPrefix("/\(repo)/releases/download/"),
                   let digest = a["digest"] as? String, digest.hasPrefix("sha256:") else { continue }
             let hex = String(digest.dropFirst(7)).lowercased()
             guard hex.count == 64, hex.allSatisfy(\.isHexDigit) else { continue }
             let update = AvailableUpdate(version: v.description, tag: tag, prerelease: pre || !v.prerelease.isEmpty,
-                                         notes: (r["body"] as? String) ?? "", page: (r["html_url"] as? String) ?? "",
+                                         notes: (r["body"] as? String) ?? "", page: Self.githubPage(r["html_url"]),
                                          imageName: name, imageURL: url, sha256: hex)
             if best == nil || v > best!.0 { best = (v, update) }
         }
         return best?.1
+    }
+
+    /// A release page on github.com, or nothing.
+    static func githubPage(_ value: Any?) -> String {
+        guard let s = value as? String, let u = URL(string: s), u.scheme == "https", u.host == "github.com" else { return "" }
+        return s
     }
 
     /// The API address of a repository's releases (`owner/name`), or nil for anything else.

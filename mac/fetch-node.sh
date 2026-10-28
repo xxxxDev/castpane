@@ -1,6 +1,7 @@
 #!/bin/sh
 # Downloads the official Node.js build for macOS on one architecture, checks it against
-# the SHASUMS256.txt nodejs.org publishes with it, and prints the path of its node binary,
+# the SHASUMS256.txt nodejs.org publishes with it and the binary's own signature (the Node.js
+# Foundation's Developer ID, team HX7739G8FX), and prints the path of its node binary,
 # for build-app.sh to bundle (CASTPANE_NODE_BIN):
 #
 #   CASTPANE_ARCH=x86_64 CASTPANE_NODE_BIN=$(mac/fetch-node.sh x86_64) mac/build-app.sh
@@ -24,4 +25,9 @@ if [ ! -x "$dir/$name/bin/node" ]; then
   tar -xzf "$dir/$name.tar.gz" -C "$dir"
   rm -f "$dir/$name.tar.gz"
 fi
-echo "$dir/$name/bin/node"
+# The binary itself, fresh or kept from before: signed by the Node.js Foundation.
+node="$dir/$name/bin/node"
+codesign --verify --strict "$node" 2>/dev/null &&
+  codesign -dv "$node" 2>&1 | grep -qx "TeamIdentifier=HX7739G8FX" ||
+  { echo "error: $node is not signed by the Node.js Foundation (HX7739G8FX)" >&2; exit 1; }
+echo "$node"
