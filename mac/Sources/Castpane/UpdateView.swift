@@ -97,7 +97,9 @@ private struct NotesView: View {
     let markdown: String
 
     private func inline(_ s: String) -> Text {
-        let a = (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
+        var a = (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
+        // Links only to web pages: the notes are text from the repository's releases.
+        for run in a.runs where run.link != nil && run.link?.scheme != "https" { a[run.range].link = nil }
         return Text(a)
     }
 

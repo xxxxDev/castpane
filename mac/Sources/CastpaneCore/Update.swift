@@ -120,7 +120,8 @@ public enum ReleaseNotes {
             else if line.count > 4, line.hasPrefix("**"), line.hasSuffix("**"), !line.dropFirst(2).dropLast(2).contains("**") { heading = String(line.dropFirst(2).dropLast(2)) }
             if let heading {
                 flush()
-                skipping = heading.lowercased().hasPrefix("install")
+                let h = heading.lowercased()
+                skipping = h == "install" || h.hasPrefix("install ") || h.hasPrefix("install(")
                 if !skipping { out.append(.heading(heading)) }
                 continue
             }
@@ -130,6 +131,7 @@ public enum ReleaseNotes {
             if line.hasPrefix("- ") || line.hasPrefix("* ") { flush(); out.append(.bullet(String(line.dropFirst(2)))); continue }
             para.append(line)
         }
+        if inCode && !skipping && !code.isEmpty { out.append(.code(code.joined(separator: "\n"))) }
         flush()
         return out
     }
