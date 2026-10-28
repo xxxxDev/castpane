@@ -69,7 +69,7 @@ Mac 上的設定精靈和設定視窗：
 在 Apple 晶片或 Intel 的 Mac 上，用 [Homebrew](https://brew.sh) 安裝：
 
 ```sh
-brew install --cask xxxxDev/tap/castpane     # 之後更新：brew upgrade --cask castpane
+brew install --cask xxxxDev/tap/castpane     # 之後 Castpane 會自己更新
 ```
 
 或從 releases 頁下載 `Castpane-<版本>-arm64.dmg`（Intel 用 `-x86_64.dmg`），把 Castpane 拖進「應用程式」再打開。之後 Castpane 會自己保持最新：每天到 GitHub 檢查一次，你同意後就安裝新版。這個 App 沒有經過 Apple 公證，所以下載的版本第一次打開要到 **系統設定 › 隱私權與安全性 › 強制打開**；步驟和 Homebrew 方式省掉了什麼，見 [docs/setup.md](docs/setup.md#install)。

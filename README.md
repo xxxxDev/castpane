@@ -97,7 +97,7 @@ Liquid Glass, which the snapshots do not draw.
 On a Mac with Apple silicon or Intel, with [Homebrew](https://brew.sh):
 
 ```sh
-brew install --cask xxxxDev/tap/castpane     # later: brew upgrade --cask castpane
+brew install --cask xxxxDev/tap/castpane     # Castpane then updates itself
 ```
 
 Or download `Castpane-<version>-arm64.dmg` (or `-x86_64.dmg` for Intel) from the releases

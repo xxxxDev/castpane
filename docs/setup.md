@@ -6,7 +6,7 @@
 
 ```sh
 brew install --cask xxxxDev/tap/castpane
-brew upgrade --cask castpane        # a later version
+# Castpane then updates itself; brew upgrade --cask --greedy castpane also works
 ```
 
 The cask (in [xxxxDev/homebrew-tap](https://github.com/xxxxDev/homebrew-tap)) downloads the
