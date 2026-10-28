@@ -23,6 +23,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A menu-bar app: no Dock icon (Info.plist says so too; this covers `swift run`).
         NSApp.setActivationPolicy(.accessory)
         #if DEBUG
+        // Debug builds only: install the image named here over this copy of the app, with
+        // every check the real update makes, and quit without opening the new app.
+        let env = ProcessInfo.processInfo.environment
+        if let image = env["CASTPANE_UPDATE_SELFTEST"], let version = env["CASTPANE_UPDATE_SELFTEST_VERSION"],
+           let sha = try? Updater.sha256(of: URL(fileURLWithPath: image)) {
+            MainActor.assumeIsolated {
+                let u = AvailableUpdate(version: version, tag: "v" + version, prerelease: true, notes: "", page: "",
+                                        imageName: (image as NSString).lastPathComponent, imageURL: URL(string: "https://github.com/")!, sha256: sha)
+                let updater = model.updater
+                Task { @MainActor in
+                    await updater.install(u, image: URL(fileURLWithPath: image), relaunch: false)
+                    print("selftest: \(updater.state)")
+                    exit(2)
+                }
+            }
+            return
+        }
         if let folder = ProcessInfo.processInfo.environment["CASTPANE_SNAPSHOT"] {
             MainActor.assumeIsolated { Snapshot.run(model, to: URL(fileURLWithPath: folder)) }
             return
@@ -100,6 +117,12 @@ final class Windows: NSObject, NSWindowDelegate {
         }
     }
 
+    func showUpdate(_ model: AppModel) {
+        show("update", title: "Castpane Update", size: NSSize(width: 520, height: 420), bare: true) {
+            UpdateView().environmentObject(model).environmentObject(model.updater)
+        }
+    }
+
     func showQR(_ model: AppModel) {
         show("qr", title: "Open on your phone", size: NSSize(width: 340, height: 400)) {
             AddressCard(showQR: true, qrSize: 220).padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -160,6 +183,7 @@ struct MenuContent: View {
         Divider()
         Button("Settings…") { Windows.shared.showSettings(model) }.keyboardShortcut(",")
         Button("Setup Assistant…") { Windows.shared.showWizard(model) }
+        Button("Check for Updates…") { model.checkForUpdates() }
         Divider()
         Button("Quit Castpane") { NSApp.terminate(nil) }.keyboardShortcut("q")
     }

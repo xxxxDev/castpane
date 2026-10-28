@@ -44,6 +44,10 @@ public struct AppConfig: Codable, Equatable, Sendable {
     public var keepAwake: Bool = true
     /// Sharing paused from the menu: the capture core is not listening.
     public var paused: Bool = false
+    /// Look for a new release once a day.
+    public var checkForUpdates: Bool = true
+    /// Offer beta releases too (all of castpane's releases are betas for now).
+    public var betaUpdates: Bool = true
 
     public init() {}
 
@@ -60,6 +64,8 @@ public struct AppConfig: Codable, Equatable, Sendable {
         defaultQuality = (try? c.decode(String.self, forKey: .defaultQuality)) ?? d.defaultQuality
         keepAwake = (try? c.decode(Bool.self, forKey: .keepAwake)) ?? d.keepAwake
         paused = (try? c.decode(Bool.self, forKey: .paused)) ?? d.paused
+        checkForUpdates = (try? c.decode(Bool.self, forKey: .checkForUpdates)) ?? d.checkForUpdates
+        betaUpdates = (try? c.decode(Bool.self, forKey: .betaUpdates)) ?? d.betaUpdates
     }
 
     public static func load(from url: URL) -> AppConfig {

@@ -85,8 +85,8 @@ Liquid Glass, which the snapshots do not draw.
 
 ## Requirements
 
-- **The Mac:** macOS 14 or later. The release image is for Apple silicon; on an Intel Mac,
-  build from source. Screen Recording and Accessibility permission for Castpane.
+- **The Mac:** macOS 14 or later, Apple silicon or Intel (one release image for each).
+  Screen Recording and Accessibility permission for Castpane.
 - **To build it:** the Command Line Tools (Swift 6) and Node.js 22.18 or later.
 - **The viewer:** a browser with WebCodecs (current Chrome, Edge, Safari 17 and later), over
   **HTTPS**. Browsers allow the video decoder, passkeys and the installable app only on HTTPS
@@ -94,14 +94,15 @@ Liquid Glass, which the snapshots do not draw.
 
 ## Quick start
 
-On a Mac with Apple silicon, with [Homebrew](https://brew.sh):
+On a Mac with Apple silicon or Intel, with [Homebrew](https://brew.sh):
 
 ```sh
 brew install --cask xxxxDev/tap/castpane     # later: brew upgrade --cask castpane
 ```
 
-Or download `Castpane-<version>-arm64.dmg` from the releases page, drag Castpane to
-Applications and open it. The app is not notarized by Apple, so a downloaded copy's first
+Or download `Castpane-<version>-arm64.dmg` (or `-x86_64.dmg` for Intel) from the releases
+page, drag Castpane to Applications and open it. Castpane then keeps itself up to date: it
+checks GitHub once a day and installs a new version when you say so. The app is not notarized by Apple, so a downloaded copy's first
 launch needs **System Settings › Privacy & Security › Open Anyway**;
 [docs/setup.md](docs/setup.md#install) has the steps and what the Homebrew way skips.
 
@@ -139,8 +140,7 @@ The setup assistant then:
 ## Not in v0.1
 
 Developer ID signing and notarization (releases are signed with the project's own
-certificate instead), automatic app updates, several Macs in one web app, audio, and the
-clipboard.
+certificate instead), several Macs in one web app, audio, and the clipboard.
 
 ## License
 

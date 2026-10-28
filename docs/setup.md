@@ -18,8 +18,8 @@ tap and the release are this project's, as you do when you build it yourself.
 
 ### From a release
 
-Each release on GitHub has a disk image, `Castpane-<version>-arm64.dmg`, for Macs with Apple
-silicon and macOS 14 or later.
+Each release on GitHub has a disk image for each kind of Mac, with macOS 14 or later:
+`Castpane-<version>-arm64.dmg` for Apple silicon and `Castpane-<version>-x86_64.dmg` for Intel.
 
 1. Open the image and drag **Castpane** onto **Applications**.
 2. Open Castpane from Applications. The image is not signed with a Developer ID, so the first
@@ -36,6 +36,22 @@ the data folder, not in the app.
 
 To check a download, compare its SHA-256 with the one in the release notes:
 `shasum -a 256 Castpane-<version>-arm64.dmg`.
+
+### Updates
+
+Castpane checks GitHub for a newer release once a day (**Settings › General**: *Check for
+updates automatically*, *Include beta versions*; **Check for Updates…** in its menu). When it
+finds one it shows the notes, and **Install and Restart** then:
+
+1. downloads the disk image for this Mac and checks it against the SHA-256 GitHub records for it;
+2. copies the app out of it and checks that the copy is signed with the same certificate as the
+   Castpane running now (and is the version announced);
+3. quits Castpane, puts the new app in its place (the old one comes back if that fails) and
+   opens it.
+
+A copy that fails a check is not installed. A Castpane you built yourself without a
+certificate cannot check that, so it does not update itself. Installed with Homebrew, the
+cask says the app updates itself, so `brew upgrade` leaves it alone.
 
 ### From source
 

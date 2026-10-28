@@ -60,19 +60,19 @@ Mac 上的設定精靈和設定視窗：
 
 ## 需求
 
-- **Mac：** macOS 14 以上。release 的 dmg 給 Apple 晶片的 Mac；Intel Mac 請從原始碼編譯。Castpane 需要「螢幕錄製」和「輔助使用」權限。
+- **Mac：** macOS 14 以上，Apple 晶片或 Intel 都可以（各有一個 dmg）。Castpane 需要「螢幕錄製」和「輔助使用」權限。
 - **編譯：** Command Line Tools（Swift 6）和 Node.js 22.18 以上。
 - **觀看端：** 支援 WebCodecs 的瀏覽器（新版 Chrome、Edge、Safari 17 以上），而且要走 **HTTPS**。瀏覽器只在 HTTPS 上（或在 Mac 本機的 `127.0.0.1`）允許影像解碼、通行密鑰和安裝 App。
 
 ## 快速開始
 
-在 Apple 晶片的 Mac 上，用 [Homebrew](https://brew.sh) 安裝：
+在 Apple 晶片或 Intel 的 Mac 上，用 [Homebrew](https://brew.sh) 安裝：
 
 ```sh
 brew install --cask xxxxDev/tap/castpane     # 之後更新：brew upgrade --cask castpane
 ```
 
-或從 releases 頁下載 `Castpane-<版本>-arm64.dmg`，把 Castpane 拖進「應用程式」再打開。這個 App 沒有經過 Apple 公證，所以下載的版本第一次打開要到 **系統設定 › 隱私權與安全性 › 強制打開**；步驟和 Homebrew 方式省掉了什麼，見 [docs/setup.md](docs/setup.md#install)。
+或從 releases 頁下載 `Castpane-<版本>-arm64.dmg`（Intel 用 `-x86_64.dmg`），把 Castpane 拖進「應用程式」再打開。之後 Castpane 會自己保持最新：每天到 GitHub 檢查一次，你同意後就安裝新版。這個 App 沒有經過 Apple 公證，所以下載的版本第一次打開要到 **系統設定 › 隱私權與安全性 › 強制打開**；步驟和 Homebrew 方式省掉了什麼，見 [docs/setup.md](docs/setup.md#install)。
 
 或從原始碼編譯（任何 Mac，Apple 晶片或 Intel 都可以）：
 
@@ -106,7 +106,7 @@ open mac/build/Castpane.app
 
 ## v0.1 還沒有的
 
-Apple 開發者簽章和公證（release 改用專案自己的憑證簽名）、App 自動更新、在同一個網頁 App 裡切換多台 Mac、聲音、剪貼簿。
+Apple 開發者簽章和公證（release 改用專案自己的憑證簽名）、在同一個網頁 App 裡切換多台 Mac、聲音、剪貼簿。
 
 ## 授權
 

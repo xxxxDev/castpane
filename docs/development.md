@@ -147,21 +147,26 @@ app again, and every user grants the permissions once more.
 
 ## Releasing
 
-1. Set the version in `package.json` and in `mac/build-app.sh` (`version=`).
-2. Build and pack it on a Mac with Apple silicon, from a clean checkout:
+1. Set the version in `package.json`, `server/package.json` and `mac/build-app.sh`
+   (`version=`, such as `0.1.3` or `0.1.3-beta`; the tag is `v` and the same).
+2. Build and pack both kinds of Mac from a clean checkout, signed with the release certificate
+   (see Signing; the app updates itself only to a version signed with the same one):
 
    ```sh
-   npm run setup && npm run lint
-   npm run build && mac/build-app.sh && mac/make-dmg.sh
+   npm run setup && npm run lint && npm run build
+   mac/build-app.sh && mac/make-dmg.sh
+   CASTPANE_ARCH=x86_64 CASTPANE_NODE_BIN=$(mac/fetch-node.sh x86_64) mac/build-app.sh && mac/make-dmg.sh
    ```
 
-3. Open the image on a Mac, install from it and go through the setup assistant once.
-4. Tag the commit `v<version>` and make a GitHub release from the tag. Attach
-   `mac/build/Castpane-<version>-arm64.dmg`, and put the SHA-256 that `make-dmg.sh` prints,
-   and the install steps from docs/setup.md ("From a release"), in the notes.
+3. Install from an image on a Mac and go through the setup assistant once.
+4. Tag the commit and make a GitHub release from the tag (a pre-release for a beta) with both
+   images and the SHA-256 that `make-dmg.sh` prints. Running copies find it within a day: the
+   app reads `CastpaneUpdateRepo` from its Info.plist (`CASTPANE_UPDATE_REPO` when building)
+   and takes the image named `Castpane-*-<arch>.dmg`.
+5. Update the cask in the Homebrew tap (version and both SHA-256s).
 
-The image is not signed with a Developer ID or notarized, so the first launch on another Mac
-needs **Open Anyway**, and each new version asks for the permissions again.
+The images are not notarized: a downloaded copy's first launch needs **Open Anyway**; the
+Homebrew cask and the app's own updates do not.
 
 ## Conventions
 

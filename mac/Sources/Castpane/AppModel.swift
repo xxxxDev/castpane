@@ -31,6 +31,7 @@ final class AppModel: ObservableObject {
     private lazy var server = ServerSupervisor(paths: paths)
     private lazy var tunnel = TunnelManager(paths: paths)
     private let keepAwake = KeepAwake()
+    private(set) lazy var updater = Updater(paths: paths)
     private var poll: Timer?
     private var permissionPoll: Timer?
     private var booted = false
@@ -115,6 +116,13 @@ final class AppModel: ObservableObject {
             MainActor.assumeIsolated { self?.refreshPermissions() }
         }
         refreshStatus()
+
+        updater.onOffer = { [weak self] _ in
+            guard let self else { return }
+            Windows.shared.showUpdate(self)
+        }
+        updater.schedule(enabled: { [weak self] in self?.config.checkForUpdates ?? false },
+                         includeBeta: { [weak self] in self?.config.betaUpdates ?? false })
     }
 
     private var shuttingDown = false
@@ -251,6 +259,22 @@ final class AppModel: ObservableObject {
         config.keepAwake = on
         keepAwake.enabled = on
         save()
+    }
+
+    func setCheckForUpdates(_ on: Bool) {
+        config.checkForUpdates = on
+        save()
+    }
+
+    func setBetaUpdates(_ on: Bool) {
+        config.betaUpdates = on
+        save()
+    }
+
+    func checkForUpdates() {
+        Windows.shared.showUpdate(self)
+        let beta = config.betaUpdates
+        Task { await updater.check(includeBeta: beta) }
     }
 
     func setQuality(_ q: String) {

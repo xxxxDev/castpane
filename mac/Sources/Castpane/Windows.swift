@@ -255,6 +255,14 @@ struct GeneralTab: View {
             Picker("Default quality", selection: Binding(get: { model.config.defaultQuality }, set: { model.setQuality($0) })) {
                 ForEach(qualities, id: \.0) { Text($0.1).tag($0.0) }
             }
+            Toggle("Check for updates automatically", isOn: Binding(get: { model.config.checkForUpdates }, set: { model.setCheckForUpdates($0) }))
+            Toggle("Include beta versions", isOn: Binding(get: { model.config.betaUpdates }, set: { model.setBetaUpdates($0) }))
+            LabeledContent("Version") {
+                HStack {
+                    Text(Updater.currentVersion)
+                    Button("Check Now") { model.checkForUpdates() }
+                }
+            }
             LabeledContent("Server", value: model.serverState.summary)
             LabeledContent("Port", value: String(model.config.port))
             if let e = model.hostError { Text(e).foregroundStyle(.red) }

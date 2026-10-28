@@ -14,6 +14,8 @@
 # after every new build. Signed with the same certificate each time (a self-signed one
 # is enough, see docs/development.md), the permissions stay across builds.
 #
+# CASTPANE_ARCH=x86_64 builds for Intel Macs on an Apple silicon Mac (or arm64 the other
+#   way); it needs a Node for that architecture: mac/fetch-node.sh x86_64 prints one.
 # CASTPANE_NODE_BIN=/path/to/node picks another Node binary (22.18 or later).
 # CASTPANE_SIGN_IDENTITY=<name or SHA-1>   the certificate to sign with
 # CASTPANE_SIGN_KEYCHAIN=<path>            the keychain that holds it (optional)
@@ -25,7 +27,11 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
 cd "$here"
 
-version=0.1.2
+# The release version (tags are v$version); macOS gets its numbers alone.
+version=0.1.3-beta
+short=${version%%-*}
+# Where the app looks for newer releases (Updater.swift): a fork names its own.
+update_repo=${CASTPANE_UPDATE_REPO:-xxxxDev/castpane}
 
 [ -f "$here/signing.env" ] && . "$here/signing.env"
 identity=${CASTPANE_SIGN_IDENTITY:--}
@@ -37,11 +43,12 @@ if [ "$identity" != "-" ] && [ -n "${CASTPANE_SIGN_KEYCHAIN:-}" ]; then
   keychain_args="--keychain $CASTPANE_SIGN_KEYCHAIN"
 fi
 if [ "$identity" != "-" ] && [ "${CASTPANE_SIGN_TIMESTAMP:-}" = "1" ]; then keychain_args="$keychain_args --timestamp"; fi
-arch=$(uname -m)
+arch=${CASTPANE_ARCH:-$(uname -m)}
+case "$arch" in arm64|x86_64) ;; *) echo "error: CASTPANE_ARCH must be arm64 or x86_64" >&2; exit 1 ;; esac
 
 echo "== swift build (release, $arch)"
-swift build -c release --product Castpane
-bin="$(swift build -c release --show-bin-path)/Castpane"
+swift build -c release --arch "$arch" --product Castpane
+bin="$(swift build -c release --arch "$arch" --show-bin-path)/Castpane"
 
 app="$here/build/Castpane.app"
 rm -rf "$app"
@@ -61,7 +68,9 @@ cat > "$app/Contents/Info.plist" <<PLIST
  <key>CFBundleExecutable</key><string>Castpane</string>
  <key>CFBundleIconFile</key><string>AppIcon</string>
  <key>CFBundlePackageType</key><string>APPL</string>
- <key>CFBundleShortVersionString</key><string>$version</string>
+ <key>CFBundleShortVersionString</key><string>$short</string>
+ <key>CastpaneVersion</key><string>$version</string>
+ <key>CastpaneUpdateRepo</key><string>$update_repo</string>
  <key>CFBundleVersion</key><string>1</string>
  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
  <key>LSMinimumSystemVersion</key><string>14.0</string>
