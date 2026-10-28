@@ -44,9 +44,10 @@ Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用�
 ## 實際畫面
 
 <p align="center">
-  <img src="docs/assets/shot-phone-remote.png" alt="手機上的遠端分頁：這台 Mac 的一個方塊" width="240">
-  <img src="docs/assets/shot-phone-stage.png" alt="手機顯示 Mac 的桌面，上方是桌面和視窗，下方是一排按鍵" width="240">
-  <img src="docs/assets/shot-phone-users.png" alt="手機上的使用者管理：一位管理員和一位成員" width="240">
+  <img src="docs/assets/shot-phone-remote.png" alt="手機上的遠端分頁：這台 Mac、加入它的另一台 Mac，以及「加入另一台 Mac」" width="200">
+  <img src="docs/assets/shot-phone-stage.png" alt="手機顯示 Mac 的桌面，上方是桌面和視窗" width="200">
+  <img src="docs/assets/shot-phone-keys.png" alt="取代手機鍵盤的按鍵面板：拷貝、貼上、復原、Spotlight、指揮中心等" width="200">
+  <img src="docs/assets/shot-phone-users.png" alt="手機上的使用者管理：一位管理員和一位成員" width="200">
 </p>
 
 <p align="center"><img src="docs/assets/shot-desktop-stage.png" alt="電腦瀏覽器裡的遠端畫面：上方是桌面和視窗，下方是 Mac 的螢幕" width="820"></p>
@@ -54,6 +55,7 @@ Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用�
 Mac 上的設定精靈和設定視窗：
 
 <p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/shot-mac-role-dark.png"><img src="docs/assets/shot-mac-role-light.png" alt="設定精靈的第一步：選這台是你要連的 Mac，還是要放進另一台 Mac 的 Castpane" width="400"></picture>
   <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/shot-mac-setup-dark.png"><img src="docs/assets/shot-mac-setup-light.png" alt="設定精靈的連線步驟：連線方式，旁邊是快速通道的網址和 QR code" width="400"></picture>
   <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/shot-mac-activity-dark.png"><img src="docs/assets/shot-mac-activity-light.png" alt="設定的活動頁：誰登入、誰看了這台 Mac，以及時間" width="400"></picture>
 </p>
@@ -86,7 +88,7 @@ mac/build-app.sh         # mac/build/Castpane.app，內含這台 Mac 的 Node、
 open mac/build/Castpane.app
 ```
 
-接著設定精靈會：
+設定精靈會先問這台 Mac 的用途。選「你要連的這台」，接著會：
 
 1. 建立你的管理員帳號；
 2. 要求「螢幕錄製」和「輔助使用」權限（開好第一個後，Castpane 會提議重新啟動）；

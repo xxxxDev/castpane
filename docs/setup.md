@@ -75,6 +75,15 @@ tunnel's credentials go with it.
 
 ## The setup assistant
 
+It first asks what this Mac is for:
+
+- **The Mac I connect to:** the steps below.
+- **Show it in another Mac's Castpane:** no account or address. Permissions (as in step 2),
+  then the other Mac's address and a code from its Remote page (**Add another Mac**); see
+  [multi-mac.md](multi-mac.md).
+
+For the Mac you connect to:
+
 1. **Admin account.** The name and password you will sign in with. Use a long password; you
    can add a passkey and two-step sign-in later, in Settings on the web app.
 2. **Permissions.** Castpane needs two, both in **System Settings › Privacy & Security**:
@@ -91,9 +100,9 @@ tunnel's credentials go with it.
 
 ### Permissions and signing
 
-From v0.1.2, releases are signed with the project's own certificate (not an Apple Developer
+Releases after 0.1.0 are signed with the project's own certificate (not an Apple Developer
 ID, and not notarized). macOS ties the permissions to that certificate, so **they stay across
-updates**. Moving from an earlier release (signed ad hoc) or from a build of your own asks for
+updates**. Moving from 0.1.0 (signed ad hoc) or from a build of your own asks for
 Screen Recording and Accessibility once more. If Remote says Castpane has no permission
 although the switches look on, remove Castpane from both lists with the minus button and add
 it again. Login Items may list Castpane as from an unidentified developer.

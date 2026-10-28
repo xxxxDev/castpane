@@ -61,7 +61,7 @@ async function open({viewport, mobile, scheme = 'dark', signedIn = true}) {
     const p = new URL(r.request().url()).pathname;
     if (p === '/api/auth/verify' || p === '/api/auth/me') return signedIn ? r.fulfill({json: {user: me}}) : r.fulfill({status: 401, json: {message: 'No token provided'}});
     if (p === '/api/auth/users') return r.fulfill({json: {users: USERS}});
-    if (p === '/api/remote/machines') return r.fulfill({json: {machines: [{id: 'local', name: 'Studio', local: true, running: true}]}});
+    if (p === '/api/remote/machines') return r.fulfill({json: {machines: [{id: 'local', name: 'Studio', local: true, online: true, running: true}, {id: 'a1b2c3d4e5f6', name: 'Office iMac', local: false, online: true, running: true}], canAdd: true}});
     if (p === '/api/remote/pass') return r.fulfill({json: {pass: 'p', expiresAt: new Date(Date.now() + 8 * 3600e3).toISOString()}});
     if (p === '/api/auth/qr/start') return r.fulfill({json: {id: 'Qq0Qq0Qq0Qq0Qq0Qq0Qq0Qq0', secret: 's'.repeat(43), code: '42', expiresAt: new Date(Date.now() + 60e3).toISOString()}});
     return r.fulfill({json: {}});
@@ -75,7 +75,7 @@ async function open({viewport, mobile, scheme = 'dark', signedIn = true}) {
   return {context, page};
 }
 async function stage(page) {
-  await page.locator('#view-remote .remote-tile').click();
+  await page.locator('#view-remote .remote-tile').first().click();
   await page.locator('.remote-stage').waitFor();
   await page.locator('.remote-canvas:not(.hidden)').waitFor();
   await page.evaluate(paint);
@@ -86,9 +86,14 @@ fs.mkdirSync(assets, {recursive: true});
 const shot = async (page, name) => { await page.screenshot({path: path.join(assets, name)}); console.log('wrote docs/assets/' + name); };
 { // The phone: the Remote tab, then the stage.
   const {context, page} = await open({viewport: {width: 390, height: 844}, mobile: true});
-  await page.locator('#view-remote .remote-tile').waitFor(); await page.waitForTimeout(300);
+  await page.locator('#view-remote .remote-tile').first().waitFor(); await page.waitForTimeout(300);
   await shot(page, 'shot-phone-remote.png');
   await stage(page); await shot(page, 'shot-phone-stage.png');
+  // The key panel in the keyboard's place, on its shortcuts page.
+  await page.locator('.remote-btn.more').click(); await page.locator('.remote-menu-item.keyboard').click();
+  await page.locator('.remote-key.panel-btn').click(); await page.locator('.remote-panel').waitFor();
+  await page.locator('.remote-dots button').nth(1).click(); await page.waitForTimeout(600);
+  await shot(page, 'shot-phone-keys.png');
   await context.close();
 }
 { // A computer: the stage with the windows bar.

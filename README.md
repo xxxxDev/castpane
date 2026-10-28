@@ -71,9 +71,10 @@ back, with touch modes made for a small screen.
 ## What it looks like
 
 <p align="center">
-  <img src="docs/assets/shot-phone-remote.png" alt="The Remote tab on a phone: one tile for this Mac" width="240">
-  <img src="docs/assets/shot-phone-stage.png" alt="A phone showing the Mac's desktop, with the desktops and windows above and a row of keys below" width="240">
-  <img src="docs/assets/shot-phone-users.png" alt="Manage Users on a phone: an admin and a member" width="240">
+  <img src="docs/assets/shot-phone-remote.png" alt="The Remote tab on a phone: this Mac, another Mac that joined it, and Add another Mac" width="200">
+  <img src="docs/assets/shot-phone-stage.png" alt="A phone showing the Mac's desktop, with the desktops and windows above" width="200">
+  <img src="docs/assets/shot-phone-keys.png" alt="The key panel in the phone keyboard's place: copy, paste, undo, Spotlight, Mission Control and more" width="200">
+  <img src="docs/assets/shot-phone-users.png" alt="Manage Users on a phone: an admin and a member" width="200">
 </p>
 
 <p align="center"><img src="docs/assets/shot-desktop-stage.png" alt="Remote in a computer's browser: the desktops and windows across the top, the Mac's screen below" width="820"></p>
@@ -81,6 +82,7 @@ back, with touch modes made for a small screen.
 On the Mac, the setup assistant and Settings:
 
 <p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/shot-mac-role-dark.png"><img src="docs/assets/shot-mac-role-light.png" alt="The setup assistant's first step: the Mac you connect to, or one to show in another Mac's Castpane" width="400"></picture>
   <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/shot-mac-setup-dark.png"><img src="docs/assets/shot-mac-setup-light.png" alt="The setup assistant's Connection step: the ways to connect, with the quick tunnel's address and QR code beside them" width="400"></picture>
   <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/shot-mac-activity-dark.png"><img src="docs/assets/shot-mac-activity-light.png" alt="Settings, Activity: who signed in and who viewed this Mac, and when" width="400"></picture>
 </p>
@@ -123,7 +125,7 @@ mac/build-app.sh         # mac/build/Castpane.app, with this Mac's Node, server/
 open mac/build/Castpane.app
 ```
 
-The setup assistant then:
+The setup assistant first asks what this Mac is for. For the Mac you connect to, it then:
 
 1. makes your admin account;
 2. asks for Screen Recording and Accessibility (Castpane offers to restart after the first);

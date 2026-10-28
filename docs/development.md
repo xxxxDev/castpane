@@ -89,10 +89,10 @@ node tools/icons.mjs   # web/public/castpane-*.png and mac/Resources (app and me
 
 The web app's screenshots are fixtures only: the "Mac screen" in them is drawn by
 `tools/shots.mjs`. The Mac app's (`docs/assets/shot-mac-*.png`) are the setup assistant's
-Connection step and Settings › Activity, taken from a debug build's snapshots (see Packaging),
-which use a made-up address and sample entries: copy `dark-wizard-2.png`,
-`light-wizard-2.png`, `dark-settings-activity.png` and `light-settings-activity.png` to
-`shot-mac-setup-{dark,light}.png` and `shot-mac-activity-{dark,light}.png`.
+first step and Connection step and Settings › Activity, taken from a debug build's snapshots
+(see Packaging), which use a made-up address and sample entries: copy `{dark,light}-wizard-0.png`,
+`{dark,light}-wizard-3.png` and `{dark,light}-settings-activity.png` to
+`shot-mac-role-*.png`, `shot-mac-setup-*.png` and `shot-mac-activity-*.png`.
 
 ## Builds for checking
 
