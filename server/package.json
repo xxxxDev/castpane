@@ -1,6 +1,6 @@
 {
   "name": "castpane-server",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Castpane's web service: accounts, sign-in, notifications and the remote relay",
   "license": "MIT",
   "private": true,

@@ -9,7 +9,7 @@ import os
 /// behind `lock`; it is started and stopped from the app's main thread and from the
 /// threads that accept and read connections.
 public final class HostServer: @unchecked Sendable {
-    private static let versionValue = OSAllocatedUnfairLock(initialState: "0.1.1")
+    private static let versionValue = OSAllocatedUnfairLock(initialState: "0.1.2")
     /// The version the status message reports. Set once at launch.
     public static var version: String {
         get { versionValue.withLock { $0 } }

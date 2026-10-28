@@ -2,6 +2,20 @@
 
 ## Install
 
+### With Homebrew
+
+```sh
+brew install --cask xxxxDev/tap/castpane
+brew upgrade --cask castpane        # a later version
+```
+
+The cask (in [xxxxDev/homebrew-tap](https://github.com/xxxxDev/homebrew-tap)) downloads the
+release's disk image, checks its SHA-256, puts Castpane in Applications and removes the
+download's quarantine flag. That flag is what makes macOS ask for **Open Anyway**: without it
+Castpane opens like any other app, and Gatekeeper does not check it. You are trusting that the
+tap and the release are this project's, as you do when you build it yourself.
+`brew uninstall --cask castpane` removes the app; `--zap` also removes its data folder.
+
 ### From a release
 
 Each release on GitHub has a disk image, `Castpane-<version>-arm64.dmg`, for Macs with Apple
@@ -16,9 +30,9 @@ silicon and macOS 14 or later.
 3. The setup assistant starts. See below.
 
 To update, quit Castpane from its menu, replace the app in Applications with the new one and
-open it again. The new app needs **Open Anyway** once more and asks for the two permissions
-again (see "Permissions and ad hoc signing"). Your accounts, settings and tunnel stay, since
-they live in the data folder, not in the app.
+open it again. A downloaded copy needs **Open Anyway** once more. The permissions stay (see
+"Permissions and signing"), and so do your accounts, settings and tunnel, since they live in
+the data folder, not in the app.
 
 To check a download, compare its SHA-256 with the one in the release notes:
 `shasum -a 256 Castpane-<version>-arm64.dmg`.
@@ -59,13 +73,17 @@ tunnel's credentials go with it.
 4. **Done.** The address and a QR code. Open it on your phone, sign in, then in Safari use
    **Share › Add to Home Screen**: the app opens full screen and can show notifications.
 
-### Permissions and ad hoc signing
+### Permissions and signing
 
-v0.1 is signed ad hoc, not with a Developer ID. macOS ties the permissions to the exact build,
-so **after every rebuild or update, macOS asks for Screen Recording and Accessibility again**.
-If Remote says Castpane has no permission although the switches look on, remove Castpane from
-both lists with the minus button and add it again. Login Items may list Castpane as from an
-unidentified developer.
+From v0.1.2, releases are signed with the project's own certificate (not an Apple Developer
+ID, and not notarized). macOS ties the permissions to that certificate, so **they stay across
+updates**. Moving from an earlier release (signed ad hoc) or from a build of your own asks for
+Screen Recording and Accessibility once more. If Remote says Castpane has no permission
+although the switches look on, remove Castpane from both lists with the minus button and add
+it again. Login Items may list Castpane as from an unidentified developer.
+
+A build of your own is signed ad hoc unless you give it a certificate
+([development.md](development.md#signing)); then macOS asks again after every build.
 
 ## Connection modes
 

@@ -66,7 +66,13 @@ Mac 上的設定精靈和設定視窗：
 
 ## 快速開始
 
-在 Apple 晶片的 Mac 上，從 releases 頁下載 `Castpane-<版本>-arm64.dmg`，把 Castpane 拖進「應用程式」再打開。這個 App 沒有 Apple 開發者簽章，所以第一次打開要到 **系統設定 › 隱私權與安全性 › 強制打開**；步驟見 [docs/setup.md](docs/setup.md#from-a-release)。
+在 Apple 晶片的 Mac 上，用 [Homebrew](https://brew.sh) 安裝：
+
+```sh
+brew install --cask xxxxDev/tap/castpane     # 之後更新：brew upgrade --cask castpane
+```
+
+或從 releases 頁下載 `Castpane-<版本>-arm64.dmg`，把 Castpane 拖進「應用程式」再打開。這個 App 沒有經過 Apple 公證，所以下載的版本第一次打開要到 **系統設定 › 隱私權與安全性 › 強制打開**；步驟和 Homebrew 方式省掉了什麼，見 [docs/setup.md](docs/setup.md#install)。
 
 或從原始碼編譯（任何 Mac，Apple 晶片或 Intel 都可以）：
 
@@ -100,7 +106,7 @@ open mac/build/Castpane.app
 
 ## v0.1 還沒有的
 
-Apple 開發者簽章和公證（v0.1 是臨時簽名，所以每次重新編譯後 macOS 都會再要一次權限）、App 自動更新、在同一個網頁 App 裡切換多台 Mac、聲音、剪貼簿。
+Apple 開發者簽章和公證（release 改用專案自己的憑證簽名）、App 自動更新、在同一個網頁 App 裡切換多台 Mac、聲音、剪貼簿。
 
 ## 授權
 

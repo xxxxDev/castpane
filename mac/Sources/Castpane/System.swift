@@ -92,7 +92,7 @@ final class KeepAwake {
 enum MacInfo {
     static var computerName: String { (SCDynamicStoreCopyComputerName(nil, nil) as String?) ?? "Mac" }
 
-    static var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.1" }
+    static var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.2" }
 
     static var inBundle: Bool { Bundle.main.bundleURL.pathExtension == "app" }
 

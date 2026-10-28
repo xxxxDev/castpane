@@ -94,10 +94,16 @@ Liquid Glass, which the snapshots do not draw.
 
 ## Quick start
 
-On a Mac with Apple silicon, download `Castpane-<version>-arm64.dmg` from the releases page,
-drag Castpane to Applications and open it. The app is not signed with a Developer ID, so the
-first launch needs **System Settings › Privacy & Security › Open Anyway**;
-[docs/setup.md](docs/setup.md#from-a-release) has the steps.
+On a Mac with Apple silicon, with [Homebrew](https://brew.sh):
+
+```sh
+brew install --cask xxxxDev/tap/castpane     # later: brew upgrade --cask castpane
+```
+
+Or download `Castpane-<version>-arm64.dmg` from the releases page, drag Castpane to
+Applications and open it. The app is not notarized by Apple, so a downloaded copy's first
+launch needs **System Settings › Privacy & Security › Open Anyway**;
+[docs/setup.md](docs/setup.md#install) has the steps and what the Homebrew way skips.
 
 Or build it from source (any Mac, Apple silicon or Intel):
 
@@ -132,9 +138,9 @@ The setup assistant then:
 
 ## Not in v0.1
 
-Developer ID signing and notarization (v0.1 is signed ad hoc, so macOS asks for the
-permissions again after each rebuild), automatic app updates, several Macs in one web app,
-audio, and the clipboard.
+Developer ID signing and notarization (releases are signed with the project's own
+certificate instead), automatic app updates, several Macs in one web app, audio, and the
+clipboard.
 
 ## License
 

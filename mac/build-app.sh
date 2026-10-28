@@ -25,7 +25,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
 cd "$here"
 
-version=0.1.1
+version=0.1.2
 
 [ -f "$here/signing.env" ] && . "$here/signing.env"
 identity=${CASTPANE_SIGN_IDENTITY:--}
