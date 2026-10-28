@@ -249,7 +249,7 @@ async function addMac() {
   put('.j6', ct('配對碼 10 分鐘內有效，只能用一次。'));
 }
 function removeMac(m) {
-  f7.dialog.confirm(ct('移除後，這台 Mac 就不會再出現在這裡；要再看到它，得在那台 Mac 重新加入。'), ct('移除「{name}」？').replace('{name}', m.name), async () => {
+  f7.dialog.confirm(ct('移除後，這台 Mac 就不會再出現在這裡；要再看到它，得在那台 Mac 重新加入。'), ct('移除「{name}」？').replace('{name}', () => m.name), async () => {
     try { await api(`/remote/members/${encodeURIComponent(m.id)}`, { method: 'DELETE' });localSet(shotKey(m.id), '');delete shots[m.id];load(); } catch (e) { f7.dialog.alert(e.message); }
   });
 }

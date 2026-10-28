@@ -455,7 +455,8 @@ struct ActivityTab: View {
 private struct ActivityRow: View {
     let item: ActivityItem
 
-    private var times: String { item.count > 1 ? " (\(item.count) times)" : "" }
+    private var whose: String { item.machine.isEmpty ? "this Mac's" : "\(item.machine)'s" }
+        private var times: String { item.count > 1 ? " (\(item.count) times)" : "" }
 
     private var look: (symbol: String, color: Color, text: String) {
         let who = item.username.isEmpty ? "Someone" : item.username
@@ -463,8 +464,8 @@ private struct ActivityRow: View {
         case "sign-in": return ("key.fill", Palette.blue, "\(who) signed in")
         case "remote-open": return ("eye.fill", .green, "\(who) started viewing \(item.machine.isEmpty ? "this Mac" : item.machine)")
         case "remote-end": return ("eye.slash.fill", .gray, "\(who) stopped viewing\(item.machine.isEmpty ? "" : " " + item.machine)")
-        case "clipboard-read": return ("doc.on.clipboard.fill", .orange, "\(who) copied this Mac's clipboard\(times)")
-        case "clipboard-write": return ("doc.on.clipboard", Palette.blue, "\(who) put text on this Mac's clipboard\(times)")
+        case "clipboard-read": return ("doc.on.clipboard.fill", .orange, "\(who) copied \(whose) clipboard\(times)")
+        case "clipboard-write": return ("doc.on.clipboard", Palette.blue, "\(who) put text on \(whose) clipboard\(times)")
         default: return ("circle.fill", .gray, "\(who): \(item.kind)")
         }
     }

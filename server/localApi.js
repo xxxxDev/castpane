@@ -59,9 +59,9 @@ function readActivity({ limit = 50, file = AUDIT_LOG } = {}) {
       out.push({ at: e.ts, kind: e.action === 'open' ? 'remote-open' : 'remote-end', username: e.username || '', ...(e.ip ? { ip: e.ip } : {}), ...(typeof e.machine === 'string' ? { machine: e.machine } : {}), ...(e.action === 'end' ? { reason: e.reason || '', seconds: e.seconds || 0 } : {}) });
     } else if (e.source === 'remote' && (e.action === 'clipboard-read' || e.action === 'clipboard-write')) {
       // A run of the same use by the same person is one row, with how many times.
-      const prev = out[out.length - 1];
-      if (prev?.kind === e.action && prev.username === (e.username || '')) prev.count = (prev.count || 1) + 1;
-      else out.push({ at: e.ts, kind: e.action, username: e.username || '' });
+      const prev = out[out.length - 1], machine = typeof e.machine === 'string' ? e.machine : '';
+      if (prev?.kind === e.action && prev.username === (e.username || '') && (prev.machine || '') === machine) prev.count = (prev.count || 1) + 1;
+      else out.push({ at: e.ts, kind: e.action, username: e.username || '', ...(machine ? { machine } : {}) });
     } else if (e.source === 'auth' && e.action === 'sign-in') {
       out.push({ at: e.ts, kind: 'sign-in', username: e.username || '', method: e.method || 'password', ...(e.ip ? { ip: e.ip } : {}) });
     }

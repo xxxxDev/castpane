@@ -155,7 +155,8 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
     app.delete('/api/remote/members/:id', ...chain, (req, res) => {
       const id = String(req.params.id);
       const name = members.name(id);
-      if (!members.remove(id)) return res.status(404).json({ message: 'No such Mac' });
+      let removed; try { removed = members.remove(id); } catch (e) { return res.status(e.status || 500).json({ message: e.message }); }
+      if (!removed) return res.status(404).json({ message: 'No such Mac' });
       audit({ source: 'members', action: 'remove', member: id, name, username: req.username, ip: resolveClientIp(req) });
       res.json({ ok: true });
     });
@@ -254,15 +255,22 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
       sendJson({ t: 'error', where: 'host', code: e.code || '', message: e.code === 'NOT_RUNNING' ? 'not-running' : 'host-unavailable' });
       return close('no host');
     }
-    let buf = Buffer.alloc(0);
+    // The capture core's stream, kept in pieces until a whole frame is there, so a large
+    // frame arriving in many pieces is joined once.
+    let buf = Buffer.alloc(0), pieces = [], held = 0, need = 5;
     host.on('data', (d) => {
-      buf = buf.length ? Buffer.concat([buf, d]) : d;
+      pieces.push(d); held += d.length;
+      if (held < need) return;
+      buf = pieces.length === 1 ? pieces[0] : Buffer.concat(pieces, held); pieces = []; held = 0;
+      need = 5;
       while (buf.length >= 5) {
         const n = buf.readUInt32BE(1); if (n > MAX_FRAME) return close('bad frame');
-        if (buf.length < 5 + n) break;
+        if (buf.length < 5 + n) { need = 5 + n; break; }
         const kind = buf[0], payload = buf.subarray(5, 5 + n); buf = buf.subarray(5 + n);
         if (kind === 1) {
-          // Another Mac's words are checked before the page sees them (server/members.js).
+          // Another Mac's words are checked before the page sees them (server/members.js),
+          // and it cannot pile them up behind a page that is not reading.
+          if (member && ws.bufferedAmount > 16 * 1024 * 1024) return close('page behind');
           const text = member ? vetFromMember(payload.toString('utf8')) : payload.toString('utf8');
           if (text !== null && ws.readyState === 1) ws.send(text);
         }
@@ -276,20 +284,26 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
           if (ws.readyState === 1) ws.send(payload, { binary: true });
         }
       }
+      if (buf.length) { pieces = [buf]; held = buf.length; buf = Buffer.alloc(0); }
     });
     host.on('close', () => close('host closed')); host.on('error', () => close('host error'));
-    let windowStart = Date.now(), count = 0, lastClipboard = 0;
+    let windowStart = Date.now(), count = 0, lastClipboard = 0, lastLarge = 0;
     ws.on('message', (raw, binary) => {
       if (closed) return;
       if (binary) return close('binary from page');
       if (Date.now() - windowStart > 1000) { windowStart = Date.now(); count = 0; }
       if (++count > 600) return close('too fast');
-      // Only clipboard-set is ever large: a large message is parsed at most once a second.
-      const large = raw.length > 16384;
-      if (large && Date.now() - lastClipboard < 1000) return close('too large');
+      // Only clipboard-set is ever large (text is at most 4000 units, 24 KB as JSON): a
+      // large message is parsed at most once a second, and one too soon is answered busy.
+      const large = raw.length > 32768;
+      if (large) {
+        const tooSoon = Date.now() - lastLarge < 1000;
+        lastLarge = Date.now();
+        if (tooSoon) return raw.subarray(0, 24).toString().startsWith('{"t":"clipboard-set"') ? sendJson({ t: 'clipboard-busy' }) : close('too large');
+      }
       let msg; try { msg = JSON.parse(raw.toString()); } catch { return close('bad message'); }
       if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.t !== 'string' || !Object.hasOwn(MESSAGES, msg.t)) return close('unknown message');
-      if (large && msg?.t !== 'clipboard-set') return close('too large');
+      if (large && msg.t !== 'clipboard-set') return close('too large');
       const clean = fromPage(msg);
       if (!clean) return;
       const clipboard = clean.t.startsWith('clipboard-');

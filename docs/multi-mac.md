@@ -34,14 +34,22 @@ ways, each prefixed with `n` (4 bytes), so nothing from an earlier session is mi
 - What comes from a member is checked before it reaches the page: JSON objects of the
   capture core's known types only, and thumbnails only as `data:image/…;base64` URLs.
 - One viewer at a time, across all Macs.
-- The member's menu shows the viewer, and **Stop Sharing Now** ends the session; **Pause**
-  stops sharing, and the hub shows the member as not sharing until it resumes.
+- The member's menu shows the viewer. **Stop Sharing Now** ends the session, and the hub may
+  not open another for five minutes; **Pause** stops sharing until it resumes. Either way the
+  hub shows the member as not sharing.
+- The member checks what the hub sends too: the same allow-list as for a page, the clipboard
+  at most once a second, and each clipboard use in its own log.
 - Sessions are in both Macs' logs and Activity: on the hub with the member's name, on the
   member with the hub's address.
 
 ## Limits on the hub's side
 
 - `/member` takes no cookies or pages: a message that is not the member protocol closes it.
-- At most 20 failed joins or hellos a minute in all, then refused for that minute; a code is
-  spent by its first use, right or wrong.
-- At most 32 members; a member's messages are size- and rate-limited like a page's.
+- Joins: at most 20 wrong codes a minute in all and 5 from one address, then joins are refused
+  for the rest of the minute; a code is spent by its first use, right or wrong. A member that
+  knows its secret always gets back in.
+- At most 64 connections, and 8 from one address, may wait to say hello.
+- At most 32 members. A member's messages are limited in number (1000 a second), size (2 MiB)
+  and bytes (64 MB a second); what it says reaches a page only rebuilt from known fields, and
+  never faster than the page reads it.
+- A `members.json` that is not this account's private file is set aside and not trusted.

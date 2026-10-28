@@ -9,9 +9,16 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const WebSocket = require('ws');
 const { audit } = require('./services/audit');
+const { FROM_PAGE, fromPage } = require('./remote');
 
 const SLICE = 256 * 1024;
 const BACKLOG = 4 * 1024 * 1024;
+// The hub not reading what this Mac sends: the session ends past this.
+const UPLINK_BACKLOG = 16 * 1024 * 1024;
+// After Stop Sharing Now, the hub may not open a session again for this long.
+const STOPPED_MS = 5 * 60 * 1000;
+// A frame from the hub is a page's message, never larger than this (remote.js).
+const FRAME_MAX = 2 * 1024 * 1024;
 
 const frame = (kind, payload) => { const h = Buffer.alloc(5); h[0] = kind; h.writeUInt32BE(payload.length, 1); return Buffer.concat([h, payload]); };
 
@@ -28,6 +35,9 @@ function hubOrigin(text) {
 // (server/remote.js). running(): whether its socket is there.
 function createMemberLink({ home, file = path.join(home, 'data', 'member.json'), connectHost, tokenOf, running, name = () => os.hostname().replace(/\.local$/, ''), retryMs = [1000, 60000], timeoutMs = 10000, onChange = () => {} } = {}) {
   let config = load(), ws = null, state = config ? 'connecting' : 'off', retry = null, delay = retryMs[0], session = null, poll = null, wasRunning = null, stopped = false;
+  let blockedUntil = 0, joinGen = 0, auditMinute = 0, audited = 0;
+  const mayAudit = () => { const m = Math.floor(Date.now() / 60000); if (m !== auditMinute) { auditMinute = m; audited = 0; } return ++audited <= 30; };
+  const blocked = () => Date.now() < blockedUntil;
 
   function load() {
     try {
@@ -50,14 +60,15 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
   function endSession(tell = true) {
     if (!session) return;
     const s = session; session = null;
-    if (s.sock) audit({ source: 'remote', action: 'end', username: s.by, via: config?.hub || '', reason: 'ended', seconds: Math.round((Date.now() - Date.parse(s.since)) / 1000) });
+    if (s.sock && mayAudit()) audit({ source: 'remote', action: 'end', username: s.by, via: config?.hub || '', reason: 'ended', seconds: Math.round((Date.now() - Date.parse(s.since)) / 1000) });
     try { s.sock?.destroy(); } catch { /* gone */ }
     if (tell) sendJson(ws, { t: 'closed', n: s.n });
   }
 
   async function openSession(n, by) {
     endSession();
-    const s = { n, by: String(by || '').slice(0, 64), since: new Date().toISOString(), sock: null };
+    if (blocked()) return sendJson(ws, { t: 'failed', n });
+    const s = { n, by: String(by || '').slice(0, 64), since: new Date().toISOString(), sock: null, pieces: [], held: 0, lastClipboard: 0 };
     session = s;
     try {
       const token = tokenOf();
@@ -67,9 +78,10 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
       sock.write(frame(1, Buffer.from(JSON.stringify({ t: 'hello', token }))));
       sendJson(ws, { t: 'opened', n });
       // In this Mac's log and Activity too: who, through which Mac.
-      audit({ source: 'remote', action: 'open', username: s.by, via: config?.hub || '', ip: config ? new URL(config.hub).hostname : '' });
+      if (mayAudit()) audit({ source: 'remote', action: 'open', username: s.by, via: config?.hub || '', ip: config ? new URL(config.hub).hostname : '' });
       sock.on('data', (d) => {
         if (session !== s || ws?.readyState !== 1) return;
+        if (ws.bufferedAmount > UPLINK_BACKLOG) return endSession();
         const head = Buffer.alloc(4); head.writeUInt32BE(n);
         for (let i = 0; i < d.length; i += SLICE) ws.send(Buffer.concat([head, d.subarray(i, i + SLICE)]), { binary: true });
       });
@@ -78,6 +90,33 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     } catch {
       if (session === s) { session = null; sendJson(ws, { t: 'failed', n }); }
     }
+  }
+
+  // What the hub sends for the capture core, checked here as the hub checks a page's: the
+  // same allow-list, the clipboard at most once a second and in this Mac's log too.
+  function fromHub(s, chunk) {
+    s.pieces.push(chunk); s.held += chunk.length;
+    if (s.held > FRAME_MAX + 5) return endSession();
+    let buf = s.pieces.length === 1 ? s.pieces[0] : Buffer.concat(s.pieces, s.held);
+    while (buf.length >= 5) {
+      const n = buf.readUInt32BE(1);
+      if (buf[0] !== 1 || n > FRAME_MAX) return endSession();
+      if (buf.length < 5 + n) break;
+      let msg; try { msg = JSON.parse(buf.subarray(5, 5 + n).toString()); } catch { return endSession(); }
+      buf = buf.subarray(5 + n);
+      if (!msg || typeof msg !== 'object' || Array.isArray(msg) || !FROM_PAGE.has(msg.t)) return endSession();
+      const clean = fromPage(msg);
+      if (!clean) continue;
+      if (clean.t.startsWith('clipboard-')) {
+        if (Date.now() - s.lastClipboard < 1000) continue;
+        s.lastClipboard = Date.now();
+        if (mayAudit()) audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: s.by, via: config?.hub || '', ...(clean.s ? { chars: clean.s.length } : {}) });
+      }
+      // The capture core not reading: the session ends rather than piling up.
+      if (s.sock.writableLength > BACKLOG) return endSession();
+      s.sock.write(frame(1, Buffer.from(JSON.stringify(clean))));
+    }
+    s.pieces = buf.length ? [buf] : []; s.held = buf.length;
   }
 
   function connect() {
@@ -92,16 +131,13 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
       if (ws !== sock) return;
       if (binary) {
         if (raw.length < 4 || !session?.sock || raw.readUInt32BE(0) !== session.n) return;
-        // The capture core not reading: the session ends rather than piling up.
-        if (session.sock.writableLength > BACKLOG) return endSession();
-        session.sock.write(raw.subarray(4));
-        return;
+        return fromHub(session, raw.subarray(4));
       }
       let m; try { m = JSON.parse(raw.toString()); } catch { return; }
       if (m?.t === 'welcome') { welcomed = true; delay = retryMs[0]; set('connected'); wasRunning = null; report(); return; }
       if (m?.t === 'refused') { set('removed'); stopped = true; return; }
       if (!welcomed) return;
-      if (m?.t === 'open' && Number.isInteger(m.n)) openSession(m.n, m.by);
+      if (m?.t === 'open' && Number.isInteger(m.n) && m.n >= 0 && m.n <= 0xffffffff) openSession(m.n, m.by);
       else if (m?.t === 'close' && session?.n === m.n) endSession(false);
     });
     sock.on('error', () => {});
@@ -115,7 +151,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     });
   }
   function report() {
-    const now = !!running();
+    const now = !!running() && !blocked();
     if (now !== wasRunning) { wasRunning = now; sendJson(ws, { t: 'status', running: now }); }
   }
 
@@ -127,24 +163,35 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     status: () => ({ state, hub: config?.hub || null, hubName: config?.hubName || '' }),
     // Who is viewing this Mac through the hub, for the app's menu.
     viewer: () => (session?.sock ? { username: session.by, since: session.since, via: config?.hub || '' } : null),
-    endViewer() { if (!session) return false; endSession(); return true; },
+    // Stop Sharing Now: the session ends, and the hub may not open another for a while
+    // (this Mac shows there as not sharing).
+    endViewer() {
+      blockedUntil = Date.now() + STOPPED_MS; report();
+      setTimeout(() => { if (ws && state === 'connected') report(); }, STOPPED_MS + 100).unref?.();
+      if (!session) return false;
+      endSession(); return true;
+    },
     // Joins the hub at `hub` with `code`, keeps what it answers, and stays connected.
     join(hub, code) {
       const origin = hubOrigin(hub);
       if (!origin) return Promise.reject(Object.assign(new Error('The address must be https://…'), { status: 400, code: 'BAD_ADDRESS' }));
       if (typeof code !== 'string' || !/^[A-Za-z0-9\s-]{6,16}$/.test(code)) return Promise.reject(Object.assign(new Error('That is not a code'), { status: 400, code: 'BAD_CODE' }));
+      const mine = ++joinGen;
       return new Promise((resolve, reject) => {
         const sock = new WebSocket(memberUrl(origin), { handshakeTimeout: timeoutMs, maxPayload: 64 * 1024 });
-        const done = (e, v) => { clearTimeout(timer); try { sock.close(); } catch { /* gone */ } if (e) reject(e); else resolve(v); };
+        let over = false;
+        const done = (e, v) => { over = true; clearTimeout(timer); try { sock.close(); } catch { /* gone */ } if (e) reject(e); else resolve(v); };
         const timer = setTimeout(() => done(Object.assign(new Error('The other Mac did not answer'), { status: 504, code: 'NO_ANSWER' })), timeoutMs);
         sock.on('open', () => sendJson(sock, { t: 'join', code, name: name() }));
         sock.on('message', (raw) => {
           let m; try { m = JSON.parse(raw.toString()); } catch { return; }
           if (m?.t === 'refused') return done(Object.assign(new Error('The code was not accepted: it is wrong, used or out of date'), { status: 403, code: 'REFUSED' }));
+          // Too late (timed out, left or joined again meanwhile): not kept.
+          if (over || mine !== joinGen) return;
           if (m?.t === 'joined' && /^[0-9a-f]{12}$/.test(m.id) && /^[0-9a-f]{64}$/.test(m.secret)) {
             endSession(); stopped = true; try { ws?.close(); } catch { /* gone */ } ws = null;
             config = { hub: origin, id: m.id, secret: m.secret, hubName: new URL(origin).hostname };
-            save(config);
+            try { save(config); } catch (e) { config = null; return done(Object.assign(new Error(`Could not keep the link: ${e.message}`), { status: 500, code: 'NOT_SAVED' })); }
             stopped = false; delay = retryMs[0];
             done(null, { hub: origin });
             connect();
@@ -156,7 +203,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     },
     // Leaves the hub: the link closes and what it kept is deleted.
     leave() {
-      stopped = true; clearTimeout(retry);
+      joinGen++; stopped = true; clearTimeout(retry);
       endSession(); const sock = ws; ws = null; try { sock?.close(); } catch { /* gone */ }
       config = null;
       try { fs.unlinkSync(file); } catch { /* none */ }
