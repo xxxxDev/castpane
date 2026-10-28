@@ -153,11 +153,14 @@ app again, and every user grants the permissions once more.
    (see Signing; the app updates itself only to a version signed with the same one):
 
    ```sh
-   npm run setup && npm run lint && npm run build
+   npm run setup && npm run lint && BUILD_ID=v<version> npm run build
    mac/build-app.sh && mac/make-dmg.sh
    CASTPANE_ARCH=x86_64 CASTPANE_NODE_BIN=$(mac/fetch-node.sh x86_64) mac/build-app.sh && mac/make-dmg.sh
    ```
 
+   `BUILD_ID` names the web app after the release. Without it the web app is named by
+   `git describe` of its last change, which comes before the release's own tag, so phones
+   would show an older version's name.
 3. Install from an image on a Mac and go through the setup assistant once.
 4. Tag the commit and make a GitHub release from the tag (a pre-release for a beta) with both
    images and the SHA-256 that `make-dmg.sh` prints. Running copies find it within a day: the
