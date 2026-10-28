@@ -18,6 +18,7 @@
 # CASTPANE_SIGN_IDENTITY=<name or SHA-1>   the certificate to sign with
 # CASTPANE_SIGN_KEYCHAIN=<path>            the keychain that holds it (optional)
 # CASTPANE_SIGN_KEYCHAIN_PASSWORD_FILE=<path>  unlocks that keychain first (optional)
+# CASTPANE_SIGN_TIMESTAMP=1                adds a secure timestamp (needed for notarization)
 # mac/signing.env (not in git), when present, is read for these.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
@@ -35,6 +36,7 @@ if [ "$identity" != "-" ] && [ -n "${CASTPANE_SIGN_KEYCHAIN:-}" ]; then
   fi
   keychain_args="--keychain $CASTPANE_SIGN_KEYCHAIN"
 fi
+if [ "$identity" != "-" ] && [ "${CASTPANE_SIGN_TIMESTAMP:-}" = "1" ]; then keychain_args="$keychain_args --timestamp"; fi
 arch=$(uname -m)
 
 echo "== swift build (release, $arch)"

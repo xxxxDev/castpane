@@ -138,6 +138,10 @@ CASTPANE_SIGN_KEYCHAIN=<path to the keychain>
 CASTPANE_SIGN_KEYCHAIN_PASSWORD_FILE=<a file holding its password>
 ```
 
+For a Developer ID build that will be notarized, also set `CASTPANE_SIGN_TIMESTAMP=1`:
+notarization needs a secure timestamp on every signature. The app has no provisioning
+profile, iCloud or APNs (notifications are Web Push), and no native addons.
+
 Keep a backup of the certificate and its key: a release signed with another one is a new
 app again, and every user grants the permissions once more.
 
