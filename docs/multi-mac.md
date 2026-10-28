@@ -7,10 +7,11 @@ own; it shows its screen only through the hub, to the hub's admins.
 
 ## Joining
 
-1. On the hub's Remote page an admin taps **Add a Mac**. The hub makes a code: 8 characters,
+1. On the hub's Remote page an admin taps **Add another Mac**. The hub makes a code: 8 characters,
    for 10 minutes, used once. It is shown with the hub's address.
-2. On the member, Castpane › Settings › **Other Macs** takes the address and the code. The
-   member's server opens `wss://<hub>/member`, sends `{t:"join", code, name}`, and the hub
+2. On the member, the setup assistant's first step offers **Show it in another Mac's
+   Castpane** (no account or address then: permissions, then the address and code), and
+   Castpane › Settings › **Other Macs** does the same later. The member's server opens `wss://<hub>/member`, sends `{t:"join", code, name}`, and the hub
    answers `{t:"joined", id, secret}`: a 32-byte secret it keeps only as a SHA-256 hash
    (`data/members.json`, 0600). The member keeps the secret in its own `data/member.json`
    (0600).

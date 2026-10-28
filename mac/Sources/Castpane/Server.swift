@@ -164,14 +164,15 @@ struct LocalAPI {
 
     private static let session: URLSession = {
         let c = URLSessionConfiguration.ephemeral
-        c.timeoutIntervalForRequest = 5
+        c.timeoutIntervalForRequest = 30  // each request sets its own, 5 s unless it waits on another Mac
         c.connectionProxyDictionary = [:]
         return URLSession(configuration: c)
     }()
 
-    private func request(_ method: String, _ path: String, body: [String: Any]? = nil) async throws -> Data {
+    private func request(_ method: String, _ path: String, body: [String: Any]? = nil, timeout: TimeInterval = 5) async throws -> Data {
         var r = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/api/local/\(path)")!)
         r.httpMethod = method
+        r.timeoutInterval = timeout
         r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let body {
             r.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -208,6 +209,8 @@ struct LocalAPI {
 
     /// This Mac's link to another Mac's Castpane (docs/multi-mac.md).
     func member() async throws -> MemberStatus { MemberStatus.decode(try await request("GET", "member")) }
-    func joinMember(hub: String, code: String) async throws { _ = try await request("POST", "member/join", body: ["hub": hub, "code": code]) }
+    /// Waits as long as the server does for the other Mac (10 s), and more: the join is
+    /// not reported failed while it may still succeed (the owner's report, 2026-10-29).
+    func joinMember(hub: String, code: String) async throws { _ = try await request("POST", "member/join", body: ["hub": hub, "code": code], timeout: 30) }
     func leaveMember() async throws { _ = try await request("POST", "member/leave", body: [:]) }
 }

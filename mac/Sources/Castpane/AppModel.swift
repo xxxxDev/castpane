@@ -162,8 +162,9 @@ final class AppModel: ObservableObject {
         Task {
             let s = try? await api.status()
             self.status = s
-            // No account yet: the setup assistant, once per launch.
-            if let s, s.users == 0, !self.wizardOffered {
+            // No account yet: the setup assistant, once per launch; not on a Mac that
+            // finished it to join another Mac, which needs none.
+            if let s, s.users == 0, !self.wizardOffered, !UserDefaults.standard.bool(forKey: Wizard.doneKey) {
                 self.wizardOffered = true
                 Windows.shared.showWizard(self)
             }

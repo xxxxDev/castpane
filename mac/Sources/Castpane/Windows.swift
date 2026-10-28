@@ -3,20 +3,46 @@ import AppKit
 import CastpaneCore
 import CastpaneHost
 
-/// The first-run assistant: account, permissions, connection, done.
+/// The first-run assistant. First what this Mac is for: the one people connect to
+/// (account, permissions, connection, done), or one that shows in another Mac's Castpane
+/// (permissions, join, done), which needs no account or address (the owner's request,
+/// 2026-10-29).
 struct Wizard: View {
     static let doneKey = "wizardDone"
     @EnvironmentObject var model: AppModel
     @ViewState private var step: Int
-    private let titles = ["Create the admin account", "Permissions", "Connection", "Done"]
-    private let subtitles = [
-        "This account signs in from your phone. More users can be added later in the web app.",
-        "Castpane needs two macOS permissions. The status updates by itself.",
-        "Choose how your phone reaches this Mac.",
-        "Scan the code with your phone's camera, sign in, and you will see this Mac.",
-    ]
+    @ViewState private var role: Role
+    @ViewState private var joined = false
 
-    init(step: Int = 0) { _step = ViewState(initialValue: step) }
+    enum Role { case main, member }
+    enum Step { case role, account, permissions, connection, join, done, joinedDone }
+
+    private var steps: [Step] { role == .main ? [.role, .account, .permissions, .connection, .done] : [.role, .permissions, .join, .joinedDone] }
+    private var current: Step { steps[min(step, steps.count - 1)] }
+
+    private func title(_ s: Step) -> String {
+        switch s {
+        case .role: return "Set up this Mac"
+        case .account: return "Create the admin account"
+        case .permissions: return "Permissions"
+        case .connection: return "Connection"
+        case .join: return "Join another Mac"
+        case .done, .joinedDone: return "Done"
+        }
+    }
+    private func subtitle(_ s: Step) -> String {
+        switch s {
+        case .role: return "Is this the Mac your phone connects to, or one to show in another Mac's Castpane?"
+        case .account: return "This account signs in from your phone. More users can be added later in the web app."
+        case .permissions: return "Castpane needs two macOS permissions. The status updates by itself."
+        case .connection: return "Choose how your phone reaches this Mac."
+        case .join: return "On the other Mac's web app, open Remote and tap Add another Mac; enter its address and code here."
+        case .done: return "Scan the code with your phone's camera, sign in, and you will see this Mac."
+        case .joinedDone: return "This Mac now shows on the other Mac's Remote page."
+        }
+    }
+
+    init(step: Int = 0, role: Role = .main) { _step = ViewState(initialValue: step); _role = ViewState(initialValue: role) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -24,18 +50,21 @@ struct Wizard: View {
                 Label { Text("Set up Castpane") } icon: { AppMark(size: 22) }
                     .font(.headline).foregroundStyle(.secondary)
                 Spacer()
-                StepDots(count: titles.count, current: step)
+                StepDots(count: steps.count, current: step)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(titles[step]).font(.largeTitle.bold())
-                Text(subtitles[step]).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(title(current)).font(.largeTitle.bold())
+                Text(subtitle(current)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Group {
-                switch step {
-                case 0: AccountStep(next: { step = 1 })
-                case 1: PermissionsPane(showNote: false)
-                case 2: ConnectionPane(showLog: false)
-                default: DoneStep()
+                switch current {
+                case .role: RoleStep(role: $role)
+                case .account: AccountStep(next: { step += 1 })
+                case .permissions: PermissionsPane(showNote: false)
+                case .connection: ConnectionPane(showLog: false)
+                case .join: OtherMacsTab(onStatus: { joined = $0.state != "off" }, showIntro: false).padding(.horizontal, -20)
+                case .done: DoneStep()
+                case .joinedDone: JoinedStep()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -43,9 +72,11 @@ struct Wizard: View {
                 if step > 0 { Button("Back") { step -= 1 }.secondaryButtonStyle().controlSize(.large) }
                 Spacer()
                 Group {
-                    if step == 0 {
-                        if (model.status?.users ?? 0) > 0 { Button("Next") { step = 1 } }
-                    } else if step < titles.count - 1 {
+                    if current == .account {
+                        if (model.status?.users ?? 0) > 0 { Button("Next") { step += 1 } }
+                    } else if current == .join {
+                        if joined { Button("Next") { step += 1 } }
+                    } else if step < steps.count - 1 {
                         Button("Next") { step += 1 }
                     } else {
                         Button("Finish") {
@@ -82,6 +113,56 @@ private struct StepDots: View {
         .animation(.snappy, value: current)
         .accessibilityElement()
         .accessibilityLabel("Step \(current + 1) of \(count)")
+    }
+}
+
+/// What this Mac is for: two cards to pick from.
+private struct RoleStep: View {
+    @Binding var role: Wizard.Role
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            card(.main, "iphone.and.arrow.forward", "The Mac I connect to",
+                 "Your phone signs in to this Mac. It gets an account and an address, and other Macs can join it.")
+            card(.member, "macbook.and.iphone", "Show it in another Mac's Castpane",
+                 "This Mac joins one that is already set up, with a code from it. No account or address here.")
+        }
+    }
+
+    private func card(_ r: Wizard.Role, _ symbol: String, _ title: String, _ text: String) -> some View {
+        Button { role = r } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: symbol).font(.title2).foregroundStyle(Palette.blue)
+                    Spacer()
+                    Image(systemName: role == r ? "checkmark.circle.fill" : "circle").font(.title3)
+                        .foregroundStyle(role == r ? Palette.blue : Palette.muted)
+                }
+                Text(title).font(.headline)
+                Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .glassCard()
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(role == r ? Palette.blue : .clear, lineWidth: 2))
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+private struct JoinedStep: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Open the other Mac's web app, then Remote: this Mac is listed there.", systemImage: "rectangle.on.rectangle")
+            Label("Castpane stays in the menu bar. Settings › Other Macs shows the link, or leaves.", systemImage: "menubar.rectangle")
+            Label("Every session is logged here too, and you can pause sharing from the menu bar.", systemImage: "eye")
+        }
+        .font(.callout)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
     }
 }
 
@@ -313,6 +394,10 @@ private struct ClipboardAccessRow: View {
 /// (docs/multi-mac.md).
 struct OtherMacsTab: View {
     @EnvironmentObject var model: AppModel
+    /// Told of each status, for the setup assistant's Next.
+    var onStatus: (MemberStatus) -> Void = { _ in }
+    /// The paragraph on what joining does: the setup assistant says it in its own words.
+    var showIntro = true
     @ViewState private var status = MemberStatus()
     @ViewState private var hub = ""
     @ViewState private var code = ""
@@ -322,10 +407,10 @@ struct OtherMacsTab: View {
 
     var body: some View {
         Form {
-            Section {
+            if showIntro { Section {
                 Text("Show this Mac in another Mac's Castpane: its admins can then see and use this screen from that Mac's web app, as they do that Mac's own. This Mac needs no address or account for it.")
                     .foregroundStyle(.secondary)
-            }
+            } }
             if status.state == "off" {
                 Section("Join another Mac") {
                     TextField("Its address", text: $hub, prompt: Text("https://castpane.example.com"))
@@ -333,7 +418,8 @@ struct OtherMacsTab: View {
                     HStack {
                         if let message { Text(message).foregroundStyle(.red).font(.callout) }
                         Spacer()
-                        Button("Join") { join() }
+                        if busy { ProgressView().controlSize(.small) }
+                        Button(busy ? "Joining…" : "Join") { join() }
                             .primaryButtonStyle()
                             .disabled(busy || hub.trimmingCharacters(in: .whitespaces).isEmpty || code.trimmingCharacters(in: .whitespaces).count < 6)
                     }
@@ -373,7 +459,7 @@ struct OtherMacsTab: View {
     }
 
     private func refresh() async {
-        if let s = try? await model.api.member() { status = s }
+        if let s = try? await model.api.member() { status = s; onStatus(s) }
     }
 
     private func join() {

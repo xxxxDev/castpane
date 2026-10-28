@@ -22,7 +22,8 @@ enum Snapshot {
              {"at": \(now - 760_000), "kind": "sign-in", "username": "admin", "method": "password", "ip": "203.0.113.7"}]
             """.utf8)), quickURL: "https://quiet-river-sample-words.trycloudflare.com")
         var shots: [(String, NSSize, AnyView)] = []
-        for step in 0..<4 { shots.append(("wizard-\(step)", Wizard.size, AnyView(Wizard(step: step)))) }
+        for step in 0..<5 { shots.append(("wizard-\(step)", Wizard.size, AnyView(Wizard(step: step)))) }
+        for step in [0, 2, 3] { shots.append(("wizard-member-\(step)", Wizard.size, AnyView(Wizard(step: step, role: .member)))) }
         for mode in ConnectionMode.allCases {
             shots.append(("connection-\(mode.rawValue)", Wizard.size,
                           AnyView(ConnectionPane(showLog: true, initialMode: mode).padding(28).frame(width: Wizard.size.width, height: 400).background(WindowBackdrop()))))
