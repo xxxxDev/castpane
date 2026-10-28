@@ -89,9 +89,13 @@ async function main() {
   const { isActiveUser } = require('./services/userLifecycle');
   const version = require('./package.json').version;
   let relay = null;
+  // The other Macs that joined this one (server/members.js), and this Mac's own link
+  // when it joined another (server/memberLink.js).
+  const members = require('./members').createMembers({ file: path.join(data, 'members.json') });
+  const memberLink = require('./memberLink').createMemberLink({ home, connectHost: () => remote.connectHost({ home }), tokenOf: () => remote.readHostToken(home), running: () => remote.hostRunning(home) });
   const app = require('./app').createApp({
-    remoteRoutes: (a, opts) => remote.installRemoteRoutes(a, opts),
-    localRoutes: createLocalRoutes({ home, version, remote: { viewer: () => relay?.viewer() || null, endViewer: async (r) => (relay ? relay.endViewer(r) : false) } }),
+    remoteRoutes: (a, opts) => remote.installRemoteRoutes(a, { ...opts, members }),
+    localRoutes: createLocalRoutes({ home, version, memberLink, remote: { viewer: () => relay?.viewer() || memberLink.viewer(), endViewer: async (r) => { const here = relay ? await relay.endViewer(r) : false; return memberLink.endViewer() || here; } } }),
   });
   const push = getDefaultPushService();
   // Every admin is told when a remote session opens: who, and from where.
@@ -107,8 +111,8 @@ async function main() {
     onListening: () => console.log(`Castpane ${version}: http://127.0.0.1:${site.servicePort()}${site.publicOrigin() ? ` (public: ${site.publicOrigin()})` : ''}`),
     product(server) {
       push.start();
-      relay = remote.installRemote(server, { onOpen: (o) => { announceOpen(o).catch((e) => console.error('remote: notification not sent:', e.message)); } });
-      return { stop() { push.stop(); relay.close(); return 0; } };
+      relay = remote.installRemote(server, { members, onOpen: (o) => { announceOpen(o).catch((e) => console.error('remote: notification not sent:', e.message)); } });
+      return { stop() { push.stop(); relay.close(); members.close(); memberLink.close(); return 0; } };
     },
   }).stop;
 }

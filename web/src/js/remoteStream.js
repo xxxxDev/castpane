@@ -7,9 +7,10 @@ export function remoteSupported() {
   return typeof window !== 'undefined' && 'VideoDecoder' in window && 'EncodedVideoChunk' in window;
 }
 
-export function openRemote({ pass, canvas, onMessage = () => {}, onState = () => {}, onStats = () => {} }) {
+// machine: another Mac that joined this one (docs/multi-mac.md), or empty for this Mac.
+export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, onState = () => {}, onStats = () => {} }) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const ws = new WebSocket(`${proto}//${location.host}/remote?pass=${encodeURIComponent(pass)}`);
+  const ws = new WebSocket(`${proto}//${location.host}/remote?pass=${encodeURIComponent(pass)}${machine ? `&machine=${encodeURIComponent(machine)}` : ''}`);
   ws.binaryType = 'arraybuffer';
   let decoder = null, config = null, needKey = true, closed = false, opened = false;
   let frames = 0, bytes = 0, statsAt = performance.now();

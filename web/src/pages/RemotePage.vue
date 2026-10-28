@@ -11,13 +11,23 @@
 
     <f7-block-title>{{ ct('連線到 Mac') }}</f7-block-title>
     <div class="remote-tiles">
-      <button v-for="m in machines" :key="m.id" type="button" class="remote-tile" :class="{disabled: !m.running || !supported}" @click="connect(m)">
-        <div class="remote-tile-shot"><img v-if="lastShot" :src="lastShot" alt=""/><f7-icon v-else f7="desktopcomputer" :size="44"/></div>
-        <div class="remote-tile-name">{{ m.name }}</div>
-        <div class="remote-tile-sub">{{ m.running ? (m.local ? ct('這台 Mac') : '') : ct('Castpane 沒有在執行') }}</div>
+      <!-- This Mac, then the other Macs that joined it (docs/multi-mac.md; the owner's
+           request, 2026-10-29). -->
+      <div v-for="m in machines" :key="m.id" class="remote-tile-wrap">
+        <button type="button" class="remote-tile" :class="{disabled: !m.running || !supported, member: !m.local}" @click="connect(m)">
+          <div class="remote-tile-shot"><img v-if="shots[m.id]" :src="shots[m.id]" alt=""/><f7-icon v-else f7="desktopcomputer" :size="44"/></div>
+          <div class="remote-tile-name">{{ m.name }}</div>
+          <div class="remote-tile-sub">{{ tileSub(m) }}</div>
+        </button>
+        <button v-if="!m.local" type="button" class="remote-tile-remove" :title="ct('移除這台 Mac')" @click="removeMac(m)"><f7-icon f7="xmark" :size="13"/></button>
+      </div>
+      <button v-if="canAdd" type="button" class="remote-tile add" @click="addMac">
+        <div class="remote-tile-shot"><f7-icon f7="plus" :size="36"/></div>
+        <div class="remote-tile-name">{{ ct('加入另一台 Mac') }}</div>
+        <div class="remote-tile-sub">{{ ct('在這裡也能看到它的畫面') }}</div>
       </button>
     </div>
-    <p v-if="machines.some(m => !m.running)" class="remote-note not-running">{{ ct('在這台 Mac 上打開 Castpane，或在選單列恢復分享，再回來這裡。') }}</p>
+    <p v-if="machines.some(m => m.local && !m.running)" class="remote-note not-running">{{ ct('在這台 Mac 上打開 Castpane，或在選單列恢復分享，再回來這裡。') }}</p>
 
     <Teleport to="body">
       <div v-if="streaming" class="remote-stage" :class="{touch: isTouch}" :style="stageBox" @contextmenu.prevent>
@@ -171,7 +181,11 @@ const PAGES = [
   { id: 'fn', name: '功能鍵', cols: 4, keys: Array.from({ length: 12 }, (_, i) => ({ code: 'F' + (i + 1), label: 'F' + (i + 1) })) },
 ];
 const prefs = reactive({ quality: 'standard', resolution: '1920', fps: 60, ...(JSON.parse(localGet('castpane-remote-prefs') || '{}')) });
-const lastShot = ref(localGet('castpane-remote-shot') || '');
+// The last picture of each Mac, for its tile; this Mac's under the key it always had.
+const shotKey = (id) => (id === 'local' ? 'castpane-remote-shot' : `castpane-remote-shot-${id}`);
+const shots = reactive({});
+const canAdd = ref(false);
+let machine = 'local';
 let link = null;
 
 function localGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
@@ -180,7 +194,11 @@ function sessionGet(k) { try { return JSON.parse(sessionStorage.getItem(k) || 'n
 function sessionSet(k, v) { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
 async function load() {
-  try { machines.value = (await api('/remote/machines')).machines;error.value = ''; } catch (e) { error.value = e.message; }
+  try {
+    const r = await api('/remote/machines');
+    machines.value = r.machines;canAdd.value = !!r.canAdd;error.value = '';
+    for (const m of r.machines) if (!(m.id in shots)) shots[m.id] = localGet(shotKey(m.id)) || '';
+  } catch (e) { error.value = e.message; }
 }
 onMounted(load);
 onBeforeUnmount(() => { disconnect(); });
@@ -206,15 +224,46 @@ async function getPass(fresh = false) {
   return r.pass;
 }
 
+function tileSub(m) {
+  if (m.local) return m.running ? ct('這台 Mac') : ct('Castpane 沒有在執行');
+  if (!m.online) return ct('離線');
+  return m.running ? '' : ct('沒有在分享');
+}
+// A one-time code for another Mac, shown with this Mac's address and what to do there.
+async function addMac() {
+  let r;
+  try { r = await api('/remote/members/code', { method: 'POST', body: '{}' }); } catch (e) {
+    return f7.dialog.alert(e.code === 'NO_PUBLIC_ADDRESS' ? ct('要先讓這台 Mac 有固定的 HTTPS 網址（自己的網域或 Tailscale），其他 Mac 才能加入。快速通道的網址每次都會變。') : e.message);
+  }
+  const d = f7.dialog.create({
+    title: ct('加入另一台 Mac'),
+    content: '<div class="remote-join"><ol><li class="j1"></li><li class="j2"></li><li class="j3"></li></ol><div class="remote-join-label j4"></div><div class="remote-join-value hub"></div><div class="remote-join-label j5"></div><div class="remote-join-value code"></div><div class="remote-join-note j6"></div></div>',
+    buttons: [{ text: ct('完成'), onClick: () => load() }],
+  }).open();
+  const put = (sel, text) => { const el = d.el.querySelector(sel);if (el) el.textContent = text; };
+  put('.j1', ct('在另一台 Mac 安裝並打開 Castpane。'));
+  put('.j2', ct('打開它的 Settings › Other Macs。'));
+  put('.j3', ct('填入下面的網址和配對碼，按 Join。'));
+  put('.j4', ct('網址'));put('.hub', r.hub);
+  put('.j5', ct('配對碼'));put('.code', r.code.replace(/^(.{4})/, '$1-'));
+  put('.j6', ct('配對碼 10 分鐘內有效，只能用一次。'));
+}
+function removeMac(m) {
+  f7.dialog.confirm(ct('移除後，這台 Mac 就不會再出現在這裡；要再看到它，得在那台 Mac 重新加入。'), ct('移除「{name}」？').replace('{name}', m.name), async () => {
+    try { await api(`/remote/members/${encodeURIComponent(m.id)}`, { method: 'DELETE' });localSet(shotKey(m.id), '');delete shots[m.id];load(); } catch (e) { f7.dialog.alert(e.message); }
+  });
+}
+
 async function connect(m, retried = false) {
   if (!m.running || !supported) return;
+  machine = m.local ? 'local' : m.id;
   let pass;
   try { pass = await getPass(retried); } catch (e) { return f7.dialog.alert(adminProblem(e) || e.message); }
   if (!pass) return;
   streaming.value = true;hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;
   await nextTick();
   link = openRemote({
-    pass, canvas: canvas.value,
+    pass, machine: machine === 'local' ? '' : machine, canvas: canvas.value,
     onState(state) {
       if (state === 'refused') { link = null;streaming.value = false;sessionSet('castpane-remote-pass', null);if (!retried) connect(m, true);else error.value = ct('無法連線，請重新整理頁面後再試。');return; }
       if (state === 'closed' && streaming.value) { saveShot();streaming.value = false;link = null; }
@@ -249,6 +298,9 @@ function onMessage(msg) {
     probeAnswer = msg;
   } else if (msg.t === 'clipboard') {
     clipWait?.resolve(msg);
+  } else if (msg.t === 'clipboard-busy') {
+    clipWait?.reject(new Error('busy'));
+    toast(ct('太快了，請等一秒再試'));
   } else if (msg.t === 'clipboard-set') {
     toast(ct('已放到 Mac 的剪貼簿'));
   } else if (msg.t === 'focus') {
@@ -331,7 +383,7 @@ function setPref(k, v) {
 }
 function askPermissions() { link?.send({ t: 'permissions' }); }
 function saveShot() {
-  try { const c = canvas.value;if (!c || !hasPicture.value) return;const s = document.createElement('canvas');s.width = 320;s.height = Math.round(320 * c.height / c.width);s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);lastShot.value = s.toDataURL('image/jpeg', 0.6);localSet('castpane-remote-shot', lastShot.value); } catch {}
+  try { const c = canvas.value;if (!c || !hasPicture.value) return;const s = document.createElement('canvas');s.width = 320;s.height = Math.round(320 * c.height / c.width);s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);shots[machine] = s.toDataURL('image/jpeg', 0.6);localSet(shotKey(machine), shots[machine]); } catch {}
 }
 function disconnect() {
   if (!streaming.value && !link) return;
@@ -691,10 +743,15 @@ async function copyFromMac() {
     const m = await answer;
     toast(m.truncated ? ct('已拷貝 Mac 的剪貼簿（太長，只拷了前面 100 000 字）') : ct('已拷貝 Mac 的剪貼簿'));
   } catch {
-    let m = null;
-    try { m = await answer; } catch { /* no answer */ }
+    let m = null, why = '';
+    try { m = await answer; } catch (e) { why = e.message; }
+    if (why === 'busy') return;
     if (!m) return toast(ct('Mac 沒有回應，請再試一次'));
+    if (m.notAllowed) return f7.dialog.alert(ct('這台 Mac 還沒允許從遠端讀剪貼簿。請在 Mac 上打開 Castpane 的 Settings › General，按「Clipboard from afar」旁的「Allow…」，再到「系統設定 › 隱私權與安全性」的貼上權限，把 Castpane 設為允許。'));
+    if (m.denied) return toast(ct('這台 Mac 設定不允許 Castpane 讀剪貼簿'));
     if (m.concealed) return toast(ct('Mac 剪貼簿裡是密碼工具標為隱藏的內容，不會傳出'));
+    if (m.error) return toast(ct('Mac 的剪貼簿內容無法傳出'));
+    if (m.truncated && !m.s) return toast(ct('Mac 剪貼簿的內容太長，無法傳出'));
     if (m.empty || !m.s) return toast(ct('Mac 的剪貼簿裡沒有文字'));
     // This browser would not take it: the text, to copy by hand.
     const d = f7.dialog.create({ title: ct('Mac 的剪貼簿'), content: '<textarea class="remote-clip-text" readonly></textarea>', buttons: [{ text: ct('關閉') }] }).open();
@@ -709,6 +766,7 @@ async function pasteToMac() {
   const put = (v) => {
     if (!v) return toast(ct('這台裝置的剪貼簿裡沒有文字'));
     if (v.length > 100000) return toast(ct('文字太長，最多 100 000 字'));
+    if (!v.isWellFormed()) v = v.toWellFormed();
     link?.send({ t: 'clipboard-set', s: v });
   };
   // This browser would not read it: a field to paste into.
@@ -755,6 +813,14 @@ function keyUp(e) {
 .remote-tiles {display:flex;flex-wrap:wrap;gap:16px;padding:0 16px;}
 .remote-tile {width:min(260px,calc(50vw - 24px));background:var(--f7-list-bg-color,#1f1f21);border:0;border-radius:20px;padding:10px;color:inherit;text-align:left;cursor:pointer;}
 .remote-tile.disabled {opacity:.5;cursor:default;}
+.remote-tile-wrap {position:relative;}
+.remote-tile-remove {position:absolute;top:16px;right:16px;width:26px;height:26px;border-radius:13px;border:0;background:rgba(0,0,0,.6);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.remote-tile.add .remote-tile-shot {background:rgba(255,255,255,.04);border:1.5px dashed rgba(142,142,147,.5);box-sizing:border-box;}
+.remote-join ol {margin:0 0 10px;padding-left:20px;text-align:left;font-size:14px;line-height:1.5;}
+.remote-join-label {font-size:12px;color:#8e8e93;margin-top:8px;text-align:left;}
+.remote-join-value {font-size:15px;font-weight:600;text-align:left;word-break:break-all;-webkit-user-select:text;user-select:text;}
+.remote-join-value.code {font-size:24px;letter-spacing:2px;font-variant-numeric:tabular-nums;}
+.remote-join-note {font-size:12px;color:#8e8e93;margin-top:10px;text-align:left;}
 .remote-tile-shot {aspect-ratio:16/10;border-radius:12px;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#8e8e93;}
 .remote-tile-shot img {width:100%;height:100%;object-fit:cover;}
 .remote-tile-name {margin-top:8px;font-weight:600;font-size:15px;}

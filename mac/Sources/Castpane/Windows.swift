@@ -1,5 +1,7 @@
 import SwiftUI
+import AppKit
 import CastpaneCore
+import CastpaneHost
 
 /// The first-run assistant: account, permissions, connection, done.
 struct Wizard: View {
@@ -169,13 +171,14 @@ struct SettingsView: View {
 
     enum Page: String, CaseIterable, Identifiable {
         case general = "General", permissions = "Permissions", connection = "Connection"
-        case accounts = "Accounts", activity = "Activity", about = "About"
+        case others = "Other Macs", accounts = "Accounts", activity = "Activity", about = "About"
         var id: Self { self }
         var symbol: String {
             switch self {
             case .general: return "gearshape"
             case .permissions: return "lock.shield"
             case .connection: return "network"
+            case .others: return "macbook.and.iphone"
             case .accounts: return "person.2"
             case .activity: return "clock"
             case .about: return "info.circle"
@@ -231,6 +234,7 @@ struct SettingsView: View {
         case .general: GeneralTab()
         case .permissions: PermissionsPane().padding(20)
         case .connection: ConnectionPane().padding(20)
+        case .others: OtherMacsTab()
         case .accounts: AccountsTab()
         case .activity: ActivityTab(loads: loadsActivity)
         case .about: AboutTab()
@@ -240,6 +244,7 @@ struct SettingsView: View {
 
 struct GeneralTab: View {
     @EnvironmentObject var model: AppModel
+    @ViewState private var clipboardCheck = 0
     private let qualities = [("auto", "Automatic"), ("high", "High"), ("balanced", "Balanced"), ("low", "Low (slow networks)")]
 
     var body: some View {
@@ -263,6 +268,10 @@ struct GeneralTab: View {
                     Button("Check Now") { model.checkForUpdates() }
                 }
             }
+            ClipboardAccessRow()
+                // Back from System Settings: shown as it is now.
+                .id(clipboardCheck)
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in clipboardCheck += 1 }
             LabeledContent("Server", value: model.serverState.summary)
             LabeledContent("Port", value: String(model.config.port))
             if let e = model.hostError { Text(e).foregroundStyle(.red) }
@@ -270,6 +279,116 @@ struct GeneralTab: View {
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
+    }
+}
+
+/// Whether a viewer may read this Mac's clipboard without someone here answering macOS's
+/// question first (macOS 15.4 and later).
+private struct ClipboardAccessRow: View {
+    @ViewState private var access = Clipboard.access
+
+    var body: some View {
+        if let access {
+            LabeledContent("Clipboard from afar") {
+                HStack {
+                    Text(access == .allowed ? "Allowed" : access == .denied ? "Not allowed" : "Asks on this Mac first")
+                        .foregroundStyle(.secondary)
+                    if access != .allowed {
+                        Button("Allow…") {
+                            if access == .notAsked { Clipboard.askOnce() }
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Pasteboard")!)
+                        }
+                    }
+                }
+            }
+            if access != .allowed {
+                Text("To copy this Mac's clipboard from a phone, set Castpane to Allow in System Settings › Privacy & Security › Paste from Other Apps. Until then it is never read.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// Joining another Mac's Castpane, so this screen shows in that Mac's web app too
+/// (docs/multi-mac.md).
+struct OtherMacsTab: View {
+    @EnvironmentObject var model: AppModel
+    @ViewState private var status = MemberStatus()
+    @ViewState private var hub = ""
+    @ViewState private var code = ""
+    @ViewState private var busy = false
+    @ViewState private var message: String?
+    @ViewState private var confirmLeave = false
+
+    var body: some View {
+        Form {
+            Section {
+                Text("Show this Mac in another Mac's Castpane: its admins can then see and use this screen from that Mac's web app, as they do that Mac's own. This Mac needs no address or account for it.")
+                    .foregroundStyle(.secondary)
+            }
+            if status.state == "off" {
+                Section("Join another Mac") {
+                    TextField("Its address", text: $hub, prompt: Text("https://castpane.example.com"))
+                    TextField("Code", text: $code, prompt: Text("From Add another Mac on its Remote page"))
+                    HStack {
+                        if let message { Text(message).foregroundStyle(.red).font(.callout) }
+                        Spacer()
+                        Button("Join") { join() }
+                            .primaryButtonStyle()
+                            .disabled(busy || hub.trimmingCharacters(in: .whitespaces).isEmpty || code.trimmingCharacters(in: .whitespaces).count < 6)
+                    }
+                }
+            } else {
+                Section("Joined") {
+                    LabeledContent("Mac", value: status.hub)
+                    LabeledContent("Link", value: stateText)
+                    if status.state == "removed" {
+                        Text("That Mac removed this one. Leave, then join again with a new code to show it there again.")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Spacer()
+                        Button("Leave…") { confirmLeave = true }.secondaryButtonStyle()
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .task { await refresh(); while !Task.isCancelled { try? await Task.sleep(nanoseconds: 3_000_000_000); await refresh() } }
+        .confirmationDialog("Leave \(status.hub)?", isPresented: $confirmLeave) {
+            Button("Leave", role: .destructive) { leave() }
+        } message: {
+            Text("This Mac stops showing in that Mac's Castpane.")
+        }
+    }
+
+    private var stateText: String {
+        switch status.state {
+        case "connected": return "Connected"
+        case "connecting": return "Connecting…"
+        case "removed": return "Removed by that Mac"
+        default: return status.state
+        }
+    }
+
+    private func refresh() async {
+        if let s = try? await model.api.member() { status = s }
+    }
+
+    private func join() {
+        busy = true; message = nil
+        let hub = hub.trimmingCharacters(in: .whitespaces), code = code.trimmingCharacters(in: .whitespaces)
+        Task {
+            do { try await model.api.joinMember(hub: hub.contains("://") ? hub : "https://" + hub, code: code); self.code = "" }
+            catch { message = error.localizedDescription }
+            busy = false
+            await refresh()
+        }
+    }
+
+    private func leave() {
+        Task { try? await model.api.leaveMember(); await refresh() }
     }
 }
 
@@ -336,14 +455,16 @@ struct ActivityTab: View {
 private struct ActivityRow: View {
     let item: ActivityItem
 
+    private var times: String { item.count > 1 ? " (\(item.count) times)" : "" }
+
     private var look: (symbol: String, color: Color, text: String) {
         let who = item.username.isEmpty ? "Someone" : item.username
         switch item.kind {
         case "sign-in": return ("key.fill", Palette.blue, "\(who) signed in")
-        case "remote-open": return ("eye.fill", .green, "\(who) started viewing this Mac")
-        case "remote-end": return ("eye.slash.fill", .gray, "\(who) stopped viewing")
-        case "clipboard-read": return ("doc.on.clipboard.fill", .orange, "\(who) copied this Mac's clipboard")
-        case "clipboard-write": return ("doc.on.clipboard", Palette.blue, "\(who) put text on this Mac's clipboard")
+        case "remote-open": return ("eye.fill", .green, "\(who) started viewing \(item.machine.isEmpty ? "this Mac" : item.machine)")
+        case "remote-end": return ("eye.slash.fill", .gray, "\(who) stopped viewing\(item.machine.isEmpty ? "" : " " + item.machine)")
+        case "clipboard-read": return ("doc.on.clipboard.fill", .orange, "\(who) copied this Mac's clipboard\(times)")
+        case "clipboard-write": return ("doc.on.clipboard", Palette.blue, "\(who) put text on this Mac's clipboard\(times)")
         default: return ("circle.fill", .gray, "\(who): \(item.kind)")
         }
     }

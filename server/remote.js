@@ -19,6 +19,7 @@ const { resolveLivePrincipal } = require('./services/livePrincipal');
 const { audit } = require('./services/audit');
 const { resolveClientIp } = require('./services/clientIp');
 const { sessionCookie } = require('./services/sessionCookie');
+const { vetFromMember } = require('./members');
 
 const HOME = () => process.env.CASTPANE_HOME || path.join(os.homedir(), 'Library', 'Application Support', 'Castpane');
 const PASS_MS = 8 * 60 * 60 * 1000;
@@ -66,10 +67,11 @@ const MESSAGES = {
     if (!Array.isArray(mods) || mods.length > MODS.size || !mods.every((x) => MODS.has(x)) || new Set(mods).size !== mods.length) return null;
     return { code: m.code, down: m.down, mods };
   },
-  text: (m) => (typeof m.s === 'string' && m.s.length >= 1 && m.s.length <= TEXT_MAX ? { s: m.s } : null),
+  // Well-formed only: a lone surrogate cannot be written as JSON the capture core reads.
+  text: (m) => (typeof m.s === 'string' && m.s.length >= 1 && m.s.length <= TEXT_MAX && m.s.isWellFormed() ? { s: m.s } : null),
   probe(m) { const p = at(m); return p && int(m.n, 0, 2 ** 31 - 1) ? { ...p, n: m.n } : null; },
   'clipboard-get': none,
-  'clipboard-set': (m) => (typeof m.s === 'string' && m.s.length >= 1 && m.s.length <= CLIPBOARD_MAX ? { s: m.s } : null),
+  'clipboard-set': (m) => (typeof m.s === 'string' && m.s.length >= 1 && m.s.length <= CLIPBOARD_MAX && m.s.isWellFormed() ? { s: m.s } : null),
 };
 const FROM_PAGE = new Set(Object.keys(MESSAGES));
 // The message as passed on to the capture core: {t, …its checked fields}, or null when
@@ -132,13 +134,32 @@ function connectHost({ home = HOME() } = {}) {
 // The passes the routes issue and the socket checks, shared by both.
 const sharedPasses = createPasses();
 
-function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/authController'), passes = sharedPasses, home = HOME } = {}) {
+// members: server/members.js, the other Macs (docs/multi-mac.md), or null for this Mac alone.
+function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/authController'), passes = sharedPasses, home = HOME, members = null, publicOrigin = () => require('./siteConfig').publicOrigin() } = {}) {
   const adminOnly = (req, res, next) => (req.role === 'admin' ? next() : res.status(403).json({ message: 'Admin only' }));
   const chain = [verifyToken, adminOnly, (req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); }];
-  // The machines the page lists: this Mac.
+  // The machines the page lists: this Mac, then the others that joined it.
   app.get('/api/remote/machines', ...chain, (req, res) => {
-    res.json({ machines: [{ id: 'local', name: os.hostname().replace(/\.local$/, ''), local: true, running: hostRunning(home()) }] });
+    res.json({ machines: [{ id: 'local', name: os.hostname().replace(/\.local$/, ''), local: true, online: true, running: hostRunning(home()) }, ...(members ? members.list() : [])], canAdd: !!members });
   });
+  if (members) {
+    // A one-time code for another Mac to join with, and this hub's address for it. Only
+    // with a stable HTTPS address: a member keeps it.
+    app.post('/api/remote/members/code', ...chain, (req, res) => {
+      const origin = publicOrigin();
+      if (!origin.startsWith('https://')) return res.status(409).json({ message: 'This Mac needs its own HTTPS address first', code: 'NO_PUBLIC_ADDRESS' });
+      const issued = members.code();
+      audit({ source: 'members', action: 'code', username: req.username, ip: resolveClientIp(req) });
+      res.json({ ...issued, hub: origin });
+    });
+    app.delete('/api/remote/members/:id', ...chain, (req, res) => {
+      const id = String(req.params.id);
+      const name = members.name(id);
+      if (!members.remove(id)) return res.status(404).json({ message: 'No such Mac' });
+      audit({ source: 'members', action: 'remove', member: id, name, username: req.username, ip: resolveClientIp(req) });
+      res.json({ ok: true });
+    });
+  }
   // The admin's own passkey instead of the password and code, when they have one.
   app.post('/api/remote/pass/passkey', ...chain, async (req, res, next) => { try { res.json((await auth.adminPasskeyStart(req)) || { challenge: null }); } catch (e) { next(e); } });
   // A pass to open the stream: the admin's passkey, or their password and two-step code.
@@ -161,7 +182,7 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
 // onOpen({username, ip}): a viewer was let in (server/start.js tells the admins).
 // signOut(userId, token): that sign-in ends, as when it is signed out from the
 // account's device list (the app's "Stop sharing now").
-function installRemote(server, { passes = sharedPasses, connect = connectHost, tokenOf = readHostToken, onOpen = () => {}, tickMs = 5000, secret = () => process.env.JWT_SECRET, principalOf = resolveLivePrincipal, allowedSocket = (req) => require('./siteConfig').isAllowedSocket(req), signOut = (userId, token) => require('./controllers/authController').endSession(userId, token) } = {}) {
+function installRemote(server, { passes = sharedPasses, connect = connectHost, members = null, tokenOf = readHostToken, onOpen = () => {}, tickMs = 5000, secret = () => process.env.JWT_SECRET, principalOf = resolveLivePrincipal, allowedSocket = (req) => require('./siteConfig').isAllowedSocket(req), signOut = (userId, token) => require('./controllers/authController').endSession(userId, token) } = {}) {
   // A page's message is small, but for clipboard-set: 100 000 UTF-16 units, at most six
   // bytes each as JSON (\u0000), well within the capture core's 1 MiB frame.
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
@@ -174,6 +195,7 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, t
   let last = null;
   server.on('upgrade', async (req, socket, head) => {
     const url = new URL(req.url || '/', 'http://x');
+    if (url.pathname === '/member' && members) return members.upgrade(req, socket, head);
     if (url.pathname !== '/remote') return;
     socket.on('error', () => {});
     let who;
@@ -187,17 +209,21 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, t
       if (principal.role !== 'admin') return reject(403);
       const pass = url.searchParams.get('pass');
       if (!passes.check(pass, principal.id, token)) return reject(403);
+      // This Mac, or another that joined it.
+      const machine = url.searchParams.get('machine') || 'local';
+      if (machine !== 'local' && !members?.has(machine)) return reject(404);
       if (socket.destroyed) return;
-      wss.handleUpgrade(req, socket, head, (ws) => serve(ws, { principal, token, pass, ip: resolveClientIp(req) }));
+      wss.handleUpgrade(req, socket, head, (ws) => serve(ws, { principal, token, pass, machine, ip: resolveClientIp(req) }));
     } catch (e) { reject(e.status || 500); }
   });
 
-  async function serve(ws, { principal, token, pass, ip }) {
+  async function serve(ws, { principal, token, pass, machine = 'local', ip }) {
     // One viewer at a time: a new page takes over from the last one.
     if (current) current.close('replaced');
     let host = null, closed = false, timer = null, dropping = false, video = 0, checking = false;
     const started = Date.now();
-    const me = { close: (reason) => close(reason), username: principal.username, userId: principal.id, token, since: new Date(started).toISOString() };
+    const member = machine !== 'local';
+    const me = { close: (reason) => close(reason), username: principal.username, userId: principal.id, token, since: new Date(started).toISOString(), ...(member ? { machine: members.name(machine) } : {}) };
     const seen = { userId: principal.id, token };
     current = me; last = seen;
     const sendJson = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
@@ -208,16 +234,22 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, t
       if (reason.startsWith('page') && last === seen) last = null;
       try { host?.destroy(); } catch { /* gone */ }
       sendJson({ t: 'closed', reason }); try { ws.close(); } catch { /* gone */ }
-      audit({ source: 'remote', action: 'end', username: principal.username, reason, seconds: Math.round((Date.now() - started) / 1000), frames: video });
+      audit({ source: 'remote', action: 'end', username: principal.username, reason, seconds: Math.round((Date.now() - started) / 1000), frames: video, ...(member ? { member: machine, machine: me.machine } : {}) });
     }
-    audit({ source: 'remote', action: 'open', username: principal.username, ip });
+    audit({ source: 'remote', action: 'open', username: principal.username, ip, ...(member ? { member: machine, machine: me.machine } : {}) });
     try { onOpen({ username: principal.username, userId: principal.id, ip, at: started }); } catch (e) { console.error('remote: the open was not announced:', e.message); }
     ws.on('close', () => close('page left')); ws.on('error', () => close('page error'));
     try {
-      const secretToken = tokenOf();
-      host = await connect();
-      if (closed) { host.destroy(); return; }
-      host.write(frame(1, Buffer.from(JSON.stringify({ t: 'hello', token: secretToken }))));
+      if (member) {
+        // The member says hello to its own capture core with its own token.
+        host = await members.connect(machine, principal.username);
+        if (closed) { host.destroy(); return; }
+      } else {
+        const secretToken = tokenOf();
+        host = await connect();
+        if (closed) { host.destroy(); return; }
+        host.write(frame(1, Buffer.from(JSON.stringify({ t: 'hello', token: secretToken }))));
+      }
     } catch (e) {
       sendJson({ t: 'error', where: 'host', code: e.code || '', message: e.code === 'NOT_RUNNING' ? 'not-running' : 'host-unavailable' });
       return close('no host');
@@ -229,7 +261,11 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, t
         const n = buf.readUInt32BE(1); if (n > MAX_FRAME) return close('bad frame');
         if (buf.length < 5 + n) break;
         const kind = buf[0], payload = buf.subarray(5, 5 + n); buf = buf.subarray(5 + n);
-        if (kind === 1) { if (ws.readyState === 1) ws.send(payload.toString('utf8')); }
+        if (kind === 1) {
+          // Another Mac's words are checked before the page sees them (server/members.js).
+          const text = member ? vetFromMember(payload.toString('utf8')) : payload.toString('utf8');
+          if (text !== null && ws.readyState === 1) ws.send(text);
+        }
         else if (kind === 2 && payload.length > 9) {
           // Behind on the page's side: drop until the next key frame, and ask for one, so
           // the picture never decodes from a frame it is missing.
@@ -248,19 +284,25 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, t
       if (binary) return close('binary from page');
       if (Date.now() - windowStart > 1000) { windowStart = Date.now(); count = 0; }
       if (++count > 600) return close('too fast');
+      // Only clipboard-set is ever large: a large message is parsed at most once a second.
+      const large = raw.length > 16384;
+      if (large && Date.now() - lastClipboard < 1000) return close('too large');
       let msg; try { msg = JSON.parse(raw.toString()); } catch { return close('bad message'); }
       if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.t !== 'string' || !Object.hasOwn(MESSAGES, msg.t)) return close('unknown message');
+      if (large && msg?.t !== 'clipboard-set') return close('too large');
       const clean = fromPage(msg);
       if (!clean) return;
-      // The clipboard: at most one use a second, each in the log and the Mac's Activity.
-      if (clean.t.startsWith('clipboard-')) {
-        if (Date.now() - lastClipboard < 1000) return;
+      const clipboard = clean.t.startsWith('clipboard-');
+      // The clipboard: at most one use a second; the page is told when it was too soon.
+      if (clipboard) {
+        if (Date.now() - lastClipboard < 1000) return sendJson({ t: 'clipboard-busy' });
         lastClipboard = Date.now();
-        audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: principal.username, ...(clean.s ? { chars: clean.s.length } : {}) });
       }
       // The capture core not reading: a page cannot pile up input behind it.
       if (host.writableLength > 1024 * 1024) return close('host backed up');
       host.write(frame(1, Buffer.from(JSON.stringify(clean))));
+      // Each use in the log and the Mac's Activity, without its text.
+      if (clipboard) audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: principal.username, ...(clean.s ? { chars: clean.s.length } : {}), ...(member ? { member: machine, machine: me.machine } : {}) });
     });
     // Still an active admin, still this sign-in, pass not run out.
     timer = setInterval(async () => {
@@ -272,7 +314,7 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, t
   return {
     wss,
     // Who is watching now, for the app's menu (server/localApi.js).
-    viewer: () => (current ? { username: current.username, since: current.since } : null),
+    viewer: () => (current ? { username: current.username, since: current.since, ...(current.machine ? { machine: current.machine } : {}) } : null),
     // The app's "Stop sharing now" and Pause: the viewer is let go, every pass ends,
     // and the sign-in the last viewer watched from is signed out, so the same page
     // cannot simply open the stream again. That holds when the viewer's connection has

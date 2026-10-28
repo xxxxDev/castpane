@@ -32,6 +32,23 @@ public struct LocalStatus: Equatable, Sendable {
     }
 }
 
+/// Whether this Mac joined another Mac's Castpane, and how its link is.
+public struct MemberStatus: Equatable, Sendable {
+    /// off, connecting, connected or removed.
+    public var state: String = "off"
+    public var hub: String = ""
+
+    public init() {}
+
+    public static func decode(_ data: Data) -> MemberStatus {
+        var s = MemberStatus()
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return s }
+        s.state = obj["state"] as? String ?? "off"
+        s.hub = obj["hub"] as? String ?? ""
+        return s
+    }
+}
+
 /// One line of the activity list: a remote session opened or ended, or a sign-in.
 public struct ActivityItem: Equatable, Identifiable, Sendable {
     public var id: Int
@@ -39,6 +56,10 @@ public struct ActivityItem: Equatable, Identifiable, Sendable {
     public var kind: String
     public var username: String
     public var detail: String
+    /// The other Mac it was on, for a session through this one (docs/multi-mac.md).
+    public var machine: String = ""
+    /// How many times in a row, for a clipboard use.
+    public var count: Int = 1
 
     /// `{items: [...]}` or a bare array; each item's time from `at`, `time` or `ts`.
     public static func decodeList(_ data: Data) -> [ActivityItem] {
@@ -49,7 +70,8 @@ public struct ActivityItem: Equatable, Identifiable, Sendable {
             let user = (r["username"] ?? r["user"]) as? String ?? ""
             let parts = ["method", "ip", "from", "device", "detail", "reason"].compactMap { r[$0] as? String }.filter { !$0.isEmpty }
             return ActivityItem(id: i, at: LocalJSON.date(r["at"] ?? r["time"] ?? r["ts"]), kind: kind, username: user,
-                                detail: parts.joined(separator: " · "))
+                                detail: parts.joined(separator: " · "), machine: r["machine"] as? String ?? "",
+                                count: max(1, LocalJSON.count(r["count"])))
         }
     }
 }

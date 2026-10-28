@@ -241,7 +241,10 @@ actor Session {
                 case let .text(s, truncated): msg["s"] = s; if truncated { msg["truncated"] = true }
                 case .empty: msg["empty"] = true
                 case .concealed: msg["concealed"] = true
+                case .notAllowed: msg["notAllowed"] = true
+                case .denied: msg["denied"] = true
                 }
+                if !JSONSerialization.isValidJSONObject(msg) { msg = ["t": "clipboard", "error": true] }
                 link.send(json: msg)
             }
         case let .clipboardSet(s):

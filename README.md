@@ -41,8 +41,15 @@ back, with touch modes made for a small screen.
 - **Made for a phone.** Three touch modes: tap where you want (direct), a trackpad, or a
   pointer you drag by a ring below it, so your finger never hides what it points at. Pinch to
   zoom; when you tap a text field the keyboard comes up and the field is zoomed into view. A
-  row of keys a phone lacks (esc, tab, arrows, ⌘ ⌥ ⌃ ⇧). Held sideways, the tabs move to a
+  row of keys a phone lacks (esc, tab, arrows, ⌘ ⌥ ⌃ ⇧), a key panel in the keyboard's place
+  (editing keys, the Mac's shortcuts, a number pad, F1–F12), and a field to write a line,
+  input method and all, and send it to the Mac's cursor. Held sideways, the tabs move to a
   rail on the right.
+- **Several Macs, one web app.** Other Macs join this one with a one-time code and show up
+  beside it on the Remote page. They need no address or account of their own
+  ([docs/multi-mac.md](docs/multi-mac.md)).
+- **The clipboard both ways.** Copy the Mac's clipboard to the phone, or put the phone's on
+  the Mac. What a password manager marks hidden is never sent; each use is in Activity.
 - **Stays current.** Each frame shown is acknowledged; the Mac skips frames while three are
   unshown, so a slow network gives fewer frames, not old ones. Quality, resolution and 30 or
   60 fps are yours to choose.
@@ -129,6 +136,7 @@ The setup assistant then:
 ## Documentation
 
 - [docs/setup.md](docs/setup.md): installing, permissions, the three connection modes.
+- [docs/multi-mac.md](docs/multi-mac.md): several Macs in one web app.
 - [docs/security.md](docs/security.md): what Castpane guarantees, where its secrets are, and
   what it cannot stop.
 - [docs/protocol.md](docs/protocol.md): the remote protocol, the app's local API, and the
@@ -140,7 +148,7 @@ The setup assistant then:
 ## Not in v0.1
 
 Developer ID signing and notarization (releases are signed with the project's own
-certificate instead), several Macs in one web app, audio, and the clipboard.
+certificate instead), and audio.
 
 ## License
 

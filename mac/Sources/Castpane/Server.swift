@@ -205,4 +205,9 @@ struct LocalAPI {
     }
 
     func endViewer() async throws { _ = try await request("POST", "end-viewer", body: [:]) }
+
+    /// This Mac's link to another Mac's Castpane (docs/multi-mac.md).
+    func member() async throws -> MemberStatus { MemberStatus.decode(try await request("GET", "member")) }
+    func joinMember(hub: String, code: String) async throws { _ = try await request("POST", "member/join", body: ["hub": hub, "code": code]) }
+    func leaveMember() async throws { _ = try await request("POST", "member/leave", body: [:]) }
 }

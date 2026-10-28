@@ -56,9 +56,12 @@ function readActivity({ limit = 50, file = AUDIT_LOG } = {}) {
   for (let i = lines.length - 1; i >= 0 && out.length < limit; i--) {
     let e; try { e = JSON.parse(lines[i]); } catch { continue; }
     if (e.source === 'remote' && (e.action === 'open' || e.action === 'end')) {
-      out.push({ at: e.ts, kind: e.action === 'open' ? 'remote-open' : 'remote-end', username: e.username || '', ...(e.ip ? { ip: e.ip } : {}), ...(e.action === 'end' ? { reason: e.reason || '', seconds: e.seconds || 0 } : {}) });
+      out.push({ at: e.ts, kind: e.action === 'open' ? 'remote-open' : 'remote-end', username: e.username || '', ...(e.ip ? { ip: e.ip } : {}), ...(typeof e.machine === 'string' ? { machine: e.machine } : {}), ...(e.action === 'end' ? { reason: e.reason || '', seconds: e.seconds || 0 } : {}) });
     } else if (e.source === 'remote' && (e.action === 'clipboard-read' || e.action === 'clipboard-write')) {
-      out.push({ at: e.ts, kind: e.action, username: e.username || '' });
+      // A run of the same use by the same person is one row, with how many times.
+      const prev = out[out.length - 1];
+      if (prev?.kind === e.action && prev.username === (e.username || '')) prev.count = (prev.count || 1) + 1;
+      else out.push({ at: e.ts, kind: e.action, username: e.username || '' });
     } else if (e.source === 'auth' && e.action === 'sign-in') {
       out.push({ at: e.ts, kind: 'sign-in', username: e.username || '', method: e.method || 'password', ...(e.ip ? { ip: e.ip } : {}) });
     }
@@ -68,7 +71,8 @@ function readActivity({ limit = 50, file = AUDIT_LOG } = {}) {
 
 // home: CASTPANE_HOME. remote: what installRemote returned (viewer, endViewer).
 // sessionCount(): live sign-ins. version: this server's version.
-function createLocalRoutes({ home, remote, version, auth = require('./controllers/authController'), usersDB = require('./stores').usersDB, sessionsDB = require('./stores').sessionsDB, publicOrigin = () => require('./siteConfig').publicOrigin(), loopbackHosts = () => require('./siteConfig').loopbackPorts().flatMap((p) => [`127.0.0.1:${p}`, `localhost:${p}`]), activity = readActivity }) {
+// memberLink: this Mac's link to another Mac it joined (server/memberLink.js).
+function createLocalRoutes({ home, remote, version, memberLink = null, auth = require('./controllers/authController'), usersDB = require('./stores').usersDB, sessionsDB = require('./stores').sessionsDB, publicOrigin = () => require('./siteConfig').publicOrigin(), loopbackHosts = () => require('./siteConfig').loopbackPorts().flatMap((p) => [`127.0.0.1:${p}`, `localhost:${p}`]), activity = readActivity }) {
   const token = () => ensureLocalToken(home);
   const router = express.Router();
   router.use((req, res, next) => {
@@ -100,6 +104,13 @@ function createLocalRoutes({ home, remote, version, auth = require('./controller
   router.post('/end-viewer', async (req, res) => {
     try { res.json({ ended: !!(await remote?.endViewer('ended on the Mac')) }); } catch (e) { console.error('end viewer:', e.message); res.status(500).json({ message: 'Error' }); }
   });
+  // Joining another Mac's Castpane, and leaving it (docs/multi-mac.md).
+  router.get('/member', (req, res) => res.json(memberLink ? memberLink.status() : { state: 'off', hub: null }));
+  router.post('/member/join', async (req, res) => {
+    if (!memberLink) return res.status(404).json({ message: 'Not found' });
+    try { res.json(await memberLink.join(req.body?.hub, req.body?.code)); } catch (e) { res.status(e.status || 500).json({ message: e.status ? e.message : 'Error', ...(e.code ? { code: e.code } : {}) }); }
+  });
+  router.post('/member/leave', (req, res) => { memberLink?.leave(); res.json({ ok: true }); });
   router.use((req, res) => res.status(404).json({ message: 'Not found' }));
   // eslint-disable-next-line no-unused-vars
   router.use((err, req, res, next) => { console.error('local api:', err.message); res.status(err.status || 500).json({ message: err.status ? err.message : 'Error' }); });

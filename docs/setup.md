@@ -185,6 +185,19 @@ Castpane reachable on this Mac only), shows the address and QR code, the
 tunnel's state and log, and can sign in to Cloudflare again. Passkeys are tied to the address:
 after a change of address, sign in with your password and add a passkey again.
 
+## Several Macs
+
+One Castpane with a fixed HTTPS address (own domain or Tailscale) can show other Macs on its
+Remote page. On it, tap **Add another Mac**; on the other Mac, install Castpane and enter the
+address and code in **Settings › Other Macs**. See [multi-mac.md](multi-mac.md).
+
+## The clipboard from afar
+
+macOS 15.4 and later ask on the Mac before an app reads the clipboard. Nobody may be there to
+answer, so Castpane does not read it until allowed: in **Settings › General**, click **Allow…**
+beside *Clipboard from afar*, then set Castpane to Allow under System Settings › Privacy &
+Security. Putting text on the Mac's clipboard needs nothing.
+
 ## Notifications
 
 Every admin gets a notification when a remote session opens. To receive them on a phone, add
