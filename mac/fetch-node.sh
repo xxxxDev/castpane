@@ -27,7 +27,6 @@ if [ ! -x "$dir/$name/bin/node" ]; then
 fi
 # The binary itself, fresh or kept from before: signed by the Node.js Foundation.
 node="$dir/$name/bin/node"
-codesign --verify --strict "$node" 2>/dev/null &&
-  codesign -dv "$node" 2>&1 | grep -qx "TeamIdentifier=HX7739G8FX" ||
+codesign --verify --strict -R='anchor apple generic and certificate leaf[subject.OU] = "HX7739G8FX"' "$node" 2>/dev/null ||
   { echo "error: $node is not signed by the Node.js Foundation (HX7739G8FX)" >&2; exit 1; }
 echo "$node"

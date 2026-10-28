@@ -97,6 +97,7 @@ final class Updater: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                if case .working = state { return }
                 state = .failed("GitHub answered \((response as? HTTPURLResponse)?.statusCode ?? 0).")
                 return
             }
