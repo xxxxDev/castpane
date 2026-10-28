@@ -48,7 +48,7 @@ ways, each prefixed with `n` (4 bytes), so nothing from an earlier session is mi
 - Joins: at most 20 wrong codes a minute in all and 5 from one address, then joins are refused
   for the rest of the minute; a code is spent by its first use, right or wrong. A member that
   knows its secret always gets back in.
-- At most 64 connections, and 8 from one address, may wait to say hello.
+- At most 8 connections from one address may wait to say hello; past 64 in all, the oldest waiting is let go.
 - At most 32 members. A member's messages are limited in number (1000 a second), size (2 MiB)
   and bytes (64 MB a second); what it says reaches a page only rebuilt from known fields, and
   never faster than the page reads it.
