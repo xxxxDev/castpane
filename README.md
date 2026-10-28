@@ -147,7 +147,7 @@ The setup assistant first asks what this Mac is for. For the Mac you connect to,
 - [mac/README.md](mac/README.md): building the Mac app.
 - [BRAND.md](BRAND.md): the logo, which the MIT License does not cover.
 
-## Not in v0.1
+## Not yet
 
 Developer ID signing and notarization (releases are signed with the project's own
 certificate instead), and audio.

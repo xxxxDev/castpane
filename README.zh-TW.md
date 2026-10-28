@@ -109,7 +109,7 @@ open mac/build/Castpane.app
 - [mac/README.md](mac/README.md)：編譯 Mac App。
 - [BRAND.md](BRAND.md)：標誌，不在 MIT 授權範圍內。
 
-## v0.1 還沒有的
+## 還沒有的
 
 Apple 開發者簽章和公證（release 改用專案自己的憑證簽名），以及聲音。
 
