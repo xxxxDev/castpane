@@ -58,6 +58,15 @@ final class Input {
     }
 
     /// A key by the browser's KeyboardEvent.code, with the modifiers held.
+    /// What a Mac keyboard itself adds to these keys. macOS's own shortcuts on them (Mission
+    /// Control ⌃↑, Show Desktop F11, the desktops ⌃← ⌃→) answer only with it (the owner's
+    /// report, 2026-10-29: Mission Control and Show Desktop did nothing).
+    static func keyFlags(_ code: String) -> CGEventFlags {
+        if code.hasPrefix("Arrow") { return [.maskNumericPad, .maskSecondaryFn] }
+        if ["Home", "End", "PageUp", "PageDown", "Delete", "Help"].contains(code) || (code.hasPrefix("F") && Int(code.dropFirst()) != nil) { return .maskSecondaryFn }
+        return []
+    }
+
     func key(code: String, down: Bool, mods: [String]) {
         var f: CGEventFlags = []
         if mods.contains("shift") { f.insert(.maskShift) }
@@ -67,7 +76,7 @@ final class Input {
         flags = f
         guard let vk = Keys.map[code], let e = CGEvent(keyboardEventSource: source, virtualKey: vk, keyDown: down) else { return }
         if down { keysDown.insert(vk) } else { keysDown.remove(vk) }
-        e.flags = f
+        e.flags = f.union(Self.keyFlags(code))
         post(e)
     }
 
