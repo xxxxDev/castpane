@@ -39,7 +39,7 @@ function ensureLocalToken(home) {
   return t;
 }
 
-// The latest remote opens and ends, and sign-ins, newest first, from the end of the
+// The latest remote opens and ends, clipboard reads and writes, and sign-ins, newest first, from the end of the
 // audit log (the last 2 MB of it: a week's log is rotated away by logRotation.js).
 function readActivity({ limit = 50, file = AUDIT_LOG } = {}) {
   let text = '';
@@ -57,6 +57,8 @@ function readActivity({ limit = 50, file = AUDIT_LOG } = {}) {
     let e; try { e = JSON.parse(lines[i]); } catch { continue; }
     if (e.source === 'remote' && (e.action === 'open' || e.action === 'end')) {
       out.push({ at: e.ts, kind: e.action === 'open' ? 'remote-open' : 'remote-end', username: e.username || '', ...(e.ip ? { ip: e.ip } : {}), ...(e.action === 'end' ? { reason: e.reason || '', seconds: e.seconds || 0 } : {}) });
+    } else if (e.source === 'remote' && (e.action === 'clipboard-read' || e.action === 'clipboard-write')) {
+      out.push({ at: e.ts, kind: e.action, username: e.username || '' });
     } else if (e.source === 'auth' && e.action === 'sign-in') {
       out.push({ at: e.ts, kind: 'sign-in', username: e.username || '', method: e.method || 'password', ...(e.ip ? { ip: e.ip } : {}) });
     }

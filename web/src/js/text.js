@@ -272,5 +272,18 @@ const english = {
 "關閉視窗":"Close window",
 "指揮中心":"Mission Control",
 "顯示桌面":"Show desktop",
+"剪貼簿":"Clipboard",
+"拷貝 Mac 的剪貼簿":"Copy the Mac’s clipboard",
+"把剪貼簿放到 Mac":"Put my clipboard on the Mac",
+"已放到 Mac 的剪貼簿":"On the Mac’s clipboard",
+"已拷貝 Mac 的剪貼簿":"Copied the Mac’s clipboard",
+"已拷貝 Mac 的剪貼簿（太長，只拷了前面 100 000 字）":"Copied the Mac’s clipboard (too long: only its first 100,000 characters)",
+"Mac 沒有回應，請再試一次":"The Mac did not answer; try again",
+"Mac 剪貼簿裡是密碼工具標為隱藏的內容，不會傳出":"The Mac’s clipboard holds something a password manager marked hidden; it is not sent",
+"Mac 的剪貼簿裡沒有文字":"There is no text on the Mac’s clipboard",
+"Mac 的剪貼簿":"The Mac’s clipboard",
+"這台裝置的剪貼簿裡沒有文字":"There is no text on this device’s clipboard",
+"文字太長，最多 100 000 字":"Too long: 100,000 characters at most",
+"貼上要放到 Mac 剪貼簿的文字。":"Paste the text to put on the Mac’s clipboard.",
 };
 export function ct(text) { if (text == null) return ''; return String(lang.value === 'zh-TW' ? text : (english[text] ?? text)).replaceAll('{product}', PRODUCT.name); }

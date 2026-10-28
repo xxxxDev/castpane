@@ -37,6 +37,8 @@ const MODS = new Set(['shift', 'ctrl', 'alt', 'meta']);
 // The longest text typed at once, in UTF-16 units (the capture core takes 4000
 // characters; the page sends text in pieces well below this).
 const TEXT_MAX = 4000;
+// The longest text put on the Mac's clipboard, in UTF-16 units (the capture core's limit).
+const CLIPBOARD_MAX = 100000;
 const at = (m) => (unit(m.x) && unit(m.y) ? { x: m.x, y: m.y } : null);
 const none = () => ({});
 const MESSAGES = {
@@ -66,6 +68,8 @@ const MESSAGES = {
   },
   text: (m) => (typeof m.s === 'string' && m.s.length >= 1 && m.s.length <= TEXT_MAX ? { s: m.s } : null),
   probe(m) { const p = at(m); return p && int(m.n, 0, 2 ** 31 - 1) ? { ...p, n: m.n } : null; },
+  'clipboard-get': none,
+  'clipboard-set': (m) => (typeof m.s === 'string' && m.s.length >= 1 && m.s.length <= CLIPBOARD_MAX ? { s: m.s } : null),
 };
 const FROM_PAGE = new Set(Object.keys(MESSAGES));
 // The message as passed on to the capture core: {t, …its checked fields}, or null when
@@ -158,7 +162,9 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
 // signOut(userId, token): that sign-in ends, as when it is signed out from the
 // account's device list (the app's "Stop sharing now").
 function installRemote(server, { passes = sharedPasses, connect = connectHost, tokenOf = readHostToken, onOpen = () => {}, tickMs = 5000, secret = () => process.env.JWT_SECRET, principalOf = resolveLivePrincipal, allowedSocket = (req) => require('./siteConfig').isAllowedSocket(req), signOut = (userId, token) => require('./controllers/authController').endSession(userId, token) } = {}) {
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 16384 });
+  // A page's message is small, but for clipboard-set: 100 000 UTF-16 units, at most six
+  // bytes each as JSON (\u0000), well within the capture core's 1 MiB frame.
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
   let auditMinute = 0, audited = 0; const mayAudit = () => { const m = Math.floor(Date.now() / 60000); if (m !== auditMinute) { auditMinute = m; audited = 0; } return ++audited <= 30; };
   let current = null;
   // The last viewer let in, kept after their page or the capture core has gone: the
@@ -236,7 +242,7 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, t
       }
     });
     host.on('close', () => close('host closed')); host.on('error', () => close('host error'));
-    let windowStart = Date.now(), count = 0;
+    let windowStart = Date.now(), count = 0, lastClipboard = 0;
     ws.on('message', (raw, binary) => {
       if (closed) return;
       if (binary) return close('binary from page');
@@ -246,6 +252,12 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, t
       if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.t !== 'string' || !Object.hasOwn(MESSAGES, msg.t)) return close('unknown message');
       const clean = fromPage(msg);
       if (!clean) return;
+      // The clipboard: at most one use a second, each in the log and the Mac's Activity.
+      if (clean.t.startsWith('clipboard-')) {
+        if (Date.now() - lastClipboard < 1000) return;
+        lastClipboard = Date.now();
+        audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: principal.username, ...(clean.s ? { chars: clean.s.length } : {}) });
+      }
       // The capture core not reading: a page cannot pile up input behind it.
       if (host.writableLength > 1024 * 1024) return close('host backed up');
       host.write(frame(1, Buffer.from(JSON.stringify(clean))));

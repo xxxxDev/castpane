@@ -342,6 +342,8 @@ private struct ActivityRow: View {
         case "sign-in": return ("key.fill", Palette.blue, "\(who) signed in")
         case "remote-open": return ("eye.fill", .green, "\(who) started viewing this Mac")
         case "remote-end": return ("eye.slash.fill", .gray, "\(who) stopped viewing")
+        case "clipboard-read": return ("doc.on.clipboard.fill", .orange, "\(who) copied this Mac's clipboard")
+        case "clipboard-write": return ("doc.on.clipboard", Palette.blue, "\(who) put text on this Mac's clipboard")
         default: return ("circle.fill", .gray, "\(who): \(item.kind)")
         }
     }

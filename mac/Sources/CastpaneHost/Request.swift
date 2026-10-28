@@ -37,6 +37,8 @@ enum Request: Equatable, Sendable {
     case scroll(dx: Double, dy: Double, x: Double, y: Double)
     case key(code: String, down: Bool, mods: [String])
     case text(String)
+    case clipboardGet
+    case clipboardSet(String)
     /// A known request with a field out of shape; `t` is what it was, for an error answer.
     case invalid(String)
 
@@ -57,6 +59,10 @@ enum Request: Equatable, Sendable {
         case "stop": return .stop
         case "ack": return .ack
         case "key-frame": return .keyFrame
+        case "clipboard-get": return .clipboardGet
+        case "clipboard-set":
+            guard let s = msg["s"] as? String, !s.isEmpty, s.utf16.count <= Clipboard.maxLength else { return .invalid(t) }
+            return .clipboardSet(s)
         case "start":
             guard let kind = msg["kind"] as? String, kind == "display" || kind == "window",
                   let id = Field.exactInt(msg["id"], in: ids),

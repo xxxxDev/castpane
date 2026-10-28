@@ -108,6 +108,8 @@ closing the session.
 | `key`         | `code` (a `KeyboardEvent.code`: a capital letter, then 1 to 31 letters or digits), `down` (boolean), `mods` (optional; each of `shift`, `ctrl`, `alt`, `meta` at most once; passed on as `[]` when absent) | Press or release a key.                                     |
 | `text`        | `s` (1 to 4000 UTF-16 units; the page sends longer text in pieces)                                                                                                                                         | Type text (any script, emoji included).                     |
 | `probe`       | `x`, `y`, `n` (integer, 0 to 2³¹−1)                                                                                                                                                                        | Is there a text field at this point?                        |
+| `clipboard-get` |                                                                                                                                                                                                          | Send the Mac's clipboard text. At most one clipboard request a second; each is logged and shown in Activity. |
+| `clipboard-set` | `s` (1 to 100 000 UTF-16 units)                                                                                                                                                                          | Put this text on the Mac's clipboard.                       |
 
 ### From the capture core
 
@@ -121,6 +123,8 @@ closing the session.
 | `focus`   | `editable`, `caret?`, `initial?`                                                                                | After a click: whether a text field has the focus, and where its caret is.  |
 | `caret`   | `caret: [x, y, w, h]`                                                                                           | The text caret moved.                                                       |
 | `probe`   | `editable`, `n`                                                                                                 | The answer to a `probe`.                                                    |
+| `clipboard` | `s?`, `truncated?`, `empty?`, `concealed?`                                                                    | The answer to `clipboard-get`: the text (at most 100 000 UTF-16 units), or none; text a password manager marks concealed or transient is never sent. |
+| `clipboard-set` |                                                                                                           | The text is on the Mac's clipboard.                                         |
 | `error`   | `where`, `message`                                                                                              | Something failed (`where: "start"`, `message: "gone"` for a closed window). |
 
 ## The app ⇄ the server: `/api/local/*`

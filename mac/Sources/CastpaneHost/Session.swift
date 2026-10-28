@@ -233,6 +233,20 @@ actor Session {
             input.key(code: code, down: down, mods: mods); if !down { reportCaret() }
         case let .text(s):
             input.type(s); reportCaret()
+        case .clipboardGet:
+            let link = self.link
+            Task { @MainActor in
+                var msg: [String: Any] = ["t": "clipboard"]
+                switch Clipboard.read() {
+                case let .text(s, truncated): msg["s"] = s; if truncated { msg["truncated"] = true }
+                case .empty: msg["empty"] = true
+                case .concealed: msg["concealed"] = true
+                }
+                link.send(json: msg)
+            }
+        case let .clipboardSet(s):
+            let link = self.link
+            Task { @MainActor in Clipboard.write(s); link.send(json: ["t": "clipboard-set"]) }
         case .invalid(let t):
             if t == "start" { link.send(json: ["t": "error", "where": "start", "message": "invalid request"]) }
         }

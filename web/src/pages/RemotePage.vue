@@ -55,6 +55,7 @@
         <div v-if="menuOpen" class="remote-menu" @pointerdown.stop>
           <!-- On a phone the keyboard lives here (the owner's request, 2026-10-28). -->
           <button type="button" class="remote-menu-item keyboard" @pointerdown.prevent @mousedown.prevent @click="menuOpen = false;toggleKeyboard()"><f7-icon f7="keyboard" :size="18"/>{{ keyboardOpen ? ct('收起鍵盤') : ct('打開鍵盤') }}</button>
+          <button type="button" class="remote-menu-item clipboard" @click="menuOpen = false;clipOpen = true"><f7-icon f7="doc_on_clipboard" :size="18"/>{{ ct('剪貼簿') }}</button>
           <div class="remote-menu-label">{{ ct('操作方式') }}</div>
           <button v-for="m in MODES" :key="m.id" type="button" class="remote-menu-item mode" :class="['mode-' + m.id, {picked: mode === m.id}]" @click="setMode(m.id);menuOpen = false"><f7-icon :f7="m.icon" :size="18"/>{{ ct(m.label) }}<f7-icon v-if="mode === m.id" f7="checkmark" :size="15" class="remote-menu-check"/></button>
           <div class="remote-menu-sep"></div>
@@ -101,12 +102,18 @@
           <input ref="composeField" v-model="composeText" class="remote-compose-field" type="text" enterkeyhint="send" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" :placeholder="ct('打好字，送到 Mac 的游標位置')" @keydown="composeKey">
           <button type="button" class="remote-compose-send" :disabled="!composeText" @pointerdown.prevent @mousedown.prevent @click="sendCompose">{{ ct('送出') }}</button>
         </div>
+        <!-- The clipboard both ways (the owner's request, 2026-10-29). -->
+        <div v-if="clipOpen" class="remote-clip" @pointerdown.stop>
+          <button type="button" class="remote-clip-btn from-mac" @click="copyFromMac"><f7-icon f7="arrow_down_doc" :size="17"/>{{ ct('拷貝 Mac 的剪貼簿') }}</button>
+          <button type="button" class="remote-clip-btn to-mac" @click="pasteToMac"><f7-icon f7="arrow_up_doc" :size="17"/>{{ ct('把剪貼簿放到 Mac') }}</button>
+        </div>
         <!-- The keys a phone's keyboard lacks; ⇧ ⌃ ⌥ ⌘ hold for the next key. -->
-        <div v-if="keyboardOpen || panel || compose || !isTouch" class="remote-keys" :class="{desk: !isTouch}">
+        <div v-if="keyboardOpen || panel || compose || clipOpen || !isTouch" class="remote-keys" :class="{desk: !isTouch}">
           <template v-if="isTouch">
             <button type="button" class="remote-key tool compose-btn" :class="{on: compose}" :title="ct('輸入文字')" @pointerdown.prevent @mousedown.prevent @click="toggleCompose"><f7-icon f7="pencil" :size="17"/></button>
             <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :title="panel ? ct('鍵盤') : ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon :f7="panel ? 'keyboard' : 'square_grid_2x2'" :size="17"/></button>
           </template>
+          <button type="button" class="remote-key tool clip-btn" :class="{on: clipOpen}" :title="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="17"/></button>
           <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
           <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
           <span class="remote-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
@@ -141,7 +148,7 @@ const machines = ref([]), error = ref(''), streaming = ref(false), items = ref([
 const hasPicture = ref(false), notice = ref(''), permission = ref(''), stats = reactive({ fps: 0, mbps: 0 });
 const keyHint = ref(false), keyboardOpen = ref(false), settingsOpen = ref(false), menuOpen = ref(false), held = reactive(new Set());
 const canvas = ref(null), area = ref(null), typing = ref(null);
-const panel = ref(false), pageNo = ref(0), pagesEl = ref(null), compose = ref(false), composeText = ref(''), composeField = ref(null);
+const clipOpen = ref(false), panel = ref(false), pageNo = ref(0), pagesEl = ref(null), compose = ref(false), composeText = ref(''), composeField = ref(null);
 const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 const mode = ref(isTouch ? (localGet('castpane-remote-mode') || 'direct') : 'direct');
 const QUALITY_LABEL = { low: '低', standard: '標準', high: '高', max: '最高' };
@@ -240,6 +247,10 @@ function onMessage(msg) {
     if (keyboardOpen.value && Array.isArray(msg.caret) && !zoomTo) keepInSight({ x: msg.caret[0] + msg.caret[2] / 2, y: msg.caret[1] + msg.caret[3] / 2 });
   } else if (msg.t === 'probe') {
     probeAnswer = msg;
+  } else if (msg.t === 'clipboard') {
+    clipWait?.resolve(msg);
+  } else if (msg.t === 'clipboard-set') {
+    toast(ct('已放到 Mac 的剪貼簿'));
   } else if (msg.t === 'focus') {
     // After a click: a text field has the focus, and the keyboard comes up (the hidden
     // field is already focused from the tap); out of one, it goes down again if it came
@@ -326,7 +337,7 @@ function disconnect() {
   if (!streaming.value && !link) return;
   saveShot();
   try { link?.send({ t: 'stop' }); } catch {}
-  link?.close();link = null;streaming.value = false;keyboardOpen.value = false;settingsOpen.value = false;menuOpen.value = false;held.clear();panel.value = false;compose.value = false;composeText.value = '';
+  link?.close();link = null;streaming.value = false;keyboardOpen.value = false;settingsOpen.value = false;menuOpen.value = false;held.clear();panel.value = false;compose.value = false;composeText.value = '';clipOpen.value = false;clipWait?.reject(new Error('closed'));
 }
 const headCollapsed = ref(localGet('castpane-remote-head') === 'folded');
 function toggleHead() { headCollapsed.value = !headCollapsed.value;localSet('castpane-remote-head', headCollapsed.value ? 'folded' : 'open');menuOpen.value = false;settingsOpen.value = false; }
@@ -656,6 +667,54 @@ function sendCompose() {
   composeText.value = '';releaseMods();
   composeField.value?.focus({ preventScroll: true });
 }
+// ---- clipboard ----
+const toast = (text) => f7.toast.create({ text, closeTimeout: 2200 }).open();
+let clipWait = null;
+// The Mac's answer to clipboard-get, or a rejection after five seconds.
+function askClipboard() {
+  clipWait?.reject(new Error('replaced'));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => clipWait?.reject(new Error('timeout')), 5000);
+    const done = () => { clearTimeout(timer);clipWait = null; };
+    clipWait = { resolve: (m) => { done();resolve(m); }, reject: (e) => { done();reject(e); } };
+    link?.send({ t: 'clipboard-get' });
+  });
+}
+async function copyFromMac() {
+  clipOpen.value = false;
+  const answer = askClipboard();
+  const textOf = (m) => { if (m.concealed || m.empty || !m.s) throw new Error('no text');return m.s; };
+  try {
+    // Written in the tap itself, with the text still on its way: what Safari allows.
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) await navigator.clipboard.write([new ClipboardItem({ 'text/plain': answer.then((m) => new Blob([textOf(m)], { type: 'text/plain' })) })]);
+    else await navigator.clipboard.writeText(textOf(await answer));
+    const m = await answer;
+    toast(m.truncated ? ct('已拷貝 Mac 的剪貼簿（太長，只拷了前面 100 000 字）') : ct('已拷貝 Mac 的剪貼簿'));
+  } catch {
+    let m = null;
+    try { m = await answer; } catch { /* no answer */ }
+    if (!m) return toast(ct('Mac 沒有回應，請再試一次'));
+    if (m.concealed) return toast(ct('Mac 剪貼簿裡是密碼工具標為隱藏的內容，不會傳出'));
+    if (m.empty || !m.s) return toast(ct('Mac 的剪貼簿裡沒有文字'));
+    // This browser would not take it: the text, to copy by hand.
+    const d = f7.dialog.create({ title: ct('Mac 的剪貼簿'), content: '<textarea class="remote-clip-text" readonly></textarea>', buttons: [{ text: ct('關閉') }] }).open();
+    const area = d.el.querySelector('.remote-clip-text');
+    if (area) area.value = m.s;
+  }
+}
+async function pasteToMac() {
+  clipOpen.value = false;
+  let s = null;
+  try { s = await navigator.clipboard.readText(); } catch { /* refused or not there */ }
+  const put = (v) => {
+    if (!v) return toast(ct('這台裝置的剪貼簿裡沒有文字'));
+    if (v.length > 100000) return toast(ct('文字太長，最多 100 000 字'));
+    link?.send({ t: 'clipboard-set', s: v });
+  };
+  // This browser would not read it: a field to paste into.
+  if (s === null) return f7.dialog.prompt(ct('貼上要放到 Mac 剪貼簿的文字。'), ct('把剪貼簿放到 Mac'), put);
+  put(s);
+}
 // Return sends, except while the input method is still choosing characters.
 function composeKey(e) {
   if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
@@ -745,6 +804,10 @@ function keyUp(e) {
 .remote-keys.desk .remote-key {display:none;}
 .remote-stage .remote-key {display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:auto;min-width:36px;height:30px;padding:0 8px;margin:0;border-radius:7px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:13px;line-height:1;cursor:pointer;}
 .remote-key.mod.on, .remote-key.tool.on {background:#0a84ff;}
+.remote-clip {display:flex;gap:6px;padding:6px 8px;background:rgba(28,28,30,.96);border-top:1px solid rgba(255,255,255,.08);}
+.remote-stage .remote-clip-btn {flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;height:36px;margin:0;padding:0 8px;border:0;border-radius:9px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap;}
+.remote-keys.desk .remote-key.clip-btn {display:inline-flex;}
+.remote-clip-text {width:100%;height:160px;box-sizing:border-box;font-size:14px;-webkit-user-select:text;user-select:text;}
 .remote-compose {display:flex;gap:6px;padding:6px 8px;background:rgba(28,28,30,.96);border-top:1px solid rgba(255,255,255,.08);}
 .remote-compose-field {flex:1;min-width:0;height:36px;box-sizing:border-box;padding:0 10px;border-radius:9px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.5);color:#fff;font-size:16px;-webkit-user-select:text;user-select:text;}
 .remote-stage .remote-compose-send {flex:0 0 auto;width:auto;height:36px;margin:0;padding:0 14px;border:0;border-radius:9px;background:#0a84ff;color:#fff;font-size:14px;cursor:pointer;}
