@@ -76,8 +76,9 @@ struct PermissionsPane: View {
                 }
                 .glassCard(padding: 12)
             }
-            Text(showNote ? "The status updates by itself. A new build of Castpane asks again, because it is signed ad hoc."
-                          : "A new build of Castpane asks again, because it is signed ad hoc.")
+            Text((showNote ? "The status updates by itself. " : "")
+                 + (MacInfo.signedAdHoc ? "A new build of Castpane asks again, because it is signed ad hoc."
+                                        : "Updates keep these permissions: Castpane is signed with the same certificate each time."))
                 .font(.footnote).foregroundStyle(.secondary)
         }
     }

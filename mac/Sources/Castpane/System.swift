@@ -90,6 +90,20 @@ final class KeepAwake {
 }
 
 enum MacInfo {
+    /// Whether this copy is signed ad hoc (a build without a certificate): then macOS asks
+    /// for the permissions again after every new build; with a certificate it does not.
+    static let signedAdHoc: Bool = {
+        var code: SecCode?
+        guard SecCodeCopySelf([], &code) == errSecSuccess, let code else { return true }
+        var staticCode: SecStaticCode?
+        guard SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode else { return true }
+        var info: CFDictionary?
+        guard SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess,
+              let dict = info as? [String: Any] else { return true }
+        let flags = (dict[kSecCodeInfoFlags as String] as? NSNumber)?.uint32Value ?? 0
+        return flags & SecCodeSignatureFlags.adhoc.rawValue != 0 || dict[kSecCodeInfoCertificates as String] == nil
+    }()
+
     static var computerName: String { (SCDynamicStoreCopyComputerName(nil, nil) as String?) ?? "Mac" }
 
     static var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.2" }
