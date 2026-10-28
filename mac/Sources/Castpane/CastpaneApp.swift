@@ -33,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                         imageName: (image as NSString).lastPathComponent, imageURL: URL(string: "https://github.com/")!, sha256: sha)
                 let updater = model.updater
                 Task { @MainActor in
-                    await updater.install(u, image: URL(fileURLWithPath: image), relaunch: false)
+                    await updater.install(u, image: URL(fileURLWithPath: image), relaunch: false, quit: env["CASTPANE_UPDATE_SELFTEST_QUIT"] == "1")
                     print("selftest: \(updater.state)")
                     exit(2)
                 }

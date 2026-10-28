@@ -127,7 +127,8 @@ final class Updater: ObservableObject {
 
     /// `image`: an image already on disk (debug self-test), instead of the download.
     /// `relaunch`: false keeps the script from opening the new app (debug self-test).
-    func install(_ update: AvailableUpdate, image local: URL?, relaunch: Bool) async {
+    /// `quit`: false exits at once instead of quitting as the app does (debug self-test).
+    func install(_ update: AvailableUpdate, image local: URL?, relaunch: Bool, quit: Bool = true) async {
         if case .working = state { return }
         if let reason = Self.cannotUpdate { state = .failed(reason); return }
         guard let requirement = Self.ownRequirement() else { state = .failed("Castpane could not read its own signature."); return }
@@ -197,7 +198,10 @@ final class Updater: ObservableObject {
             p.standardOutput = FileHandle.nullDevice
             p.standardError = FileHandle.nullDevice
             try p.run()
-            if relaunch { NSApp.terminate(nil) } else { exit(0) }
+            // Quit from the run loop, not from inside this task: terminate waits for
+            // applicationShouldTerminate's own task on the main actor, which this one would
+            // still hold (0.1.3 and 0.1.4 stayed at "Restarting into…").
+            if quit { NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0) } else { exit(0) }
         } catch {
             try? fm.removeItem(at: staged)
             state = .failed("Update not installed: \((error as? Failure)?.text ?? error.localizedDescription).")
