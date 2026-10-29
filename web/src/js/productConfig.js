@@ -13,6 +13,8 @@ export const PRODUCT = Object.freeze({
     loginKey: 'castpane-login-key', // qrLogin.js
     passkeyOffer: 'castpane-passkey-offer', // passkeys.js
     updateDialog: 'castpane-update-dialog', // updatePrompt.js
+    sidebarFolded: 'castpane-sidebar-folded', // sidebarState.js
+    sidebarAuto: 'castpane-sidebar-auto', // sidebarState.js
     language: 'castpane-lang', // i18n.js
   }),
   // push.js: the kinds of notification a device has before it says otherwise
