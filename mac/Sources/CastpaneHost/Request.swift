@@ -30,7 +30,7 @@ enum Field {
 
 enum Request: Equatable, Sendable {
     case status, permissions, list, stop, ack, keyFrame
-    case start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int)
+    case start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool = false)
     case move(x: Double, y: Double)
     case button(Int, down: Bool, x: Double, y: Double)
     case probe(x: Double, y: Double, n: Double)
@@ -68,9 +68,10 @@ enum Request: Equatable, Sendable {
                   let id = Field.exactInt(msg["id"], in: ids),
                   let maxWidth = Field.clampedInt(msg["maxWidth"], 320...3840, default: 1920),
                   let fps = Field.clampedInt(msg["fps"], 10...60, default: 60),
-                  let bitrate = Field.clampedInt(msg["bitrate"], 500_000...40_000_000, default: 8_000_000)
+                  let bitrate = Field.clampedInt(msg["bitrate"], 500_000...40_000_000, default: 8_000_000),
+                  msg["codec"] == nil || msg["codec"] as? String == "h264" || msg["codec"] as? String == "hevc"
             else { return .invalid(t) }
-            return .start(kind: kind, id: id, maxWidth: maxWidth, fps: fps, bitrate: bitrate)
+            return .start(kind: kind, id: id, maxWidth: maxWidth, fps: fps, bitrate: bitrate, hevc: msg["codec"] as? String == "hevc")
         case "move":
             guard let (x, y) = point() else { return .invalid(t) }
             return .move(x: x, y: y)

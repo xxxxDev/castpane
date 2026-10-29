@@ -1,6 +1,6 @@
 // swift-tools-version:6.0
 // Castpane.app: the Mac side of castpane. A menu-bar app that starts the castpane server,
-// captures the screen or one window on the hardware H.264 encoder, posts the clicks and
+// captures the screen or one window on the hardware H.264 or HEVC encoder, posts the clicks and
 // keys a viewer sends, and manages the tunnel that makes the server reachable.
 //
 // CastpaneCore holds the pure logic (config files, backoff, tunnel state and the parsing

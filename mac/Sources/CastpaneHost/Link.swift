@@ -3,7 +3,7 @@ import Foundation
 // The link to the castpane server: a Unix socket in a folder only this user can open,
 // one connection at a time. Every frame is [kind: 1 byte][length: 4 bytes, big-endian]
 // [payload]. Kind 1 is a JSON message, either way; kind 2 is video, from here only:
-// [flags: 1 byte, bit 0 = key frame][timestamp in µs: 8 bytes][H.264 Annex B].
+// [flags: 1 byte, bit 0 = key frame][timestamp in µs: 8 bytes][H.264 or HEVC Annex B].
 // The first message must be {"t":"hello","token":…} with the token from host.token,
 // which the app writes for the server; anything else closes the connection.
 enum Kind: UInt8 { case json = 1, video = 2 }

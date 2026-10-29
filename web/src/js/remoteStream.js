@@ -1,5 +1,5 @@
 // The Remote page's link (server/remote.js): one socket that brings the capture core's
-// H.264 frames and answers, and takes the page's requests, clicks and keys. Frames are
+// H.264 or HEVC frames and answers, and takes the page's requests, clicks and keys. Frames are
 // decoded by the browser's own (hardware) decoder and drawn on a canvas; each one shown
 // is acknowledged, and the capture core skips frames while three are unshown, so the picture
 // stays current instead of falling behind (as Sill does).
@@ -7,12 +7,25 @@ export function remoteSupported() {
   return typeof window !== 'undefined' && 'VideoDecoder' in window && 'EncodedVideoChunk' in window;
 }
 
+// Whether this browser decodes HEVC in hardware: the Mac then sends it, sharper for the
+// same bits. Asked once; a browser that cannot say is taken as no.
+let hevcAnswer = null;
+export function hevcDecodes() {
+  if (!hevcAnswer) {
+    hevcAnswer = remoteSupported() && typeof VideoDecoder.isConfigSupported === 'function'
+      ? VideoDecoder.isConfigSupported({ codec: 'hvc1.1.6.L153.B0', optimizeForLatency: true, hardwareAcceleration: 'prefer-hardware' }).then((r) => !!r.supported, () => false)
+      : Promise.resolve(false);
+  }
+  return hevcAnswer;
+}
+
 // machine: another Mac that joined this one (docs/multi-mac.md), or empty for this Mac.
-export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, onState = () => {}, onStats = () => {} }) {
+// onCodecFailed: an HEVC stream this browser would not decode after all; ask for H.264.
+export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, onState = () => {}, onStats = () => {}, onCodecFailed = () => {} }) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const ws = new WebSocket(`${proto}//${location.host}/remote?pass=${encodeURIComponent(pass)}${machine ? `&machine=${encodeURIComponent(machine)}` : ''}`);
   ws.binaryType = 'arraybuffer';
-  let decoder = null, config = null, needKey = true, closed = false, opened = false;
+  let decoder = null, config = null, needKey = true, closed = false, opened = false, shown = false;
   let frames = 0, bytes = 0, statsAt = performance.now();
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
   const send = (msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); };
@@ -25,14 +38,23 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
           if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) { canvas.width = frame.displayWidth; canvas.height = frame.displayHeight; }
           ctx.drawImage(frame, 0, 0);
         } finally { frame.close(); }
-        frames++;
+        frames++;shown = true;
         send({ t: 'ack' });
       },
-      error() { needKey = true; send({ t: 'key-frame' }); if (config) { try { makeDecoder(); } catch {} } },
+      error() {
+        // HEVC that fails before its first picture: this browser cannot decode it.
+        if (hevc() && !shown) { codecFailed();return; }
+        needKey = true; send({ t: 'key-frame' }); if (config) { try { makeDecoder(); } catch {} }
+      },
     });
-    if (config) decoder.configure({ codec: config.codec, optimizeForLatency: true, hardwareAcceleration: 'prefer-hardware' });
+    shown = false;
     needKey = true;
+    if (!config) return;
+    try { decoder.configure({ codec: config.codec, optimizeForLatency: true, hardwareAcceleration: 'prefer-hardware' }); }
+    catch (e) { if (hevc()) codecFailed();else throw e; }
   }
+  const hevc = () => !!config?.codec?.startsWith('hvc1');
+  function codecFailed() { const was = config;config = null;try { decoder?.close(); } catch {} decoder = null;if (was) onCodecFailed(); }
 
   ws.onopen = () => { opened = true; onState('open'); };
   ws.onclose = () => { closed = true; try { decoder?.close(); } catch {} onState(opened ? 'closed' : 'refused'); };
@@ -85,5 +107,6 @@ export function codeOfChar(ch) {
   return { ' ': 'Space', '-': 'Minus', '=': 'Equal', '[': 'BracketLeft', ']': 'BracketRight', '\\': 'Backslash', ';': 'Semicolon', "'": 'Quote', ',': 'Comma', '.': 'Period', '/': 'Slash', '`': 'Backquote' }[c] || null;
 }
 
+// For a 1920 × 1080 picture: the Mac gives a larger one more (Session.scaledBitrate).
 export const QUALITY = { low: 2_000_000, standard: 6_000_000, high: 12_000_000, max: 25_000_000 };
 export const RESOLUTION = { '1280': 1280, '1920': 1920, '2560': 2560, native: 3840 };

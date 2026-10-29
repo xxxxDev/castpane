@@ -79,8 +79,8 @@ A Unix socket in Castpane's folder. Frames are
 ```
 
 - kind `1`: a UTF-8 JSON object, at most a few kilobytes;
-- kind `2`: video, `[flags: 1][timestamp µs: 8, big-endian][H.264 Annex B]`; `flags & 1` marks a
-  key frame.
+- kind `2`: video, `[flags: 1][timestamp µs: 8, big-endian][H.264 or HEVC Annex B]`; `flags & 1`
+  marks a key frame. A picture that stops changing is sent again a few times, each copy sharper.
 
 The server's first message is `{t:"hello", token}` with the contents of `host.token`. Anything
 else, or a wrong token, closes the connection. The capture core serves one connection at a
@@ -98,7 +98,7 @@ closing the session.
 | `status`      |                                                                                                                                                                                                            | Ask for the permissions state again.                        |
 | `permissions` |                                                                                                                                                                                                            | Show macOS's permission prompts on the Mac.                 |
 | `list`        |                                                                                                                                                                                                            | List what can be shown.                                     |
-| `start`       | `kind` (`display`/`window`), `id` (integer, 0 to 2³²−1); optional `maxWidth` (integer, 320 to 3840), `fps` (integer, 10 to 60), `bitrate` (integer, 500 000 to 40 000 000)                                 | Show one display or window.                                 |
+| `start`       | `kind` (`display`/`window`), `id` (integer, 0 to 2³²−1); optional `maxWidth` (integer, 320 to 3840), `fps` (integer, 10 to 60), `bitrate` (integer, 500 000 to 40 000 000, for a 1920 × 1080 picture; a larger one gets more), `codec` (`h264` or `hevc`)                                 | Show one display or window.                                 |
 | `stop`        |                                                                                                                                                                                                            | Stop the picture.                                           |
 | `ack`         |                                                                                                                                                                                                            | One frame was shown (the core keeps at most three unshown). |
 | `key-frame`   |                                                                                                                                                                                                            | Send a key frame next.                                      |
@@ -118,7 +118,7 @@ closing the session.
 | `status`  | `screen`, `accessibility`, `version`                                                                            | Which permissions it has. Sent after the hello.                             |
 | `list`    | `items: [{kind, id, title, app, width, height, thumb, here, desk: {id, number, display, fullscreen, current}}]` | Displays and windows, by desktop. With several displays, one more `display` item, `id` 0 and `all: true`: every display at once, side by side as arranged. |
 | `started` | `kind`, `id`, `width`, `height`, `fps`                                                                          | The picture started.                                                        |
-| `config`  | `codec`, `width`, `height`                                                                                      | The decoder configuration, before the first key frame.                      |
+| `config`  | `codec` (`avc1.…` or `hvc1.…`), `width`, `height`                                                               | The decoder configuration, before the first key frame.                      |
 | `stopped` | `reason`                                                                                                        | The picture stopped (the window closed, …).                                 |
 | `focus`   | `editable`, `caret?`, `initial?`                                                                                | After a click: whether a text field has the focus, and where its caret is.  |
 | `caret`   | `caret: [x, y, w, h]`                                                                                           | The text caret moved.                                                       |

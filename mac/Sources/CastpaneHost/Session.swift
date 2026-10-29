@@ -20,38 +20,66 @@ func sameBytes(_ a: String, _ b: String) -> Bool {
 /// rather than waiting for the session.
 final class VideoGate: @unchecked Sendable {
     private let lock = NSLock()
-    private var encoder: H264Encoder?
-    private var inFlight = 0
+    private var encoder: ScreenEncoder?
+    /// When each frame not yet acknowledged was let through, oldest first (the page
+    /// acknowledges them in order).
+    private var sent: [TimeInterval] = []
     private var lastAck: TimeInterval = 0
+    /// Recent round trips (when measured, how long), for the shortest of the last few seconds.
+    private var trips: [(at: TimeInterval, took: TimeInterval)] = []
+
+    /// Frames that may be unshown at once: always 3, more when the round trip is long. Three
+    /// was the limit for every link; over a long one (a Mac joined through another, by way of
+    /// Cloudflare, about 0.3 s there and back) that held the picture to 8 to 10 frames a
+    /// second however small they were (the owner's report, 2026-10-30). The shortest recent
+    /// round trip is what the link takes without a queue: enough frames to cover it, and two
+    /// more, keep it busy without letting a queue build up behind a slow one.
+    static let fewest = 3, most = 16
+
+    func window(fps: Int, now: TimeInterval) -> Int {
+        guard let shortest = trips.lazy.filter({ now - $0.at < 3 }).map(\.took).min() else { return Self.fewest }
+        return min(Self.most, max(Self.fewest, Int((shortest * Double(max(1, fps))).rounded(.up)) + 2))
+    }
 
     /// Puts `next` in place (nil: none) and returns the one it replaced.
-    func replace(with next: H264Encoder?) -> H264Encoder? {
+    func replace(with next: ScreenEncoder?, now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> ScreenEncoder? {
         lock.withLock {
-            defer { encoder = next; inFlight = 0 }
+            // The second without an answer counts from here: from 0 it had always run out, and
+            // the first frames past the window were let through with a key frame asked for.
+            defer { encoder = next; sent = []; lastAck = now }
             return encoder
         }
     }
 
-    func ack() { lock.withLock { inFlight = max(0, inFlight - 1); lastAck = ProcessInfo.processInfo.systemUptime } }
+    func ack(now: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        lock.withLock {
+            lastAck = now
+            guard !sent.isEmpty else { return }
+            trips.append((now, now - sent.removeFirst()))
+            trips.removeAll { now - $0.at > 3 }
+        }
+    }
 
     /// Asked when the page or the server lost a frame: start clean, and forget the frames
     /// that will never be acknowledged.
     func keyFrame() {
-        let enc = lock.withLock { () -> H264Encoder? in inFlight = 0; return encoder }
+        let enc = lock.withLock { () -> ScreenEncoder? in sent = []; return encoder }
         enc?.requestKeyFrame()
     }
 
     /// The encoder to give this frame to, or nil to skip it. The page acknowledges each
-    /// frame it shows: with three not yet shown, or a link that has not written what it
-    /// has, the frame is skipped rather than queued. No answer for a second while frames
-    /// are out (one lost on the way): start again from a key frame.
-    func admit(linkPending: Int) -> H264Encoder? {
+    /// frame it shows: with a window's worth not yet shown, or a link that has not written
+    /// what it has, the frame is skipped rather than queued. No answer for a second while
+    /// frames are out (one lost on the way): start again from a key frame. A still copy
+    /// (Capture's sharpening) goes only with nothing unshown and nothing unwritten, so it
+    /// never holds up the frames of a picture that moves again.
+    func admit(linkPending: Int, still: Bool = false, now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> ScreenEncoder? {
         lock.withLock {
             guard let enc = encoder else { return nil }
-            let now = ProcessInfo.processInfo.systemUptime
-            if inFlight >= 3 && now - lastAck > 1 { inFlight = 0; lastAck = now; enc.requestKeyFrame() }
-            guard inFlight < 3, linkPending <= 2_000_000 else { return nil }
-            inFlight += 1
+            let limit = window(fps: enc.settings.fps, now: now)
+            if sent.count >= limit && now - lastAck > 1 { sent = []; lastAck = now; enc.requestKeyFrame() }
+            guard sent.count < limit, linkPending <= 2_000_000, !still || (sent.isEmpty && linkPending == 0) else { return nil }
+            sent.append(now)
             return enc
         }
     }
@@ -86,6 +114,10 @@ actor Session {
     private var watcher: Task<Void, Never>?
     private var lastSignature = ""
     private var lastListed = Date.distantPast
+    /// What the picture shown was started with, and the displays' arrangement then: a
+    /// display shown is started again when that changes.
+    private var lastStart: (kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool)?
+    private var displaysAtStart = ""
 
     /// `onHello` runs once, on the reader's thread, when the hello carried the token and
     /// before anything is answered; false (the server stopped meanwhile) ends the session.
@@ -95,9 +127,10 @@ actor Session {
         self.onHello = onHello
         (events, feed) = AsyncStream.makeStream(of: Event.self)
         let video = self.video
-        capture.setHandlers(onFrame: { [link] pixels, time in
-            guard let enc = video.admit(linkPending: link.pending) else { return }
+        capture.setHandlers(onFrame: { [link] pixels, time, still in
+            guard let enc = video.admit(linkPending: link.pending, still: still) else { return false }
             enc.encode(pixels, at: time)
+            return true
         }, onStop: { [link] reason in
             link.send(json: ["t": "stopped", "reason": reason])
         })
@@ -165,6 +198,12 @@ actor Session {
 
     private func checkWindows() {
         guard !link.isClosed, CGPreflightScreenCaptureAccess() else { return }
+        // The Mac's own resolution changed while a display was shown: the clicks went where
+        // the old size put them, and the picture kept its old shape, until a reconnect (the
+        // owner's report, 2026-10-30). The same display is started again at its new size.
+        if let s = lastStart, s.kind == "display", target != nil, Self.displaysSignature() != displaysAtStart {
+            queued { await self.start(kind: s.kind, id: s.id, maxWidth: s.maxWidth, fps: s.fps, bitrate: s.bitrate, hevc: s.hevc) }
+        }
         let sig = Self.windowSignature()
         if sig != lastSignature || Date().timeIntervalSince(lastListed) > 20 {
             let first = lastSignature.isEmpty
@@ -179,6 +218,13 @@ actor Session {
             guard (w[kCGWindowLayer as String] as? Int) == 0, let name = w[kCGWindowName as String] as? String, !name.isEmpty else { return nil }
             return "\(w[kCGWindowNumber as String] ?? 0):\(name):\(w[kCGWindowIsOnscreen as String] as? Bool ?? false)"
         }.sorted().joined(separator: "|")
+    }
+
+    /// Every active display's place and size in points and pixels.
+    private static func displaysSignature() -> String {
+        var ids = [CGDirectDisplayID](repeating: 0, count: 16), count: UInt32 = 0
+        guard CGGetActiveDisplayList(16, &ids, &count) == .success else { return "" }
+        return ids.prefix(Int(count)).map { "\($0):\(CGDisplayBounds($0)):\(CGDisplayPixelsWide($0))" }.joined(separator: "|")
     }
 
     private static func status() -> [String: Any] {
@@ -203,8 +249,8 @@ actor Session {
                 do { link.send(json: ["t": "list", "items": try await Catalog.list()]) }
                 catch { link.send(json: ["t": "error", "where": "list", "message": error.localizedDescription]) }
             }
-        case let .start(kind, id, maxWidth, fps, bitrate):
-            queued { await self.start(kind: kind, id: id, maxWidth: maxWidth, fps: fps, bitrate: bitrate) }
+        case let .start(kind, id, maxWidth, fps, bitrate, hevc):
+            queued { await self.start(kind: kind, id: id, maxWidth: maxWidth, fps: fps, bitrate: bitrate, hevc: hevc) }
         case .stop: queued { await self.stop() }
         case .ack: video.ack()
         case .keyFrame: video.keyFrame()
@@ -293,8 +339,17 @@ actor Session {
         return input.point(x, y, in: rect)
     }
 
-    private func start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int) async {
+    /// The bitrate asked for is for a 1920 × 1080 picture; a larger one gets more, though
+    /// less than in proportion (its detail is finer, not all new), at most 40 Mbps.
+    static func scaledBitrate(_ bitrate: Int, width: Int, height: Int) -> Int {
+        let more = pow(max(1, Double(width * height) / (1920 * 1080)), 0.75)
+        return min(40_000_000, Int(Double(bitrate) * more))
+    }
+
+    private func start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool) async {
         await stop()
+        lastStart = (kind, id, maxWidth, fps, bitrate, hevc)
+        displaysAtStart = Self.displaysSignature()
         do {
             guard let found = try await Catalog.target(kind: kind, id: id) else {
                 link.send(json: ["t": "error", "where": "start", "message": "gone"]); return
@@ -307,9 +362,14 @@ actor Session {
             guard w.isFinite, h.isFinite else { link.send(json: ["t": "error", "where": "start", "message": "gone"]); return }
             let width = max(64, Int(min(w, 8192)) & ~1), height = max(64, Int(min(h, 8192)) & ~1)
             let link = self.link
-            let enc = try H264Encoder(.init(width: width, height: height, fps: fps, bitrate: bitrate)) { data, key, micros, codec in
+            let output: ScreenEncoder.Output = { data, key, micros, codec in
                 Self.sendVideo(link, data, key: key, micros: micros, codec: codec, width: width, height: height)
             }
+            let settings = ScreenEncoder.Settings(width: width, height: height, fps: fps,
+                                                  bitrate: Self.scaledBitrate(bitrate, width: width, height: height), hevc: hevc)
+            // HEVC this Mac cannot encode (an older Intel Mac): H.264, which the page always takes.
+            let enc = try (hevc ? try? ScreenEncoder(settings, output: output) : nil)
+                ?? ScreenEncoder(.init(width: settings.width, height: settings.height, fps: fps, bitrate: settings.bitrate), output: output)
             video.replace(with: enc)?.invalidate()
             target = found
             windowFrame = nil

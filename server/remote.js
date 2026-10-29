@@ -9,7 +9,7 @@
 // hours, and relays between the page and the capture core.
 //
 // Page ⇄ server, over /remote: text frames are JSON both ways, binary frames are video
-// from the capture core ([flags][timestamp µs: 8 bytes][H.264 Annex B]) passed on
+// from the capture core ([flags][timestamp µs: 8 bytes][H.264 or HEVC Annex B]) passed on
 // untouched. Server ⇄ capture core: [kind][length: 4 bytes BE][payload], kind 1 JSON,
 // kind 2 video (docs/protocol.md).
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path'), net = require('node:net'), crypto = require('node:crypto');
@@ -52,6 +52,10 @@ const MESSAGES = {
       if (m[k] === undefined) continue;
       if (!int(m[k], lo, hi)) return null;
       out[k] = m[k];
+    }
+    if (m.codec !== undefined) {
+      if (m.codec !== 'h264' && m.codec !== 'hevc') return null;
+      out.codec = m.codec;
     }
     return out;
   },

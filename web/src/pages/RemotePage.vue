@@ -151,7 +151,7 @@ import { ct } from '../js/text.js';
 import { api } from '../js/api.js';
 import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
-import { openRemote, remoteSupported, toPicture, codeOfChar, QUALITY, RESOLUTION } from '../js/remoteStream.js';
+import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, QUALITY, RESOLUTION } from '../js/remoteStream.js';
 
 const supported = remoteSupported();
 const machines = ref([]), error = ref(''), streaming = ref(false), items = ref([]), current = ref(null);
@@ -180,7 +180,16 @@ const PAGES = [
     ...'789-456*123/'.split('').map((c) => ({ text: c, label: c })), { text: '0', label: '0' }, { text: '.', label: '.' }, { code: 'Backspace', label: '⌫' }, { text: '+', label: '+' }] },
   { id: 'fn', name: '功能鍵', cols: 4, keys: Array.from({ length: 12 }, (_, i) => ({ code: 'F' + (i + 1), label: 'F' + (i + 1) })) },
 ];
-const prefs = reactive({ quality: 'standard', resolution: '1920', fps: 60, ...(JSON.parse(localGet('castpane-remote-prefs') || '{}')) });
+// Native resolution by default: text on a Retina screen kept at 1920 across was soft (the
+// owner's report, 2026-10-30). Choices kept from before then (v missing) had 1920 as the
+// default and move to native; one picked since stays.
+const prefs = reactive({ quality: 'standard', resolution: 'native', fps: 60, ...(JSON.parse(localGet('castpane-remote-prefs') || '{}')) });
+if (prefs.v !== 2) { if (prefs.resolution === '1920') prefs.resolution = 'native';prefs.v = 2;localSet('castpane-remote-prefs', JSON.stringify(prefs)); }
+// HEVC when this browser decodes it, until a stream shows it does not.
+let useHevc = false;
+hevcDecodes().then((yes) => { useHevc = yes; });
+// Zoomed in on a picture made smaller than the Mac's: native while zoomed, so the detail is there.
+const zoomNative = ref(false);
 // The last picture of each Mac, for its tile; this Mac's under the key it always had.
 const shotKey = (id) => (id === 'local' ? 'castpane-remote-shot' : `castpane-remote-shot-${id}`);
 const shots = reactive({});
@@ -270,6 +279,7 @@ async function connect(m, retried = false) {
     },
     onMessage,
     onStats(s) { Object.assign(stats, s); },
+    onCodecFailed() { useHevc = false;showCurrent(); },
   });
 }
 
@@ -370,16 +380,22 @@ watch(groups, (gs) => {
 });
 function list() { link?.send({ t: 'list' }); }
 function show(w) {
-  hasPicture.value = hasPicture.value && current.value?.kind === w.kind && current.value?.id === w.id;
+  const same = current.value?.kind === w.kind && current.value?.id === w.id;
+  hasPicture.value = hasPicture.value && same;
+  if (!same) zoomNative.value = false;
   notice.value = ct('正在切換…');
+  const resolution = zoomNative.value ? 'native' : prefs.resolution;
   // Only values the server passes on (server/remote.js): a stale stored choice is left out.
-  link?.send({ t: 'start', kind: w.kind, id: w.id, maxWidth: Object.hasOwn(RESOLUTION, prefs.resolution) ? RESOLUTION[prefs.resolution] : undefined, fps: prefs.fps === 30 ? 30 : 60, bitrate: Object.hasOwn(QUALITY, prefs.quality) ? QUALITY[prefs.quality] : undefined });
+  link?.send({ t: 'start', kind: w.kind, id: w.id, maxWidth: Object.hasOwn(RESOLUTION, resolution) ? RESOLUTION[resolution] : undefined, fps: prefs.fps === 30 ? 30 : 60, bitrate: Object.hasOwn(QUALITY, prefs.quality) ? QUALITY[prefs.quality] : undefined, ...(useHevc ? { codec: 'hevc' } : {}) });
   current.value = { kind: w.kind, id: w.id };
+}
+function showCurrent() {
+  const w = items.value.find((x) => current.value && x.kind === current.value.kind && x.id === current.value.id);
+  if (w) show(w);
 }
 function setPref(k, v) {
   prefs[k] = v;localSet('castpane-remote-prefs', JSON.stringify(prefs));
-  const w = items.value.find((x) => current.value && x.kind === current.value.kind && x.id === current.value.id);
-  if (w) show(w);
+  showCurrent();
 }
 function askPermissions() { link?.send({ t: 'permissions' }); }
 function saveShot() {
@@ -403,6 +419,14 @@ const touches = new Map();
 // (a desktop is small on a phone); at full size two fingers scroll the Mac.
 const view = reactive({ z: 1, x: 0, y: 0 });
 function resetView() { view.z = 1;view.x = 0;view.y = 0; }
+// Zoomed in for a moment on a picture smaller than native: the Mac sends it at native size
+// from then on (until another window or screen is picked), so zooming shows real detail.
+let zoomSettle = 0;
+watch(() => view.z > 1.2, (zoomed) => {
+  clearTimeout(zoomSettle);
+  if (zoomed && !zoomNative.value && prefs.resolution !== 'native') zoomSettle = setTimeout(() => { if (view.z > 1.2 && streaming.value) { zoomNative.value = true;showCurrent(); } }, 400);
+});
+onBeforeUnmount(() => clearTimeout(zoomSettle));
 function clampView() {
   const r = area.value.getBoundingClientRect();
   view.z = Math.min(5, Math.max(1, view.z));

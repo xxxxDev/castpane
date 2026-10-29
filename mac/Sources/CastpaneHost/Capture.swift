@@ -170,7 +170,9 @@ enum Catalog {
 /// its frames and its end arrive on ScreenCaptureKit's queues: the streams and the handlers
 /// are behind a lock, and the frames of every stream come on one serial queue.
 final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
-    typealias FrameHandler = @Sendable (CVPixelBuffer, CMTime) -> Void
+    /// True when the frame was taken (encoded), false when it was skipped. `still`: a
+    /// sharper copy of a picture already sent, which only goes when the link is idle.
+    typealias FrameHandler = @Sendable (CVPixelBuffer, CMTime, Bool) -> Bool
     typealias StopHandler = @Sendable (String) -> Void
     private let lock = NSLock()
     private var streams: [SCStream] = []
@@ -179,6 +181,14 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Send
     private let queue = DispatchQueue(label: "castpane.capture")
     /// "All displays" only; used on `queue` alone.
     private var compositor: Compositor?
+    /// The last picture, kept to sharpen once the screen stands still, and which stillness
+    /// it belongs to; used on `queue` alone.
+    private var still: CVPixelBuffer?
+    private var stillCount = 0
+    /// How long the screen stands still before it is sharpened, the time between the
+    /// sharper copies, how many are sent, and how soon a copy the link had no room for
+    /// is tried again.
+    static let stillAfter = 0.3, stillEvery = 0.15, stillCopies = 8, stillRetry = 0.04
 
     func setHandlers(onFrame: @escaping FrameHandler, onStop: @escaping StopHandler) {
         lock.withLock { self.onFrame = onFrame; self.onStop = onStop }
@@ -199,7 +209,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Send
             let s = SCStream(filter: target.filter, configuration: config(width, height), delegate: self)
             try s.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
             try await s.startCapture()
-            queue.sync { compositor = nil }
+            queue.sync { compositor = nil; forgetStill() }
             lock.withLock { streams = [s] }
             return
         }
@@ -217,7 +227,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Send
                 started.append(s)
             }
             let comp = try Compositor(width: width, height: height, places: places, streams: started.map(ObjectIdentifier.init), fps: fps)
-            queue.sync { compositor = comp }
+            queue.sync { compositor = comp; forgetStill() }
             for s in started { try await s.startCapture() }
         } catch {
             for s in started { try? await s.stopCapture() }
@@ -230,7 +240,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Send
     func stop() async {
         let all = lock.withLock { () -> [SCStream] in defer { streams = [] }; return streams }
         for s in all { try? await s.stopCapture() }
-        queue.sync { compositor = nil }
+        queue.sync { compositor = nil; forgetStill() }
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sample: CMSampleBuffer, of type: SCStreamOutputType) {
@@ -239,13 +249,42 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Send
         if let info = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
            let raw = info.first?[.status] as? Int, let status = SCFrameStatus(rawValue: raw), status != .complete { return }
         let time = CMSampleBufferGetPresentationTimeStamp(sample)
-        let handler = lock.withLock { onFrame }
         if let compositor {
-            if let picture = compositor.add(pixels, from: ObjectIdentifier(stream), at: time) { handler?(picture, time) }
+            if let picture = compositor.add(pixels, from: ObjectIdentifier(stream), at: time) { deliver(picture, time) }
         } else {
-            handler?(pixels, time)
+            deliver(pixels, time)
         }
     }
+
+    /// On `queue`: the frame goes to the encoder, and is kept in case it is the last.
+    private func deliver(_ pixels: CVPixelBuffer, _ time: CMTime) {
+        let handler = lock.withLock { onFrame }
+        _ = handler?(pixels, time, false)
+        still = pixels
+        stillCount += 1
+        sharpen(stillCount, sent: 0, tries: 0)
+    }
+
+    /// A screen that stops changing sends no more frames, and the last one, encoded while
+    /// it moved, is the least sharp: text stayed blurred (the owner's report, 2026-10-30).
+    /// Once it has stood still for a moment the same picture is encoded again a few times;
+    /// each copy spends its bits on what the one before left out. A copy goes only when
+    /// every frame before it has been shown, so when the picture moves again (a mouse that
+    /// paused) at most one copy is ahead of it; one that cannot go yet is tried again, a
+    /// few times at most.
+    private func sharpen(_ count: Int, sent: Int, tries: Int, wait: Double = Capture.stillAfter) {
+        guard sent < Self.stillCopies, tries < Self.stillCopies * 8 else { if count == stillCount { still = nil }; return }
+        queue.asyncAfter(deadline: .now() + wait) { [weak self] in
+            guard let self, count == self.stillCount, let pixels = self.still else { return }
+            let handler = self.lock.withLock { self.onFrame }
+            // Frames are stamped with the host clock, as ScreenCaptureKit's are.
+            let took = handler?(pixels, CMClockGetTime(CMClockGetHostTimeClock()), true) ?? false
+            self.sharpen(count, sent: sent + (took ? 1 : 0), tries: tries + 1, wait: took ? Self.stillEvery : Self.stillRetry)
+        }
+    }
+
+    /// On `queue`: a new picture or none: what was kept is not sharpened any more.
+    private func forgetStill() { still = nil; stillCount += 1 }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         let handler = lock.withLock { () -> StopHandler? in

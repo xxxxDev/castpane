@@ -13,8 +13,9 @@ Castpane lets you see and control your own Mac from a phone or another computer.
 in a browser, or install it on the phone's Home Screen as an app. The Mac runs one app,
 **Castpane.app**. The phone or the other computer needs nothing installed.
 
-The picture is the Mac's own hardware H.264, decoded by the browser's hardware decoder, so a
-whole screen or a single window stays sharp and current on a phone. You click, scroll and type
+The picture is the Mac's own hardware HEVC or H.264, decoded by the browser's hardware decoder,
+at the Mac's full Retina resolution, so a whole screen or a single window stays sharp and current
+on a phone. When the screen stops changing, the picture sharpens within about a second. You click, scroll and type
 back, with touch modes made for a small screen.
 
 > [!WARNING]
@@ -52,7 +53,7 @@ back, with touch modes made for a small screen.
   the Mac. What a password manager marks hidden is never sent; each use is in Activity.
 - **Stays current.** Each frame shown is acknowledged; the Mac skips frames while three are
   unshown, so a slow network gives fewer frames, not old ones. Quality, resolution and 30 or
-  60 fps are yours to choose.
+  60 fps are yours to choose; the bitrate grows with the picture's size.
 - **Sign-in that holds up.** Passwords, passkeys (Face ID, Touch ID, Windows Hello), two-step
   codes with recovery codes, and QR sign-in from a phone that is already signed in. Failed
   sign-ins lock an address out for longer each time; an admin sees what was tried and from
