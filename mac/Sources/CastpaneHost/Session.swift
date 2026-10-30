@@ -233,8 +233,9 @@ actor Session {
     private static func wakeDisplays() async {
         guard Wake.needed else { return }
         Wake.display()
-        for _ in 0..<12 {
-            if let c = try? await Catalog.content(), !c.displays.isEmpty { return }
+        let until = Date().addingTimeInterval(3)
+        while Date() < until {
+            if let c = try? await Catalog.within(1, { Catalog.Unchecked(try await Catalog.content()) }), !c.value.displays.isEmpty { return }
             try? await Task.sleep(nanoseconds: 250_000_000)
         }
     }

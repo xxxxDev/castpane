@@ -3,6 +3,7 @@ import ScreenCaptureKit
 import CoreMedia
 import AppKit
 import ApplicationServices
+import os
 
 // The window number behind an Accessibility window (private, long-standing in macOS;
 // the public API has no other way to match the two).
@@ -26,8 +27,37 @@ enum Catalog {
     /// Every window, also those on the Mac's other desktops (Spaces) and in the Dock
     /// too: a window there is brought here when picked.
     static func content() async throws -> SCShareableContent {
-        try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
+        guard let content = try await within(5, { Unchecked(try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)) }) else {
+            log.error("the list of displays and windows did not come within 5 s")
+            throw CocoaError(.featureUnsupported, userInfo: [NSLocalizedDescriptionKey: "The screen capture did not answer"])
+        }
+        return content.value
     }
+
+    /// ScreenCaptureKit's objects, passed between tasks as they are (they are not changed after).
+    struct Unchecked<T>: @unchecked Sendable { let value: T; init(_ value: T) { self.value = value } }
+
+    /// ScreenCaptureKit can leave a call unanswered for good (an Intel Mac mini, 2026-10-30:
+    /// the list never came, so the page stayed on Connecting). The answer is waited for this
+    /// long at most; nil after that, and a late answer is dropped.
+    static func within<T: Sendable>(_ seconds: Double, _ work: @escaping @Sendable () async throws -> T) async throws -> T? {
+        let done = OSAllocatedUnfairLock(initialState: false)
+        return try await withCheckedThrowingContinuation { (k: CheckedContinuation<T?, Error>) in
+            let finish: @Sendable (Result<T?, Error>) -> Void = { r in
+                if done.withLock({ was in defer { was = true }; return !was }) { k.resume(with: r) }
+            }
+            Task { do { finish(.success(try await work())) } catch { finish(.failure(error)) } }
+            Task { try? await Task.sleep(nanoseconds: UInt64(seconds * 1e9)); finish(.success(nil)) }
+        }
+    }
+
+    private static func screenshot(_ filter: SCContentFilter, _ config: SCStreamConfiguration) async -> CGImage? {
+        let args = Unchecked((filter, config))
+        let image = try? await within(2) { Unchecked(try await SCScreenshotManager.captureImage(contentFilter: args.value.0, configuration: args.value.1)) }
+        if image == nil { log.error("a thumbnail failed or did not come within 2 s") }
+        return image?.value
+    }
+    private static let log = Logger(subsystem: "io.github.castpane", category: "capture")
 
     /// Ordinary windows: layer 0, with a title, big enough to use, not ours; the ones on
     /// this desktop first.
@@ -143,7 +173,7 @@ enum Catalog {
             let r = CGRect(x: (f.minX - union.minX) * scale, y: CGFloat(height) - (f.maxY - union.minY) * scale, width: f.width * scale, height: f.height * scale)
             let config = SCStreamConfiguration()
             config.width = max(1, Int(r.width)); config.height = max(1, Int(r.height)); config.showsCursor = false
-            if let image = try? await SCScreenshotManager.captureImage(contentFilter: SCContentFilter(display: d, excludingWindows: []), configuration: config) {
+            if let image = await screenshot(SCContentFilter(display: d, excludingWindows: []), config) {
                 ctx.draw(image, in: r)
             }
         }
@@ -158,7 +188,7 @@ enum Catalog {
         config.width = width
         config.height = max(1, Int(CGFloat(width) * size.height / size.width))
         config.showsCursor = false
-        guard let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) else { return nil }
+        guard let image = await screenshot(filter, config) else { return nil }
         let rep = NSBitmapImageRep(cgImage: image)
         guard let jpeg = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.6]) else { return nil }
         return "data:image/jpeg;base64," + jpeg.base64EncodedString()
