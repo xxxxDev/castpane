@@ -122,6 +122,11 @@ are allowed only on secure pages.
 | Your own domain | `https://remote.example.com`          | Yes (Cloudflare) | Yes                  | A domain on Cloudflare             |
 | Tailscale       | `https://<your-mac>.<tailnet>.ts.net` | Yes (Tailscale)  | Yes, on your tailnet | Tailscale on the Mac and the phone |
 
+**Tailscale gives the best experience**: the phone and the Mac (and other Macs joined to it)
+reach each other directly, often on the same network, so the picture is smoother and
+reacts sooner than through Cloudflare (about 3 ms against about 300 ms a round trip, between
+two Macs at home). Choose a tunnel when a device cannot run Tailscale.
+
 Until you choose one, Castpane has no address and serves this Mac alone, at
 `http://127.0.0.1:47900`. There is no plain-HTTP local-network mode: Remote could not work in
 it, since browsers keep the video decoder and passkeys for secure pages.
@@ -169,6 +174,11 @@ Castpane does not manage Tailscale; it takes the address you type.
    ```sh
    tailscale serve --bg 47900
    ```
+
+   With the Tailscale app from its website or the App Store there may be no `tailscale`
+   command; the app's own binary is the command, run as one:
+   `TAILSCALE_BE_CLI=1 /Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg 47900`.
+   The tailnet needs HTTPS certificates turned on (the admin console's DNS page) first.
 
 3. In Castpane's Connection settings, enter the `https://<your-mac>.<tailnet>.ts.net` address
    that `tailscale serve status` shows.

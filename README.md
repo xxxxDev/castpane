@@ -137,6 +137,13 @@ The setup assistant first asks what this Mac is for. For the Mac you connect to,
 4. shows the address and a QR code. Open it on the phone, sign in, and use **Share › Add to
    Home Screen** for the app.
 
+**Tailscale is the one we recommend.** Your phone and your Macs then talk to each other
+directly, often over the same network, instead of through a server elsewhere: the picture is
+smoother and reacts sooner. Between two Macs at home, a round trip took about 3 ms over
+Tailscale and about 300 ms through a Cloudflare tunnel. Only your own devices can reach it,
+and TLS ends on your Mac. The price is the Tailscale app on each device, connected while you
+use Castpane. A Cloudflare tunnel needs nothing on the phone, for when that matters more.
+
 [docs/setup.md](docs/setup.md) explains each connection mode and its trade-offs.
 
 ## Documentation
