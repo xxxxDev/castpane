@@ -31,6 +31,8 @@ enum Snapshot {
         for page in SettingsView.Page.allCases {
             shots.append(("settings-\(page.id.rawValue.lowercased())", SettingsView.size, AnyView(SettingsView(page: page, loadsActivity: false))))
         }
+        var joined = MemberStatus(); joined.state = "connected"; joined.hub = "https://studio.example.ts.net"
+        shots.append(("settings-connection-member", SettingsView.size, AnyView(SettingsView(page: .connection, loadsActivity: false, member: joined))))
         shots.append(("tunnel-log", NSSize(width: 560, height: 380), AnyView(TunnelLogSheet())))
         shots.append(("qr", NSSize(width: 340, height: 400),
                       AnyView(AddressCard(showQR: true, qrSize: 220).padding(24).frame(maxWidth: .infinity, maxHeight: .infinity).background(WindowBackdrop()))))

@@ -18,6 +18,11 @@ own; it shows its screen only through the hub, to the hub's admins.
 3. From then on the member connects with `{t:"hello", id, secret, name}`, and reconnects by
    itself, with back-off, when the link drops.
 
+A member is opened through the hub's address. Its own Settings › Connection says so and
+points to Other Macs (leave there to use it on its own); it shows the connection choices
+again only while the member still has a connection of its own turned on, so that can be
+turned off.
+
 The hub needs a stable HTTPS address (own domain or Tailscale): a quick tunnel's address
 changes at every start. Removing a Mac on the hub (or **Leave** on the member) ends it: the
 hash or the secret is deleted and the link closed.

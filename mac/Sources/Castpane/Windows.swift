@@ -249,6 +249,7 @@ private struct DoneStep: View {
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @ViewState private var page: Page
+    @ViewState private var member = MemberStatus()
 
     enum Page: String, CaseIterable, Identifiable {
         case general = "General", permissions = "Permissions", connection = "Connection"
@@ -269,8 +270,9 @@ struct SettingsView: View {
 
     private var loadsActivity = true
 
-    init(page: Page = .general, loadsActivity: Bool = true) {
+    init(page: Page = .general, loadsActivity: Bool = true, member: MemberStatus = MemberStatus()) {
         _page = ViewState(initialValue: page)
+        _member = ViewState(initialValue: member)
         self.loadsActivity = loadsActivity
     }
 
@@ -314,12 +316,39 @@ struct SettingsView: View {
         switch page {
         case .general: GeneralTab()
         case .permissions: PermissionsPane().padding(20)
-        case .connection: ConnectionPane().padding(20)
+        case .connection: connection
         case .others: OtherMacsTab()
         case .accounts: AccountsTab()
         case .activity: ActivityTab(loads: loadsActivity)
         case .about: AboutTab()
         }
+    }
+}
+
+extension SettingsView {
+    /// A Mac shown in another Mac's Castpane is reached through that one: its own connection
+    /// choices only stood in the way (the owner's report, 2026-10-30). They come back when it
+    /// leaves, or while a connection of its own is still on, so that can be turned off.
+    @ViewBuilder var connection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if member.state != "off" {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("This Mac is shown in another Mac's Castpane", systemImage: "macbook.and.iphone").font(.headline)
+                    Text("Open \(member.hub) on your phone to see and use it: that Mac's address is the one to use, and this Mac needs none of its own. To use this Mac on its own instead, leave that Mac in Other Macs first, then choose a connection here.")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if model.config.connection != ConnectionMode.none {
+                        Text("It still has a connection of its own, below: turn it Off unless you also open this Mac by its own address.")
+                            .foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    }
+                    HStack { Spacer(); Button("Open Other Macs") { page = .others }.secondaryButtonStyle() }
+                }
+                .padding(20)
+            }
+            if member.state == "off" || model.config.connection != ConnectionMode.none {
+                ConnectionPane().padding(20)
+            }
+        }
+        .task { while !Task.isCancelled { if let s = try? await model.api.member() { member = s }; try? await Task.sleep(nanoseconds: 3_000_000_000) } }
     }
 }
 
