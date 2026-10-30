@@ -9,7 +9,7 @@ contract with the server is in [docs/protocol.md](../docs/protocol.md).
 | Path | What |
 |---|---|
 | `Sources/CastpaneCore` | Pure logic: config.json and token files, addresses, backoff, cloudflared output and releases, the tunnel state machine, the local API's answers |
-| `Sources/CastpaneHost` | The capture and input core (ScreenCaptureKit, VideoToolbox H.264 or HEVC, CGEvent), listening on `host.sock` |
+| `Sources/CastpaneHost` | The capture and input core (ScreenCaptureKit, VideoToolbox H.264 or HEVC, CGEvent), listening on `host.sock`; it wakes a sleeping or locked Mac's display for a viewer |
 | `Sources/Castpane` | The SwiftUI app: menu, setup assistant, settings, server and cloudflared supervision, permissions, launch at login, keep awake, QR code; `Glass.swift` holds the look (Liquid Glass, the palette) |
 | `Resources/` | The app icon (`AppIcon.icns`) and the menu bar's template image, rendered from `AppIcon.svg` and `MenuIcon.svg` by `tools/icons.mjs` |
 | `build-app.sh` | Builds and signs `build/Castpane.app` |

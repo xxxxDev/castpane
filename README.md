@@ -39,6 +39,8 @@ back, with touch modes made for a small screen.
 
 - **Your screen or one window.** Pick a whole display, a desktop (Space), a full-screen app or a
   single window. The list is grouped by desktop, with thumbnails.
+- **Asleep or locked.** Connecting wakes the Mac's display, and it stays on while you watch;
+  a locked Mac shows its login screen, and you type the password from the phone.
 - **Made for a phone.** Three touch modes: tap where you want (direct), a trackpad, or a
   pointer you drag by a ring below it, so your finger never hides what it points at. Pinch to
   zoom; when you tap a text field the keyboard comes up and the field is zoomed into view. A
@@ -51,9 +53,10 @@ back, with touch modes made for a small screen.
   ([docs/multi-mac.md](docs/multi-mac.md)).
 - **The clipboard both ways.** Copy the Mac's clipboard to the phone, or put the phone's on
   the Mac. What a password manager marks hidden is never sent; each use is in Activity.
-- **Stays current.** Each frame shown is acknowledged; the Mac skips frames while three are
-  unshown, so a slow network gives fewer frames, not old ones. Quality, resolution and 30 or
-  60 fps are yours to choose; the bitrate grows with the picture's size.
+- **Stays current.** Each frame shown is acknowledged; the Mac skips frames while a few are
+  unshown (more over a slower round trip), so a slow network gives fewer frames, not old
+  ones. Quality, resolution and 30 or 60 fps are yours to choose; the bitrate grows with the
+  picture's size.
 - **Sign-in that holds up.** Passwords, passkeys (Face ID, Touch ID, Windows Hello), two-step
   codes with recovery codes, and QR sign-in from a phone that is already signed in. Failed
   sign-ins lock an address out for longer each time; an admin sees what was tried and from

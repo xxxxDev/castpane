@@ -22,6 +22,7 @@ let package = Package(
                 .linkedFramework("CoreMedia"),
                 .linkedFramework("ApplicationServices"),
                 .linkedFramework("AppKit"),
+                .linkedFramework("IOKit"),
             ]
         ),
         .executableTarget(

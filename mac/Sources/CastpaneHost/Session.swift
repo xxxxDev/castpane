@@ -118,6 +118,7 @@ actor Session {
     /// display shown is started again when that changes.
     private var lastStart: (kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool)?
     private var displaysAtStart = ""
+    private var wokenAt = Date.distantPast
 
     /// `onHello` runs once, on the reader's thread, when the hello carried the token and
     /// before anything is answered; false (the server stopped meanwhile) ends the session.
@@ -174,6 +175,7 @@ actor Session {
             switch event {
             case .hello:
                 link.send(json: Self.status())
+                if Wake.needed { Wake.display() }
                 watchWindows()
             case .request(let r):
                 route(r)
@@ -198,6 +200,12 @@ actor Session {
 
     private func checkWindows() {
         guard !link.isClosed, CGPreflightScreenCaptureAccess() else { return }
+        // Someone is watching: the display stays on, at the lock screen too (which turns it
+        // off after a minute whatever else asks it not to).
+        if Date().timeIntervalSince(wokenAt) > 10, Wake.needed {
+            wokenAt = Date()
+            Wake.display()
+        }
         // The Mac's own resolution changed while a display was shown: the clicks went where
         // the old size put them, and the picture kept its old shape, until a reconnect (the
         // owner's report, 2026-10-30). The same display is started again at its new size.
@@ -218,6 +226,17 @@ actor Session {
             guard (w[kCGWindowLayer as String] as? Int) == 0, let name = w[kCGWindowName as String] as? String, !name.isEmpty else { return nil }
             return "\(w[kCGWindowNumber as String] ?? 0):\(name):\(w[kCGWindowIsOnscreen as String] as? Bool ?? false)"
         }.sorted().joined(separator: "|")
+    }
+
+    /// Wakes the displays of a Mac that is asleep or locked, and waits (at most 3 s) until
+    /// the capture sees them again: asleep, it lists none.
+    private static func wakeDisplays() async {
+        guard Wake.needed else { return }
+        Wake.display()
+        for _ in 0..<12 {
+            if let c = try? await Catalog.content(), !c.displays.isEmpty { return }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
     }
 
     /// Every active display's place and size in points and pixels.
@@ -246,6 +265,7 @@ actor Session {
             lastListed = Date()
             let link = self.link
             Task.detached {
+                await Self.wakeDisplays()
                 do { link.send(json: ["t": "list", "items": try await Catalog.list()]) }
                 catch { link.send(json: ["t": "error", "where": "list", "message": error.localizedDescription]) }
             }
@@ -348,6 +368,7 @@ actor Session {
 
     private func start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool) async {
         await stop()
+        await Self.wakeDisplays()
         lastStart = (kind, id, maxWidth, fps, bitrate, hevc)
         displaysAtStart = Self.displaysSignature()
         do {
