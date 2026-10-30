@@ -138,7 +138,7 @@
           </div>
           <div class="remote-dots"><button v-for="(pg, i) in PAGES" :key="pg.id" type="button" :class="{on: i === pageNo}" :aria-label="ct(pg.name)" @click="goPage(i)"></button></div>
         </div>
-        <textarea ref="typing" class="remote-typing" :inputmode="isTouch && !keyboardOpen ? 'none' : 'text'" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="keyboard" @beforeinput="beforeInput" @compositionend="compositionEnd" @keydown="keyDown" @keyup="keyUp" @blur="typingBlur"></textarea>
+        <textarea ref="typing" class="remote-typing" :inputmode="isTouch && !keyboardOpen ? 'none' : 'text'" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="keyboard" @beforeinput="beforeInput" @compositionend="compositionEnd" @keydown="keyDown" @keyup="keyUp" @paste="pasteFromHere" @blur="typingBlur"></textarea>
 
       </div>
     </Teleport>
@@ -211,7 +211,29 @@ async function load() {
 }
 onMounted(load);
 onBeforeUnmount(() => { disconnect(); });
-const onHidden = () => { if (document.visibilityState === 'hidden' && streaming.value) disconnect();else if (document.visibilityState === 'visible' && !streaming.value) load(); };
+// The Macs as they are now: one that joins, comes online or stops sharing shows up without
+// a reload (the owner's report, 2026-10-30: a Mac that had just joined stayed Offline).
+const listTimer = setInterval(() => { if (!streaming.value && document.visibilityState === 'visible') load(); }, 5000);
+onBeforeUnmount(() => clearInterval(listTimer));
+// Out of sight (another tab, another app, the phone locked) the session ends: the Mac stops
+// capturing for nobody. Back within ten minutes, it opens again on the same Mac and the same
+// screen or window by itself; it used to leave you at the list of Macs (the owner's report,
+// 2026-10-30). Longer, it may be someone else's turn by then, so it waits for a tap.
+const RESUME_WITHIN = 10 * 60 * 1000;
+let lastMachine = null, resume = null, resumeItem = null;
+const machineKey = (m) => (m.local ? 'local' : m.id);
+const onHidden = async () => {
+  if (document.visibilityState === 'hidden' && streaming.value) {
+    resume = lastMachine && { key: machineKey(lastMachine), item: current.value, at: Date.now() };
+    disconnect();
+  } else if (document.visibilityState === 'visible' && !streaming.value) {
+    const r = resume;resume = null;
+    await load();
+    if (!r || Date.now() - r.at > RESUME_WITHIN || streaming.value || document.visibilityState !== 'visible') return;
+    const m = machines.value.find((x) => machineKey(x) === r.key);
+    if (m?.running) { resumeItem = r.item;connect(m); }
+  }
+};
 document.addEventListener('visibilitychange', onHidden);
 onBeforeUnmount(() => document.removeEventListener('visibilitychange', onHidden));
 
@@ -265,7 +287,7 @@ function removeMac(m) {
 
 async function connect(m, retried = false) {
   if (!m.running || !supported) return;
-  machine = m.local ? 'local' : m.id;
+  machine = m.local ? 'local' : m.id;lastMachine = m;
   let pass;
   try { pass = await getPass(retried); } catch (e) { return f7.dialog.alert(adminProblem(e) || e.message); }
   if (!pass) return;
@@ -298,7 +320,11 @@ function onMessage(msg) {
     if (msg.screen) list();
   } else if (msg.t === 'list') {
     items.value = msg.items || [];
-    if (!current.value && items.value.length) show(items.value[0]);
+    if (!current.value && items.value.length) {
+      const back = resumeItem && items.value.find((w) => w.kind === resumeItem.kind && w.id === resumeItem.id);
+      resumeItem = null;
+      show(back || items.value[0]);
+    }
   } else if (msg.t === 'started') {
     if (!current.value || current.value.kind !== msg.kind || current.value.id !== msg.id) resetView();
     current.value = { kind: msg.kind, id: msg.id };notice.value = '';
@@ -310,9 +336,10 @@ function onMessage(msg) {
     clipWait?.resolve(msg);
   } else if (msg.t === 'clipboard-busy') {
     clipWait?.reject(new Error('busy'));
-    toast(ct('太快了，請等一秒再試'));
+    // A second ⌘V within the second: the text put there a moment ago is still there.
+    if (clipSetWait) clipSetWait();else toast(ct('太快了，請等一秒再試'));
   } else if (msg.t === 'clipboard-set') {
-    toast(ct('已放到 Mac 的剪貼簿'));
+    if (clipSetWait) clipSetWait();else toast(ct('已放到 Mac 的剪貼簿'));
   } else if (msg.t === 'focus') {
     // After a click: a text field has the focus, and the keyboard comes up (the hidden
     // field is already focused from the tap); out of one, it goes down again if it came
@@ -797,6 +824,32 @@ async function pasteToMac() {
   if (s === null) return f7.dialog.prompt(ct('貼上要放到 Mac 剪貼簿的文字。'), ct('把剪貼簿放到 Mac'), put);
   put(s);
 }
+// ⌘V on this computer's keyboard pasted the Mac's own clipboard, not what was just copied
+// here (the owner's report, 2026-10-30). The browser's paste now brings this computer's
+// text: it goes on the Mac's clipboard first, then ⌘V. A paste with no text, or none at
+// all, still sends ⌘V, for what the Mac has copied itself.
+let pasteMods = null, pasteTimer = null, clipSetWait = null;
+function pasteKey(m) {
+  link?.send({ t: 'key', code: 'KeyV', down: true, mods: m });link?.send({ t: 'key', code: 'KeyV', down: false, mods: m });releaseMods();
+}
+async function pasteFromHere(e) {
+  if (!pasteMods) return;
+  e.preventDefault();
+  const m = pasteMods;pasteMods = null;clearTimeout(pasteTimer);
+  let s = e.clipboardData?.getData('text/plain') || '';
+  if (s.length > 100000) return toast(ct('文字太長，最多 100 000 字'));
+  if (s) {
+    if (!s.isWellFormed()) s = s.toWellFormed();
+    // The Mac says when the text is on its clipboard; ⌘V waits for that (at most 2 s).
+    await new Promise((resolve) => {
+      const done = () => { clearTimeout(timer);clipSetWait = null;resolve(); };
+      const timer = setTimeout(done, 2000);
+      clipSetWait = done;
+      link?.send({ t: 'clipboard-set', s });
+    });
+  }
+  pasteKey(m);
+}
 // Return sends, except while the input method is still choosing characters.
 function composeKey(e) {
   if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
@@ -809,6 +862,12 @@ const sentDown = new Set();
 function keyDown(e) {
   if (e.isComposing || e.key === 'Process' || e.keyCode === 229) return;
   const special = e.key.length > 1 && e.key !== 'Unidentified';
+  if (e.metaKey && e.code === 'KeyV' && !e.ctrlKey && !e.altKey && !e.repeat) {
+    pasteMods = e.shiftKey ? ['shift', 'meta'] : ['meta'];
+    clearTimeout(pasteTimer);
+    pasteTimer = setTimeout(() => { if (pasteMods) { const m = pasteMods;pasteMods = null;pasteKey(m); } }, 300);
+    return;
+  }
   if (e.metaKey || e.ctrlKey || e.altKey || special) {
     if (['Meta', 'Control', 'Alt', 'Shift', 'CapsLock'].includes(e.key)) return;
     e.preventDefault();
