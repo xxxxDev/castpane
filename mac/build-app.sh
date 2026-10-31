@@ -28,7 +28,7 @@ root=$(cd "$here/.." && pwd)
 cd "$here"
 
 # The release version (tags are v$version); macOS gets its numbers alone.
-version=0.2.7
+version=0.2.8-dev.1
 short=${version%%-*}
 # Where the app looks for newer releases (Updater.swift): a fork names its own.
 update_repo=${CASTPANE_UPDATE_REPO:-xxxxDev/castpane}
