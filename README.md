@@ -43,13 +43,13 @@ back, with touch modes made for a small screen.
   a locked Mac shows its login screen, and you type the password from the phone.
 - **Made for a phone.** Three touch modes: tap where you want (direct), a trackpad, or a
   pointer you drag by a ring below it, so your finger never hides what it points at. Pinch to
-  zoom; when you tap a text field the keyboard comes up and the field is zoomed into view. A
+  zoom, or pick a size in the menu; when you tap a text field the keyboard comes up and the field is zoomed into view. A
   row of keys a phone lacks (esc, tab, arrows, ⌘ ⌥ ⌃ ⇧), a key panel in the keyboard's place
   (editing keys, the Mac's shortcuts, a number pad, F1–F12), and a field to write a line,
   input method and all, and send it to the Mac's cursor. Held sideways, the tabs move to a
   rail on the right.
-- **At a computer too.** Pinch on a trackpad, Ctrl or ⌘ with the wheel, or the bar's + and − zoom
-  the picture, which then follows your pointer; the wheel alone keeps scrolling the Mac. On a Windows or Linux keyboard, Ctrl is the Mac's ⌘,
+- **At a computer too.** Pinch on a trackpad, Ctrl or ⌘ with the wheel, or the sizes in the top
+  bar zoom the picture, which then follows your pointer; the wheel alone keeps scrolling the Mac. On a Windows or Linux keyboard, Ctrl is the Mac's ⌘,
   the Windows key is ⌃, and F5 reloads.
 - **Several Macs, one web app.** Other Macs join this one with a one-time code and show up
   beside it on the Remote page. They need no address or account of their own

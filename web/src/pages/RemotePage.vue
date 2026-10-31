@@ -49,9 +49,20 @@
           <div class="remote-actions">
             <!-- The screens, desktops and windows fold away for a bigger picture (the owner's request, 2026-10-28). -->
             <button type="button" class="remote-btn fold" :title="headCollapsed ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headCollapsed ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
-            <button v-if="!isTouch" type="button" class="remote-btn zoom-out" :title="ct('縮小')" :disabled="view.z <= 1" @click="zoomStep(1 / 1.25)"><f7-icon f7="minus" :size="16"/></button>
-            <button v-if="view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="resetView">1×</button>
-            <button v-if="!isTouch" type="button" class="remote-btn zoom-in" :title="ct('放大')" :disabled="view.z >= 5" @click="zoomStep(1.25)"><f7-icon f7="plus" :size="16"/></button>
+            <button v-if="isTouch && view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="resetView">1×</button>
+            <!-- A computer: the picture's size, and what the bottom bar used to hold (the owner's request, 2026-10-31). -->
+            <template v-if="!isTouch">
+              <span class="remote-stats remote-head-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
+              <div class="remote-zoom">
+                <button type="button" class="remote-btn zoom-out" :title="ct('縮小')" :disabled="view.z <= 1" @click="zoomStep(1 / 1.25)"><f7-icon f7="minus" :size="16"/></button>
+                <button type="button" class="remote-btn size" :class="{on: sizeOpen}" :title="ct('畫面大小')" @click="sizeOpen = !sizeOpen;settingsOpen = false">{{ view.z <= 1 ? ct('適合') : Math.round(view.z * 100) + '%' }}</button>
+                <button type="button" class="remote-btn zoom-in" :title="ct('放大')" :disabled="view.z >= 5" @click="zoomStep(1.25)"><f7-icon f7="plus" :size="16"/></button>
+                <div v-if="sizeOpen" class="remote-menu remote-size-menu" @pointerdown.stop>
+                  <button v-for="z in ZOOMS" :key="z" type="button" class="remote-menu-item" :class="{picked: zoomIs(z)}" @click="setZoom(z);sizeOpen = false">{{ z === 1 ? ct('適合畫面') : z * 100 + '%' }}<f7-icon v-if="zoomIs(z)" class="remote-menu-check" f7="checkmark_alt" :size="16"/></button>
+                </div>
+              </div>
+              <button type="button" class="remote-btn clip" :class="{on: clipOpen}" :title="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="17"/></button>
+            </template>
             <button v-if="!isTouch" type="button" class="remote-btn" :class="{on: keyboardOpen, hint: keyHint}" :title="ct('鍵盤')" @pointerdown.prevent @mousedown.prevent @click="toggleKeyboard"><f7-icon f7="keyboard" :size="18"/></button>
             <!-- On a phone the rest sit in one menu, so the bar keeps room for windows (the owner's request, 2026-10-28). -->
             <template v-if="isTouch">
@@ -59,7 +70,7 @@
             </template>
             <template v-else>
               <button type="button" class="remote-btn" :title="ct('重新整理視窗')" @click="list"><f7-icon f7="arrow_clockwise" :size="18"/></button>
-              <button type="button" class="remote-btn" :title="ct('設定')" @click="settingsOpen = !settingsOpen"><f7-icon f7="slider_horizontal_3" :size="18"/></button>
+              <button type="button" class="remote-btn" :title="ct('設定')" @click="settingsOpen = !settingsOpen;sizeOpen = false"><f7-icon f7="slider_horizontal_3" :size="18"/></button>
               <button type="button" class="remote-btn danger" :title="ct('中斷連線')" @click="disconnect"><f7-icon f7="xmark" :size="18"/></button>
             </template>
           </div>
@@ -68,6 +79,8 @@
           <!-- On a phone the keyboard lives here (the owner's request, 2026-10-28). -->
           <button type="button" class="remote-menu-item keyboard" @pointerdown.prevent @mousedown.prevent @click="menuOpen = false;toggleKeyboard()"><f7-icon f7="keyboard" :size="18"/>{{ keyboardOpen ? ct('收起鍵盤') : ct('打開鍵盤') }}</button>
           <button type="button" class="remote-menu-item clipboard" @click="menuOpen = false;clipOpen = true"><f7-icon f7="doc_on_clipboard" :size="18"/>{{ ct('剪貼簿') }}</button>
+          <div class="remote-menu-label">{{ ct('畫面大小') }}</div>
+          <div class="remote-seg remote-sizes"><button v-for="z in ZOOMS" :key="z" type="button" :class="{on: zoomIs(z)}" @click="setZoom(z);menuOpen = false">{{ z === 1 ? ct('適合') : z * 100 }}</button></div>
           <div class="remote-menu-label">{{ ct('操作方式') }}</div>
           <button v-for="m in MODES" :key="m.id" type="button" class="remote-menu-item mode" :class="['mode-' + m.id, {picked: mode === m.id}]" @click="setMode(m.id);menuOpen = false"><f7-icon :f7="m.icon" :size="18"/>{{ ct(m.label) }}<f7-icon v-if="mode === m.id" f7="checkmark" :size="15" class="remote-menu-check"/></button>
           <div class="remote-menu-sep"></div>
@@ -121,7 +134,7 @@
           <button type="button" class="remote-clip-btn to-mac" @click="pasteToMac"><f7-icon f7="arrow_up_doc" :size="17"/>{{ ct('把剪貼簿放到 Mac') }}</button>
         </div>
         <!-- The keys a phone's keyboard lacks; ⇧ ⌃ ⌥ ⌘ hold for the next key. -->
-        <div v-if="keyboardOpen || panel || compose || clipOpen || !isTouch" class="remote-keys" :class="{desk: !isTouch}">
+        <div v-if="isTouch && (keyboardOpen || panel || compose || clipOpen)" class="remote-keys">
           <template v-if="isTouch">
             <button type="button" class="remote-key tool compose-btn" :class="{on: compose}" :title="ct('輸入文字')" @pointerdown.prevent @mousedown.prevent @click="toggleCompose"><f7-icon f7="pencil" :size="17"/></button>
             <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :title="panel ? ct('鍵盤') : ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon :f7="panel ? 'keyboard' : 'square_grid_2x2'" :size="17"/></button>
@@ -593,7 +606,7 @@ function click(p, b = 0) {
 const pixelScale = () => { const r = canvas.value.getBoundingClientRect();return (canvas.value.width || 1) / Math.max(1, r.width); };
 
 function down(e) {
-  if (!link || settingsOpen.value || menuOpen.value) { settingsOpen.value = false;menuOpen.value = false;return; }
+  if (!link || settingsOpen.value || menuOpen.value || sizeOpen.value) { settingsOpen.value = false;menuOpen.value = false;sizeOpen.value = false;return; }
   // A button over the picture (asking for the permission) keeps its own tap.
   if (e.target.closest?.('button')) return;
   try { area.value.setPointerCapture?.(e.pointerId); } catch {}
@@ -705,8 +718,8 @@ function up(e) {
 }
 function cancel(e) { touches.delete(e.pointerId);clearTimeout(longTimer);if (!touches.size) gesture = null; }
 // A computer has no two fingers to pinch with: a trackpad's pinch (a wheel with Ctrl to
-// most browsers, gesture events to Safari), Ctrl or ⌘ with a mouse wheel, or the bar's
-// buttons zoom instead. A plain wheel keeps scrolling the Mac, so the picture follows the
+// most browsers, gesture events to Safari), Ctrl or ⌘ with a mouse wheel, or the sizes in
+// the bar zoom instead (the phone's sit in its menu). A plain wheel keeps scrolling the Mac, so the picture follows the
 // pointer to reach the rest of it (the owner's request, 2026-10-31).
 function zoomAt(z, clientX, clientY) {
   const r = area.value?.getBoundingClientRect();if (!r) return;
@@ -714,8 +727,13 @@ function zoomAt(z, clientX, clientY) {
   view.x = ox - (ox - view.x) * (nz / view.z);view.y = oy - (oy - view.y) * (nz / view.z);view.z = nz;
   clampView();
 }
+const ZOOMS = [1, 1.5, 2, 3, 5], sizeOpen = ref(false);
 function zoomStep(by) {
   const r = area.value?.getBoundingClientRect();if (r) zoomAt(view.z * by, r.left + r.width / 2, r.top + r.height / 2);
+}
+const zoomIs = (z) => Math.abs(view.z - z) < 0.02;
+function setZoom(z) {
+  const r = area.value?.getBoundingClientRect();if (r) zoomAt(z, r.left + r.width / 2, r.top + r.height / 2);
 }
 function followPointer(clientX, clientY) {
   if (view.z <= 1) return false;
@@ -978,7 +996,6 @@ function keyUp(e) {
 .remote-area {position:relative;flex:1;min-height:0;touch-action:none;overflow:hidden;}
 .remote-canvas {width:100%;height:100%;object-fit:contain;display:block;cursor:default;transform-origin:0 0;}
 .remote-btn.zoom {font-size:12px;font-weight:600;}
-.remote-btn:disabled {opacity:.35;cursor:default;}
 .remote-canvas.hidden {visibility:hidden;}
 .remote-notice {position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px;background:rgba(0,0,0,.6);font-size:14px;line-height:1.5;}
 .remote-notice p {max-width:520px;margin:0;}
@@ -996,12 +1013,10 @@ function keyUp(e) {
    2026-10-28: the keys had grown to one full-width row each). */
 .remote-keys {display:flex;flex-wrap:nowrap;align-items:center;gap:5px;padding:5px 8px;overflow-x:auto;scrollbar-width:none;background:rgba(28,28,30,.96);border-top:1px solid rgba(255,255,255,.08);}
 .remote-keys::-webkit-scrollbar {display:none;}
-.remote-keys.desk .remote-key {display:none;}
 .remote-stage .remote-key {display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:auto;min-width:36px;height:30px;padding:0 8px;margin:0;border-radius:7px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:13px;line-height:1;cursor:pointer;}
 .remote-key.mod.on, .remote-key.tool.on {background:#0a84ff;}
 .remote-clip {display:flex;gap:6px;padding:6px 8px;background:rgba(28,28,30,.96);border-top:1px solid rgba(255,255,255,.08);}
 .remote-stage .remote-clip-btn {flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;height:36px;margin:0;padding:0 8px;border:0;border-radius:9px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap;}
-.remote-keys.desk .remote-key.clip-btn {display:inline-flex;}
 .remote-clip-text {width:100%;height:160px;box-sizing:border-box;font-size:14px;-webkit-user-select:text;user-select:text;}
 .remote-compose {display:flex;gap:6px;padding:6px 8px;background:rgba(28,28,30,.96);border-top:1px solid rgba(255,255,255,.08);}
 .remote-compose-field {flex:1;min-width:0;height:36px;box-sizing:border-box;padding:0 10px;border-radius:9px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.5);color:#fff;font-size:16px;-webkit-user-select:text;user-select:text;}
@@ -1034,5 +1049,14 @@ function keyUp(e) {
 .remote-seg {display:flex;gap:4px;background:rgba(255,255,255,.08);border-radius:10px;padding:3px;}
 .remote-seg button {flex:1;border:0;border-radius:8px;padding:6px 0;background:transparent;color:#ddd;font-size:13px;cursor:pointer;}
 .remote-seg button.on {background:#0a84ff;color:#fff;}
+.remote-sizes {margin:2px 6px 4px;}
+.remote-sizes button {font-size:12px;}
+.remote-zoom {position:relative;display:flex;gap:4px;}
+.remote-btn.size {width:auto;min-width:58px;padding:0 10px;font-size:12px;font-variant-numeric:tabular-nums;}
+.remote-zoom .remote-menu {right:auto;left:50%;transform:translateX(-50%);min-width:140px;z-index:5;}
+.remote-btn:disabled {opacity:.35;cursor:default;}
+.remote-head-stats {align-self:center;margin-right:6px;}
+.remote-stage:not(.touch) .remote-area {order:2;}
+.remote-stage:not(.touch) .remote-clip {order:1;border-top:0;border-bottom:1px solid rgba(255,255,255,.08);}
 @media (min-width: 800px){.remote-note{max-width:min(828px,calc(100% - 32px));margin-left:auto;margin-right:auto;padding:0 16px;box-sizing:border-box;}}
 </style>
