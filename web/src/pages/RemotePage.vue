@@ -85,6 +85,7 @@
           <div class="remote-set-title">{{ ct('每秒畫面') }}</div>
           <div class="remote-seg"><button v-for="f in [30, 60]" :key="f" type="button" :class="{on: prefs.fps === f}" @click="setPref('fps', f)">{{ f }}</button></div>
           <p class="remote-small">{{ ct('網路慢時調低畫質或解析度，畫面會比較順。') }}</p>
+          <p v-if="otherKeyboard" class="remote-small keys-note">{{ ct('鍵盤：Ctrl 等於 Mac 的 ⌘，Windows 鍵等於 ⌃，F5 重新整理。瀏覽器自己留著的 Ctrl+W、Ctrl+T、Ctrl+N 傳不到 Mac。') }}</p>
         </div>
         </div>
 
@@ -889,12 +890,22 @@ function composeKey(e) {
 }
 function compositionEnd(e) { sendText(e.data || '');if (typing.value) typing.value.value = ''; }
 const sentDown = new Set();
+// A keyboard not made for a Mac (Windows, Linux): Ctrl is where its shortcuts are, so it
+// goes as ⌘ and the Windows key as ⌃, Ctrl+R as ⌘R; F5, which reloads there, as ⌘R too
+// (the owner's report, 2026-10-31).
+const otherKeyboard = typeof navigator !== 'undefined' && !/Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
 // A hardware keyboard: shortcuts and keys that type nothing go as keys; what types
 // text goes through beforeinput, so input methods work.
 function keyDown(e) {
   if (e.isComposing || e.key === 'Process' || e.keyCode === 229) return;
   const special = e.key.length > 1 && e.key !== 'Unidentified';
-  if (e.metaKey && e.code === 'KeyV' && !e.ctrlKey && !e.altKey && !e.repeat) {
+  const meta = otherKeyboard ? e.ctrlKey : e.metaKey, ctrl = otherKeyboard ? e.metaKey : e.ctrlKey;
+  if (otherKeyboard && e.code === 'F5' && !meta && !ctrl && !e.altKey && !e.shiftKey) {
+    e.preventDefault();
+    link?.send({ t: 'key', code: 'KeyR', down: true, mods: ['meta'] });link?.send({ t: 'key', code: 'KeyR', down: false, mods: ['meta'] });
+    return;
+  }
+  if (meta && e.code === 'KeyV' && !ctrl && !e.altKey && !e.repeat) {
     pasteMods = e.shiftKey ? ['shift', 'meta'] : ['meta'];
     clearTimeout(pasteTimer);
     pasteTimer = setTimeout(() => { if (pasteMods) { const m = pasteMods;pasteMods = null;pasteKey(m); } }, 300);
@@ -903,7 +914,7 @@ function keyDown(e) {
   if (e.metaKey || e.ctrlKey || e.altKey || special) {
     if (['Meta', 'Control', 'Alt', 'Shift', 'CapsLock'].includes(e.key)) return;
     e.preventDefault();
-    const m = [e.shiftKey && 'shift', e.ctrlKey && 'ctrl', e.altKey && 'alt', e.metaKey && 'meta'].filter(Boolean);
+    const m = [e.shiftKey && 'shift', ctrl && 'ctrl', e.altKey && 'alt', meta && 'meta'].filter(Boolean);
     for (const x of held) if (!m.includes(x)) m.push(x);
     link?.send({ t: 'key', code: e.code, down: true, mods: m });sentDown.add(e.code);
   }

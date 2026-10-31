@@ -238,6 +238,7 @@ const english = {
 "選電腦登入頁上顯示的數字來登入。看不到那個畫面，就不是你正在用的電腦，請拒絕。":"Pick the number shown on the computer's sign-in page. If you cannot see that screen, it is not your computer: refuse.",
 "還原大小":"Actual size",
 "放大":"Zoom in",
+"鍵盤：Ctrl 等於 Mac 的 ⌘，Windows 鍵等於 ⌃，F5 重新整理。瀏覽器自己留著的 Ctrl+W、Ctrl+T、Ctrl+N 傳不到 Mac。":"Keyboard: Ctrl is the Mac's ⌘, the Windows key is ⌃, F5 reloads. Ctrl+W, Ctrl+T and Ctrl+N stay with the browser and do not reach the Mac.",
 "縮小":"Zoom out",
 "還沒有失敗的登入":"No failed sign-ins yet",
 "還沒有綁定的手機":"No phone bound yet",

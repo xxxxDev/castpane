@@ -49,7 +49,8 @@ back, with touch modes made for a small screen.
   input method and all, and send it to the Mac's cursor. Held sideways, the tabs move to a
   rail on the right.
 - **At a computer too.** Pinch on a trackpad, Ctrl or ⌘ with the wheel, or the bar's + and − zoom
-  the picture, which then follows your pointer; the wheel alone keeps scrolling the Mac.
+  the picture, which then follows your pointer; the wheel alone keeps scrolling the Mac. On a Windows or Linux keyboard, Ctrl is the Mac's ⌘,
+  the Windows key is ⌃, and F5 reloads.
 - **Several Macs, one web app.** Other Macs join this one with a one-time code and show up
   beside it on the Remote page. They need no address or account of their own
   ([docs/multi-mac.md](docs/multi-mac.md)).
