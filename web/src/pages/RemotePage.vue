@@ -513,10 +513,17 @@ let lastTap = null, beforeKeyboard = null, zoomTo = null, settle = 0;
 // Zoomed once, to the field whose tap opened the keyboard, after the keyboard has
 // finished coming up; later taps while it is up do not move the picture (the owner's
 // report, 2026-10-28: a tap elsewhere zoomed to that place instead).
-// On an iPhone the bar above the keyboard (the input method's candidates, ⌃ ⌄ ✓) floats over
-// the bottom of what visualViewport reports, and hid the row of keys: the page cannot turn
-// that bar off, so the row sits above it (the owner's report, 2026-10-31).
+// On an iPhone the bar above the keyboard (the input method's candidates, ⌃ ⌄ ✓) can float
+// over the bottom of what visualViewport reports, and hid the row of keys; the page cannot turn
+// that bar off, so the row then sits above it. At other times the height already ends above
+// the bar, and the same room left a gap that took the picture's place. Measured on the owner's
+// iPhone (2026-10-31), the share of the screen covered: upright 36% with the bar over it, 45%
+// without; sideways 53% and 68%. The lines are halfway; other keyboards may differ.
 const keyboardBarOver = typeof navigator !== 'undefined' && /iPhone/.test(navigator.userAgent || '');
+function barOverViewport(height, tall) {
+  const covered = (window.innerHeight - height) / (tall ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height));
+  return covered < (tall ? 0.41 : 0.61);
+}
 // The menu ends above the bottom of what is showing and scrolls: held sideways it did not
 // fit, and what was below the screen could not be reached (the owner's report, 2026-10-31).
 const menuEl = ref(null), menuMax = ref(0);
@@ -553,7 +560,7 @@ function fitViewport() {
   if (wasCovered && !covered && !broken) keyboardGone();
   wasCovered = covered;
   keyboardSideways.value = covered && window.innerWidth > window.innerHeight;
-  stageBox.value = covered ? { top: (broken ? 0 : vv.offsetTop) + 'px', height: height + 'px', bottom: 'auto', ...(keyboardBarOver ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 42px)' } : {}) } : null;
+  stageBox.value = covered ? { top: (broken ? 0 : vv.offsetTop) + 'px', height: height + 'px', bottom: 'auto', ...(keyboardBarOver ? { paddingBottom: barOverViewport(height, tall) ? 'calc(env(safe-area-inset-bottom) + 42px)' : '0px' } : {}) } : null;
   clearTimeout(settle);
   if (covered && zoomTo) settle = setTimeout(() => { if (zoomTo && keyboardOpen.value) { focusOn(zoomTo);zoomTo = null; } }, 250);
 }
