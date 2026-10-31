@@ -652,7 +652,8 @@ function ringUp() {
   if (press.moved < 8 && performance.now() - press.t < 450) {
     click(cursor, 0);
     if (probeAnswer?.n === probeN && probeAnswer.editable && !keyboardOpen.value) keyboardOpen.value = true;
-    if (document.activeElement !== typing.value) typing.value?.focus({ preventScroll: true });
+    if (keyboardOpen.value) askKeyboard();
+    else if (document.activeElement !== typing.value) typing.value?.focus({ preventScroll: true });
   }
 }
 function click(p, b = 0) {
@@ -764,7 +765,8 @@ function up(e) {
     // The hidden field takes the focus in the tap itself, with no keyboard (inputmode
     // none): when the Mac's answer comes a moment later, switching it to text brings
     // the keyboard up, which iOS would not do for a focus outside a tap.
-    if (isTouch && document.activeElement !== typing.value) typing.value?.focus({ preventScroll: true });
+    if (isTouch && keyboardOpen.value) askKeyboard();
+    else if (isTouch && document.activeElement !== typing.value) typing.value?.focus({ preventScroll: true });
   }
   // The finger left over from a pinch or a two-finger move does nothing until lifted.
   if (touches.size === 1 && ['two', 'zoom', 'pan', 'scroll2'].includes(gesture.kind)) gesture = { kind: 'done', moved: 0 };
@@ -811,16 +813,22 @@ function wheel(e) {
 }
 
 // ---- keys ----
+// Brings the keyboard up, also one iOS took away while the field kept the focus (a screenshot),
+// when a tap on a text field found it gone and only the row left (the owner's report,
+// 2026-10-31): focused already, a focus would do nothing. iOS brings it up only within the
+// press and not for inputmode none, so both are settled here and now.
+let askingKeyboard = false;
+function askKeyboard() {
+  const field = typing.value;if (!field) return;
+  askingKeyboard = true;field.blur();askingKeyboard = false;
+  field.setAttribute('inputmode', 'text');
+  field.focus({ preventScroll: true });
+}
 function toggleKeyboard() {
   keyHint.value = false;autoOpened = false;
   if (keyboardOpen.value) { keyboardOpen.value = false;typing.value?.blur();return; }
-  // Focused already, a focus would do nothing and the keyboard stay away; and iOS brings it
-  // up only within the press and not for inputmode none, so both are settled here and now.
-  const field = typing.value;
-  field?.blur();
   keyboardOpen.value = true;
-  field?.setAttribute('inputmode', 'text');
-  field?.focus({ preventScroll: true });
+  askKeyboard();
 }
 // The Mac's desktops (Spaces), with its own shortcut ⌃← ⌃→; the windows are listed again
 // after the switch.
@@ -1005,6 +1013,7 @@ function keyDown(e) {
 let rowPress = false;
 function rowRelease() { setTimeout(() => { rowPress = false; }, 300); }
 function typingBlur() {
+  if (askingKeyboard) return;
   // A press on the pointer's ring keeps the keyboard where it is.
   if ((ringPress || (rowPress && !compose.value && !panel.value)) && keyboardOpen.value) { setTimeout(() => typing.value?.focus({ preventScroll: true }), 0);return; }
   keyboardOpen.value = false;
