@@ -73,7 +73,8 @@ final class Input {
         if mods.contains("ctrl") { f.insert(.maskControl) }
         if mods.contains("alt") { f.insert(.maskAlternate) }
         if mods.contains("meta") { f.insert(.maskCommand) }
-        flags = f
+        // Only while the key is down: ⌃ kept after ⌃← went on every later click (the owner's report, 2026-10-31).
+        flags = down ? f : []
         guard let vk = Keys.map[code], let e = CGEvent(keyboardEventSource: source, virtualKey: vk, keyDown: down) else { return }
         if down { keysDown.insert(vk) } else { keysDown.remove(vk) }
         e.flags = f.union(Self.keyFlags(code))
