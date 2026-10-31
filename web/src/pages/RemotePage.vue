@@ -75,7 +75,7 @@
             </template>
           </div>
         </div>
-        <div v-if="menuOpen" class="remote-menu" @pointerdown.stop>
+        <div v-if="menuOpen" ref="menuEl" class="remote-menu" :style="menuMax ? {maxHeight: menuMax + 'px'} : null" @pointerdown.stop>
           <!-- On a phone the keyboard lives here (the owner's request, 2026-10-28). -->
           <button type="button" class="remote-menu-item keyboard" @pointerdown.prevent @mousedown.prevent @click="menuOpen = false;toggleKeyboard()"><f7-icon f7="keyboard" :size="18"/>{{ keyboardOpen ? ct('收起鍵盤') : ct('打開鍵盤') }}</button>
           <button type="button" class="remote-menu-item clipboard" @click="menuOpen = false;clipOpen = true"><f7-icon f7="doc_on_clipboard" :size="18"/>{{ ct('剪貼簿') }}</button>
@@ -517,6 +517,30 @@ let lastTap = null, beforeKeyboard = null, zoomTo = null, settle = 0;
 // the bottom of what visualViewport reports, and hid the row of keys: the page cannot turn
 // that bar off, so the row sits above it (the owner's report, 2026-10-31).
 const keyboardBarOver = typeof navigator !== 'undefined' && /iPhone/.test(navigator.userAgent || '');
+// The menu ends above the bottom of what is showing and scrolls: held sideways it did not
+// fit, and what was below the screen could not be reached (the owner's report, 2026-10-31).
+const menuEl = ref(null), menuMax = ref(0);
+function fitMenu() {
+  nextTick(() => {
+    const m = menuEl.value, stage = m?.closest('.remote-stage');if (!m || !stage) return;
+    menuMax.value = Math.max(120, Math.floor(stage.getBoundingClientRect().bottom - m.getBoundingClientRect().top - 8));
+  });
+}
+watch([menuOpen, headFolded, stageBox], fitMenu);
+if (typeof window !== 'undefined') { window.addEventListener('resize', fitMenu);onBeforeUnmount(() => window.removeEventListener('resize', fitMenu)); }
+// iOS can take the keyboard away with nothing to say so but the height coming back (a
+// screenshot does), the field keeping its focus. Counted as closed once it has stayed away,
+// not during a turn of the phone (the owner's report, 2026-10-31).
+let wasCovered = false, goneCheck = 0;
+function keyboardGone() {
+  clearTimeout(goneCheck);
+  goneCheck = setTimeout(() => {
+    const vv = window.visualViewport;
+    if (!keyboardOpen.value || viewportBroken(vv) || window.innerHeight - vv.height > 80) return;
+    typing.value?.blur();keyboardOpen.value = false;
+  }, 400);
+}
+onBeforeUnmount(() => clearTimeout(goneCheck));
 function fitViewport() {
   const vv = window.visualViewport;
   if (!vv || !isTouch) return;
@@ -526,6 +550,8 @@ function fitViewport() {
   const broken = viewportBroken(vv), tall = window.innerHeight >= window.innerWidth;
   const height = !broken ? vv.height : keyboardOpen.value ? window.innerHeight - Math.round((tall ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height)) * 0.44) : window.innerHeight;
   const covered = window.innerHeight - height > 80;
+  if (wasCovered && !covered && !broken) keyboardGone();
+  wasCovered = covered;
   keyboardSideways.value = covered && window.innerWidth > window.innerHeight;
   stageBox.value = covered ? { top: (broken ? 0 : vv.offsetTop) + 'px', height: height + 'px', bottom: 'auto', ...(keyboardBarOver ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 42px)' } : {}) } : null;
   clearTimeout(settle);
@@ -787,8 +813,14 @@ function wheel(e) {
 // ---- keys ----
 function toggleKeyboard() {
   keyHint.value = false;autoOpened = false;
-  keyboardOpen.value = !keyboardOpen.value;
-  if (keyboardOpen.value) nextTick(() => typing.value?.focus({ preventScroll: true }));else typing.value?.blur();
+  if (keyboardOpen.value) { keyboardOpen.value = false;typing.value?.blur();return; }
+  // Focused already, a focus would do nothing and the keyboard stay away; and iOS brings it
+  // up only within the press and not for inputmode none, so both are settled here and now.
+  const field = typing.value;
+  field?.blur();
+  keyboardOpen.value = true;
+  field?.setAttribute('inputmode', 'text');
+  field?.focus({ preventScroll: true });
 }
 // The Mac's desktops (Spaces), with its own shortcut ⌃← ⌃→; the windows are listed again
 // after the switch.
@@ -1005,7 +1037,7 @@ function keyUp(e) {
 .remote-tile-shot img {width:100%;height:100%;object-fit:cover;}
 .remote-tile-name {margin-top:8px;font-weight:600;font-size:15px;}
 .remote-tile-sub {font-size:12px;color:var(--dp-color-text-secondary,#8e8e93);}
-.remote-stage {-webkit-touch-callout:none;position:fixed;inset:0;z-index:12000;background:#000;display:flex;flex-direction:column;color:#fff;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);user-select:none;-webkit-user-select:none;}
+.remote-stage {-webkit-touch-callout:none;position:fixed;inset:0;z-index:12000;background:#000;display:flex;flex-direction:column;color:#fff;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box;box-shadow:0 100vh 0 100vh #000;user-select:none;-webkit-user-select:none;}
 .remote-desks {display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:6px 8px 0;background:rgba(28,28,30,.96);}
 .remote-desks::-webkit-scrollbar {display:none;}
 .remote-stage .remote-desk {flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;width:auto;margin:0;padding:5px 10px;border-radius:14px;border:1px solid transparent;background:rgba(255,255,255,.08);color:#ddd;font-size:12px;white-space:nowrap;cursor:pointer;}
@@ -1072,10 +1104,10 @@ function keyUp(e) {
 .remote-typing {position:absolute;left:-1000px;top:0;width:10px;height:10px;opacity:0;}
 .remote-settings {position:absolute;right:8px;top:calc(100% + 6px);width:min(320px,calc(100vw - 16px));background:rgba(44,44,46,.98);border-radius:16px;padding:12px 14px;box-shadow:0 8px 30px rgba(0,0,0,.5);}
 .remote-head {position:relative;z-index:2;}
-.remote-head.collapsed {position:absolute;top:env(safe-area-inset-top);right:0;}
+.remote-head.collapsed {position:absolute;top:env(safe-area-inset-top);right:env(safe-area-inset-right);}
 .remote-head.collapsed .remote-bar {background:transparent;border:0;padding:8px;}
 .remote-head.collapsed .remote-btn {background:rgba(44,44,46,.85);box-shadow:0 2px 8px rgba(0,0,0,.4);}
-.remote-menu {position:absolute;right:8px;top:calc(100% + 6px);min-width:200px;background:rgba(44,44,46,.98);border-radius:14px;padding:6px;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;}
+.remote-menu {position:absolute;right:8px;top:calc(100% + 6px);min-width:200px;box-sizing:border-box;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;background:rgba(44,44,46,.98);border-radius:14px;padding:6px;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;}
 .remote-stage .remote-menu-item {display:flex;align-items:center;gap:10px;width:100%;margin:0;border:0;background:transparent;color:#fff;font-size:15px;text-align:left;padding:10px 12px;border-radius:9px;cursor:pointer;}
 .remote-stage .remote-menu-item:active {background:rgba(255,255,255,.1);}
 .remote-stage .remote-menu-item.disconnect {color:#ff6961;}
@@ -1090,7 +1122,7 @@ function keyUp(e) {
 .remote-zoom .remote-menu {right:auto;left:50%;transform:translateX(-50%);min-width:140px;z-index:5;}
 .remote-btn:disabled {opacity:.35;cursor:default;}
 .remote-head-stats {align-self:center;margin-right:6px;}
-.remote-area-stats {position:absolute;top:4px;left:max(6px,env(safe-area-inset-left));z-index:1;margin:0;padding:2px 6px;border-radius:6px;background:rgba(0,0,0,.55);color:#ddd;pointer-events:none;}
+.remote-area-stats {position:absolute;top:4px;left:6px;z-index:1;margin:0;padding:2px 6px;border-radius:6px;background:rgba(0,0,0,.55);color:#ddd;pointer-events:none;}
 .remote-stage:not(.touch) .remote-area {order:2;}
 .remote-stage:not(.touch) .remote-clip {order:1;border-top:0;border-bottom:1px solid rgba(255,255,255,.08);}
 @media (min-width: 800px){.remote-note{max-width:min(828px,calc(100% - 32px));margin-left:auto;margin-right:auto;padding:0 16px;box-sizing:border-box;}}
