@@ -396,7 +396,10 @@ actor Session {
             }
             // Pixels, not points: a Retina display's full detail, scaled down to fit maxWidth.
             let backing = await MainActor.run { NSScreen.main?.backingScaleFactor ?? 2 }
-            let scale = kind == "display" && id != Catalog.allDisplays ? CGFloat(CGDisplayPixelsWide(CGDirectDisplayID(id))) / max(1, found.size.width) : backing
+            // A display's own mode says it: CGDisplayPixelsWide gives points, which left a whole
+            // screen at half the detail of its windows (a user's report, 2026-10-31).
+            let mode = kind == "display" && id != Catalog.allDisplays ? CGDisplayCopyDisplayMode(CGDirectDisplayID(id)) : nil
+            let scale = mode.map { CGFloat($0.pixelWidth) / max(1, CGFloat($0.width)) } ?? backing
             let w = found.size.width * max(1, scale), h = found.size.height * max(1, scale)
             guard w.isFinite, h.isFinite else { link.send(json: ["t": "error", "where": "start", "message": "gone"]); return }
             let (width, height) = Self.pictureSize(width: w, height: h, maxWidth: maxWidth, maxPixels: found.parts.isEmpty ? Self.maxPicturePixels : Self.allDisplaysPixels)
