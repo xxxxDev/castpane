@@ -1,6 +1,6 @@
 {
   "name": "castpane",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "See and control your own Mac from a phone or another computer, in a browser or as an installed PWA",
   "license": "MIT",
   "private": true,
