@@ -107,6 +107,26 @@ export function codeOfChar(ch) {
   return { ' ': 'Space', '-': 'Minus', '=': 'Equal', '[': 'BracketLeft', ']': 'BracketRight', '\\': 'Backslash', ';': 'Semicolon', "'": 'Quote', ',': 'Comma', '.': 'Period', '/': 'Slash', '`': 'Backquote' }[c] || null;
 }
 
+// A Windows or Linux keyboard's habits, as the Mac's own keys: Ctrl is otherwise simply ⌘, and
+// Ctrl+← would go to the line's start, not a word back (the owner's report, 2026-10-31).
+export function otherKeyboardKey({ code, ctrl, alt, shift, win }) {
+  if (win) return null;
+  const s = shift ? ['shift'] : [], arrow = /^Arrow(Left|Right)$/.test(code);
+  if (!ctrl && !alt && code === 'Home') return { code: 'ArrowLeft', mods: [...s, 'meta'] };
+  if (!ctrl && !alt && code === 'End') return { code: 'ArrowRight', mods: [...s, 'meta'] };
+  if (alt && !ctrl && code === 'F4') return { code: 'KeyQ', mods: ['meta'] };
+  if (alt && !ctrl && code === 'Tab') return { code: 'Tab', mods: [...s, 'meta'] };
+  if (!ctrl || alt) return null;
+  if (code === 'Home') return { code: 'ArrowUp', mods: [...s, 'meta'] };
+  if (code === 'End') return { code: 'ArrowDown', mods: [...s, 'meta'] };
+  if (arrow) return { code, mods: [...s, 'alt'] };
+  if (code === 'Backspace' || code === 'Delete') return { code, mods: ['alt'] };
+  if (code === 'KeyY' && !shift) return { code: 'KeyZ', mods: ['shift', 'meta'] };
+  if (code === 'Tab') return { code: 'Tab', mods: [...s, 'ctrl'] };
+  if (code === 'F4') return { code: 'KeyW', mods: ['meta'] };
+  return null;
+}
+
 // For a 1920 × 1080 picture: the Mac gives a larger one more (Session.scaledBitrate).
 export const QUALITY = { low: 2_000_000, standard: 6_000_000, high: 12_000_000, max: 25_000_000 };
 export const RESOLUTION = { '1280': 1280, '1920': 1920, '2560': 2560, native: 3840 };

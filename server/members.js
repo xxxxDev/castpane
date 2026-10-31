@@ -289,6 +289,7 @@ const SHAPES = {
   error: (m) => pick({ where: str(m.where, 32) ?? '', message: str(m.message, 200) ?? '', code: str(m.code, 32) }),
   clipboard: (m) => pick({ s: str(m.s, 100000), truncated: bool(m.truncated), empty: bool(m.empty), concealed: bool(m.concealed), notAllowed: bool(m.notAllowed), denied: bool(m.denied), error: bool(m.error) }),
   'clipboard-set': () => ({}),
+  'clipboard-changed': () => ({}),
   'clipboard-busy': () => ({}),
 };
 function vetFromMember(text) {

@@ -42,7 +42,7 @@
           <div v-if="!headFolded" class="remote-thumbs" role="tablist">
             <button v-for="w in shownItems" :key="w.kind + w.id" type="button" class="remote-thumb" :class="{active: current && current.kind === w.kind && current.id === w.id}" :title="w.app ? w.app + ' · ' + w.title : w.title" @click="show(w)">
               <img v-if="w.thumb" :src="w.thumb" alt=""/><f7-icon v-else :f7="w.kind === 'display' ? 'desktopcomputer' : 'macwindow'" :size="20"/>
-              <span>{{ w.kind === 'display' ? (w.all ? ct('所有螢幕') : ct('整個螢幕') + (w.title.match(/\d+$/) ? ' ' + w.title.match(/\d+$/)[0] : '')) : (w.app || w.title) }}</span>
+              <span>{{ w.kind === 'display' ? (w.all ? ct('所有螢幕') : ct('桌面') + (w.title.match(/\d+$/) ? ' ' + w.title.match(/\d+$/)[0] : '')) : (w.app || w.title) }}</span>
               <small v-if="w.kind === 'window' && w.here === false" class="remote-away">{{ ct('不在畫面上') }}</small>
             </button>
           </div>
@@ -64,6 +64,7 @@
               <button type="button" class="remote-btn clip" :class="{on: clipOpen}" :title="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="17"/></button>
             </template>
             <button v-if="!isTouch" type="button" class="remote-btn" :class="{on: keyboardOpen, hint: keyHint}" :title="ct('鍵盤')" @pointerdown.prevent @mousedown.prevent @click="toggleKeyboard"><f7-icon f7="keyboard" :size="18"/></button>
+            <button v-if="!isTouch && canFullscreen" type="button" class="remote-btn fullscreen" :class="{on: fullscreen}" :title="ct('全螢幕顯示')" @pointerdown.prevent @mousedown.prevent @click="toggleFullscreen"><f7-icon :f7="fullscreen ? 'arrow_down_right_arrow_up_left' : 'arrow_up_left_arrow_down_right'" :size="17"/></button>
             <!-- On a phone the rest sit in one menu, so the bar keeps room for windows (the owner's request, 2026-10-28). -->
             <template v-if="isTouch">
               <button type="button" class="remote-btn more" :class="{on: menuOpen}" :title="ct('更多')" @pointerdown.prevent @mousedown.prevent @click="menuOpen = !menuOpen;settingsOpen = false"><f7-icon f7="ellipsis" :size="18"/></button>
@@ -98,7 +99,7 @@
           <div class="remote-set-title">{{ ct('每秒畫面') }}</div>
           <div class="remote-seg"><button v-for="f in [30, 60]" :key="f" type="button" :class="{on: prefs.fps === f}" @click="setPref('fps', f)">{{ f }}</button></div>
           <p class="remote-small">{{ ct('網路慢時調低畫質或解析度，畫面會比較順。') }}</p>
-          <p v-if="otherKeyboard" class="remote-small keys-note">{{ ct('鍵盤：Ctrl 等於 Mac 的 ⌘，Windows 鍵等於 ⌃，F5 重新整理。瀏覽器自己留著的 Ctrl+W、Ctrl+T、Ctrl+N 傳不到 Mac。') }}</p>
+          <p v-if="otherKeyboard" class="remote-small keys-note">{{ ct('鍵盤：Ctrl 等於 Mac 的 ⌘，Windows 鍵等於 ⌃，F5 重新整理；Ctrl+←→、Ctrl+Backspace、Home、End、Ctrl+Y 照 Windows 的習慣。瀏覽器自己留著的 Ctrl+W、Ctrl+T、Ctrl+N 要按全螢幕鈕才傳得到 Mac（Chrome、Edge）。') }}</p>
         </div>
         </div>
 
@@ -173,7 +174,7 @@ import { api } from '../js/api.js';
 import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
-import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, QUALITY, RESOLUTION } from '../js/remoteStream.js';
+import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, otherKeyboardKey, QUALITY, RESOLUTION } from '../js/remoteStream.js';
 
 const supported = remoteSupported();
 const machines = ref([]), error = ref(''), streaming = ref(false), items = ref([]), current = ref(null);
@@ -357,6 +358,9 @@ function onMessage(msg) {
     probeAnswer = msg;
   } else if (msg.t === 'clipboard') {
     clipWait?.resolve(msg);
+  } else if (msg.t === 'clipboard-changed') {
+    macCopied = true;
+    if (!isTouch && document.hasFocus()) bringClipboard();
   } else if (msg.t === 'clipboard-busy') {
     clipWait?.reject(new Error('busy'));
     // A second ⌘V within the second: the text put there a moment ago is still there.
@@ -455,6 +459,7 @@ function disconnect() {
   if (!streaming.value && !link) return;
   saveShot();
   try { link?.send({ t: 'stop' }); } catch {}
+  if (document.fullscreenElement) document.exitFullscreen();
   link?.close();link = null;streaming.value = false;keyboardOpen.value = false;settingsOpen.value = false;menuOpen.value = false;held.clear();panel.value = false;compose.value = false;composeText.value = '';clipOpen.value = false;clipWait?.reject(new Error('closed'));
 }
 const headCollapsed = ref(localGet('castpane-remote-head') === 'folded');
@@ -844,6 +849,16 @@ function space(code) {
   link?.send({ t: 'key', code, down: true, mods: ['ctrl'] });link?.send({ t: 'key', code, down: false, mods: ['ctrl'] });
   setTimeout(list, 900);
 }
+// Full screen, with the keys a browser keeps for itself (Ctrl+W, the Windows key) passed on
+// where it can (Chrome, Edge); holding Esc leaves.
+const canFullscreen = typeof document !== 'undefined' && document.fullscreenEnabled;
+const fullscreen = ref(false);
+async function toggleFullscreen() {
+  if (document.fullscreenElement) return document.exitFullscreen();
+  try { await document.documentElement.requestFullscreen();await navigator.keyboard?.lock?.(); } catch { /* refused */ }
+}
+const fullscreenChanged = () => { fullscreen.value = !!document.fullscreenElement;if (!fullscreen.value) navigator.keyboard?.unlock?.(); };
+if (typeof document !== 'undefined') { document.addEventListener('fullscreenchange', fullscreenChanged);onBeforeUnmount(() => document.removeEventListener('fullscreenchange', fullscreenChanged)); }
 function toggleMod(id) { if (held.has(id)) held.delete(id);else held.add(id);if (!isTouch) typing.value?.focus({ preventScroll: true }); }
 function releaseMods() { held.clear(); }
 function tap(code) {
@@ -958,6 +973,21 @@ async function pasteToMac() {
 // text: it goes on the Mac's clipboard first, then ⌘V. A paste with no text, or none at
 // all, still sends ⌘V, for what the Mac has copied itself.
 let pasteMods = null, pasteTimer = null, clipSetWait = null;
+// But something copied on the Mac is what a paste means while this page keeps the focus: this
+// computer's clipboard still held the older text, which went over it (the owner's report,
+// 2026-10-31). Away from the page, this computer may have copied something newer.
+let macCopied = false;
+const leftPage = () => { macCopied = false; };
+if (typeof window !== 'undefined') { window.addEventListener('blur', leftPage);onBeforeUnmount(() => window.removeEventListener('blur', leftPage)); }
+// What the Mac copied comes here too, where the Mac allows it to be read. A browser that
+// refuses keeps its own, quietly.
+async function bringClipboard() {
+  if (clipWait) return;
+  try {
+    const m = await askClipboard();
+    if (m.s && !m.truncated && !m.concealed) await navigator.clipboard.writeText(m.s);
+  } catch { /* not allowed, too soon, or refused */ }
+}
 function pasteKey(m) {
   link?.send({ t: 'key', code: 'KeyV', down: true, mods: m });link?.send({ t: 'key', code: 'KeyV', down: false, mods: m });releaseMods();
 }
@@ -999,6 +1029,20 @@ function keyDown(e) {
   if (otherKeyboard && e.code === 'F5' && !meta && !ctrl && !e.altKey && !e.shiftKey) {
     e.preventDefault();
     link?.send({ t: 'key', code: 'KeyR', down: true, mods: ['meta'] });link?.send({ t: 'key', code: 'KeyR', down: false, mods: ['meta'] });
+    return;
+  }
+  const habit = otherKeyboard && otherKeyboardKey({ code: e.code, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, win: e.metaKey });
+  if (habit) {
+    e.preventDefault();
+    const m = [...habit.mods];
+    for (const x of held) if (!m.includes(x)) m.push(x);
+    link?.send({ t: 'key', code: habit.code, down: true, mods: m });link?.send({ t: 'key', code: habit.code, down: false, mods: m });releaseMods();
+    return;
+  }
+  if (meta && (e.code === 'KeyC' || e.code === 'KeyX') && !ctrl && !e.altKey) macCopied = true;
+  if (meta && e.code === 'KeyV' && !ctrl && !e.altKey && !e.repeat && macCopied) {
+    e.preventDefault();
+    pasteKey(e.shiftKey ? ['shift', 'meta'] : ['meta']);
     return;
   }
   if (meta && e.code === 'KeyV' && !ctrl && !e.altKey && !e.repeat) {

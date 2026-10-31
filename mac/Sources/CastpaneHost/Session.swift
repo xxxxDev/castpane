@@ -112,6 +112,8 @@ actor Session {
     private var chain: Task<Void, Never>?
     private var caretPending = false
     private var watcher: Task<Void, Never>?
+    private var clipboardWatcher: Task<Void, Never>?
+    private var clipboardSeen = 0
     private var lastSignature = ""
     private var lastListed = Date.distantPast
     /// What the picture shown was started with, and the displays' arrangement then: a
@@ -177,10 +179,12 @@ actor Session {
                 link.send(json: Self.status())
                 if Wake.needed { Wake.display() }
                 watchWindows()
+                watchClipboard()
             case .request(let r):
                 route(r)
             case .end:
                 watcher?.cancel()
+                clipboardWatcher?.cancel()
                 queued { await self.stop() }
             }
         }
@@ -197,6 +201,22 @@ actor Session {
             }
         }
     }
+
+    /// Tells the page when the Mac's clipboard changes, so a paste there brings what was just
+    /// copied on the Mac (the owner's report, 2026-10-31). Only the count is read: it needs no
+    /// permission and says nothing of what is on the clipboard.
+    private func watchClipboard() {
+        clipboardWatcher = Task {
+            clipboardSeen = await MainActor.run { NSPasteboard.general.changeCount }
+            while !Task.isCancelled && !link.isClosed {
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                let count = await MainActor.run { NSPasteboard.general.changeCount }
+                if count != clipboardSeen { clipboardSeen = count; link.send(json: ["t": "clipboard-changed"]) }
+            }
+        }
+    }
+
+    private func clipboardWritten(_ count: Int) { clipboardSeen = count }
 
     private func checkWindows() {
         guard !link.isClosed, CGPreflightScreenCaptureAccess() else { return }
@@ -316,7 +336,11 @@ actor Session {
             }
         case let .clipboardSet(s):
             let link = self.link
-            Task { @MainActor in Clipboard.write(s); link.send(json: ["t": "clipboard-set"]) }
+            Task { @MainActor in
+                Clipboard.write(s)
+                await self.clipboardWritten(NSPasteboard.general.changeCount)
+                link.send(json: ["t": "clipboard-set"])
+            }
         case .invalid(let t):
             if t == "start" { link.send(json: ["t": "error", "where": "start", "message": "invalid request"]) }
         }
