@@ -371,12 +371,16 @@ actor Session {
     /// other make a tall "all displays" that the width limit alone leaves at twice that,
     /// and a phone's page crashed on it (the owner's report, 2026-10-31).
     static let maxPicturePixels: CGFloat = 3840 * 2160
+    /// "All displays" holds what one large display sends, not several together: at three
+    /// times the pixels it moved in jerks where a single display was smooth (the owner's
+    /// report, 2026-10-31). Zooming shows each display a little softer; a single one is sharper.
+    static let allDisplaysPixels: CGFloat = 2560 * 1440
 
-    /// The picture's size in even pixels: within maxWidth and maxPicturePixels, its shape kept.
-    static func pictureSize(width: CGFloat, height: CGFloat, maxWidth: Int) -> (width: Int, height: Int) {
+    /// The picture's size in even pixels: within maxWidth and the pixels allowed, its shape kept.
+    static func pictureSize(width: CGFloat, height: CGFloat, maxWidth: Int, maxPixels: CGFloat = maxPicturePixels) -> (width: Int, height: Int) {
         var w = width, h = height
         if w > CGFloat(maxWidth) { h = h * CGFloat(maxWidth) / w; w = CGFloat(maxWidth) }
-        let over = w * h / maxPicturePixels
+        let over = w * h / maxPixels
         if over > 1 { w /= over.squareRoot(); h /= over.squareRoot() }
         return (max(64, Int(w) & ~1), max(64, Int(h) & ~1))
     }
@@ -395,7 +399,7 @@ actor Session {
             let scale = kind == "display" && id != Catalog.allDisplays ? CGFloat(CGDisplayPixelsWide(CGDirectDisplayID(id))) / max(1, found.size.width) : backing
             let w = found.size.width * max(1, scale), h = found.size.height * max(1, scale)
             guard w.isFinite, h.isFinite else { link.send(json: ["t": "error", "where": "start", "message": "gone"]); return }
-            let (width, height) = Self.pictureSize(width: w, height: h, maxWidth: maxWidth)
+            let (width, height) = Self.pictureSize(width: w, height: h, maxWidth: maxWidth, maxPixels: found.parts.isEmpty ? Self.maxPicturePixels : Self.allDisplaysPixels)
             let link = self.link
             let output: ScreenEncoder.Output = { data, key, micros, codec in
                 Self.sendVideo(link, data, key: key, micros: micros, codec: codec, width: width, height: height)
