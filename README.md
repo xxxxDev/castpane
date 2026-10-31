@@ -14,8 +14,8 @@ in a browser, or install it on the phone's Home Screen as an app. The Mac runs o
 **Castpane.app**. The phone or the other computer needs nothing installed.
 
 The picture is the Mac's own hardware HEVC or H.264, decoded by the browser's hardware decoder,
-at the Mac's full Retina resolution, so a whole screen or a single window stays sharp and current
-on a phone. When the screen stops changing, the picture sharpens within about a second. You click, scroll and type
+so a whole screen (at the size macOS lays it out in, 2560 × 1440 on a 5K display) or a single
+window (at its full Retina detail) stays sharp and current on a phone. When the screen stops changing, the picture sharpens within about a second. You click, scroll and type
 back, with touch modes made for a small screen.
 
 > [!WARNING]
