@@ -148,7 +148,8 @@ app again, and every user grants the permissions once more.
 ## Releasing
 
 1. Set the version in `package.json`, `server/package.json` and `mac/build-app.sh`
-   (`version=`, such as `0.1.3` or `0.1.3-beta`; the tag is `v` and the same).
+   (`version=`: the date, such as `2026.11.1` with no leading zeros, or `2026.11.1-dev.1` for a
+   pre-release; the tag is `v` and the same).
 2. Build and pack both kinds of Mac from a clean checkout, signed with the release certificate
    (see Signing; the app updates itself only to a version signed with the same one):
 
