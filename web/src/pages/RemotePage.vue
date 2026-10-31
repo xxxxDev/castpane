@@ -172,6 +172,7 @@ import { ct } from '../js/text.js';
 import { api } from '../js/api.js';
 import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
+import { viewportBroken } from '../js/visibleHeight.js';
 import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, QUALITY, RESOLUTION } from '../js/remoteStream.js';
 
 const supported = remoteSupported();
@@ -519,9 +520,14 @@ const keyboardBarOver = typeof navigator !== 'undefined' && /iPhone/.test(naviga
 function fitViewport() {
   const vv = window.visualViewport;
   if (!vv || !isTouch) return;
-  const covered = window.innerHeight - vv.height > 80;
+  // A viewport that reports no height (visibleHeight.js) sends nothing when the keyboard
+  // moves either: with it open, what is left is estimated. The keyboard took 44% of the
+  // screen on the owner's iPhone; other keyboards may differ.
+  const broken = viewportBroken(vv), tall = window.innerHeight >= window.innerWidth;
+  const height = !broken ? vv.height : keyboardOpen.value ? window.innerHeight - Math.round((tall ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height)) * 0.44) : window.innerHeight;
+  const covered = window.innerHeight - height > 80;
   keyboardSideways.value = covered && window.innerWidth > window.innerHeight;
-  stageBox.value = covered ? { top: vv.offsetTop + 'px', height: vv.height + 'px', bottom: 'auto', ...(keyboardBarOver ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 42px)' } : {}) } : null;
+  stageBox.value = covered ? { top: (broken ? 0 : vv.offsetTop) + 'px', height: height + 'px', bottom: 'auto', ...(keyboardBarOver ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 42px)' } : {}) } : null;
   clearTimeout(settle);
   if (covered && zoomTo) settle = setTimeout(() => { if (zoomTo && keyboardOpen.value) { focusOn(zoomTo);zoomTo = null; } }, 250);
 }
@@ -552,7 +558,7 @@ function focusOn(p) {
 watch(keyboardOpen, (open) => {
   // No keyboard came up over the page (a hardware keyboard): nothing waits to zoom.
   if (open) { zoomTo = lastTap && Date.now() - lastTap.at < 5000 ? { ...lastTap } : null;nextTick(fitViewport);setTimeout(() => { if (!stageBox.value) zoomTo = null; }, 1500); }
-  else { zoomTo = null;if (beforeKeyboard) { Object.assign(view, beforeKeyboard);beforeKeyboard = null; } }
+  else { zoomTo = null;if (beforeKeyboard) { Object.assign(view, beforeKeyboard);beforeKeyboard = null; } nextTick(fitViewport); }
 });
 if (typeof window !== 'undefined' && window.visualViewport) {
   window.visualViewport.addEventListener('resize', fitViewport);
