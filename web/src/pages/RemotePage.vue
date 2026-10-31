@@ -143,12 +143,11 @@
           <button type="button" class="remote-key tool clip-btn" :class="{on: clipOpen}" :title="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="17"/></button>
           <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
           <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
-          <!-- The Mac's desktops and Mission Control, a press away with the keyboard up (the owner's request, 2026-10-31). -->
+          <!-- The row in the order the owner picked (2026-10-31). The Mac's desktops and Mission Control are a press away with the keyboard up. -->
+          <button type="button" class="remote-key tool mission" :title="ct('指揮中心')" @pointerdown.prevent @click="space('ArrowUp')"><f7-icon f7="rectangle_3_offgrid" :size="17"/></button>
           <button type="button" class="remote-key tool space-left" :title="ct('上一個桌面')" @pointerdown.prevent @click="space('ArrowLeft')"><f7-icon f7="arrow_left_square" :size="17"/></button>
           <button type="button" class="remote-key tool space-right" :title="ct('下一個桌面')" @pointerdown.prevent @click="space('ArrowRight')"><f7-icon f7="arrow_right_square" :size="17"/></button>
-          <button type="button" class="remote-key tool mission" :title="ct('指揮中心')" @pointerdown.prevent @click="space('ArrowUp')"><f7-icon f7="square_grid_2x2" :size="17"/></button>
-          <!-- The arrows last, at the row's end (the owner's request, 2026-10-31). -->
-          <button v-for="k in ARROWS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
+          <button v-for="k in LAST_KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
         </div>
         <!-- In the phone keyboard's place: pages of keys, swiped sideways (the owner's request,
              2026-10-29). -->
@@ -184,8 +183,8 @@ const clipOpen = ref(false), panel = ref(false), pageNo = ref(0), pagesEl = ref(
 const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 const mode = ref(isTouch ? (localGet('castpane-remote-mode') || 'direct') : 'direct');
 const QUALITY_LABEL = { low: '低', standard: '標準', high: '高', max: '最高' };
-const KEYS = [{ code: 'Escape', label: 'esc' }, { code: 'Tab', label: 'tab' }, { code: 'Backspace', label: '⌫' }, { code: 'Enter', label: '⏎' }];
-const ARROWS = [{ code: 'ArrowLeft', label: '←' }, { code: 'ArrowUp', label: '↑' }, { code: 'ArrowDown', label: '↓' }, { code: 'ArrowRight', label: '→' }];
+const KEYS = [{ code: 'Escape', label: 'esc' }, { code: 'Tab', label: 'tab' }];
+const LAST_KEYS = [{ code: 'Backspace', label: '⌫' }, { code: 'Enter', label: '⏎' }, { code: 'ArrowLeft', label: '←' }, { code: 'ArrowUp', label: '↑' }, { code: 'ArrowDown', label: '↓' }, { code: 'ArrowRight', label: '→' }];
 const MODS = [{ id: 'shift', label: '⇧' }, { id: 'ctrl', label: '⌃' }, { id: 'alt', label: '⌥' }, { id: 'meta', label: '⌘' }];
 // The key panel's pages. A Mac has no Insert, so Tab sits there; the shortcuts are the
 // Mac's own (Mission Control ⌃↑, Show Desktop F11); the number pad types its characters.
