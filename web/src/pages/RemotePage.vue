@@ -34,12 +34,12 @@
         <!-- The bar: every window, the Desktop first, as Sill's bar of thumbnails. -->
         <!-- The Mac's desktops first, then the windows on the one picked (the owner's
              request, 2026-10-28): whole screens, each desktop, full-screen apps, the Dock. -->
-        <div class="remote-head" :class="{collapsed: headCollapsed}">
-        <div v-if="groups.length > 1 && !headCollapsed" class="remote-desks" role="tablist">
+        <div class="remote-head" :class="{collapsed: headFolded}">
+        <div v-if="groups.length > 1 && !headFolded" class="remote-desks" role="tablist">
           <button v-for="g in groups" :key="g.key" type="button" class="remote-desk" :class="{active: g.key === groupKey, current: g.current}" @click="groupKey = g.key">{{ g.label }}<span class="remote-desk-count">{{ g.items.length }}</span></button>
         </div>
         <div class="remote-bar">
-          <div v-if="!headCollapsed" class="remote-thumbs" role="tablist">
+          <div v-if="!headFolded" class="remote-thumbs" role="tablist">
             <button v-for="w in shownItems" :key="w.kind + w.id" type="button" class="remote-thumb" :class="{active: current && current.kind === w.kind && current.id === w.id}" :title="w.app ? w.app + ' · ' + w.title : w.title" @click="show(w)">
               <img v-if="w.thumb" :src="w.thumb" alt=""/><f7-icon v-else :f7="w.kind === 'display' ? 'desktopcomputer' : 'macwindow'" :size="20"/>
               <span>{{ w.kind === 'display' ? (w.all ? ct('所有螢幕') : ct('整個螢幕') + (w.title.match(/\d+$/) ? ' ' + w.title.match(/\d+$/)[0] : '')) : (w.app || w.title) }}</span>
@@ -48,7 +48,7 @@
           </div>
           <div class="remote-actions">
             <!-- The screens, desktops and windows fold away for a bigger picture (the owner's request, 2026-10-28). -->
-            <button type="button" class="remote-btn fold" :title="headCollapsed ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headCollapsed ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
+            <button type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headFolded ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
             <button v-if="isTouch && view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="resetView">1×</button>
             <!-- A computer: the picture's size, and what the bottom bar used to hold (the owner's request, 2026-10-31). -->
             <template v-if="!isTouch">
@@ -102,7 +102,7 @@
         </div>
         </div>
 
-        <div ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart.prevent="pinchStart" @gesturechange.prevent="pinchChange">
+        <div ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
@@ -455,6 +455,9 @@ function disconnect() {
   link?.close();link = null;streaming.value = false;keyboardOpen.value = false;settingsOpen.value = false;menuOpen.value = false;held.clear();panel.value = false;compose.value = false;composeText.value = '';clipOpen.value = false;clipWait?.reject(new Error('closed'));
 }
 const headCollapsed = ref(localGet('castpane-remote-head') === 'folded');
+// Held sideways with the keyboard up there is little height left: the bar of windows folds
+// away for that time, or the picture has almost none (the owner's report, 2026-10-31).
+const keyboardSideways = ref(false), headFolded = computed(() => headCollapsed.value || keyboardSideways.value);
 function toggleHead() { headCollapsed.value = !headCollapsed.value;localSet('castpane-remote-head', headCollapsed.value ? 'folded' : 'open');menuOpen.value = false;settingsOpen.value = false; }
 const MODES = [{ id: 'direct', label: '直接點', icon: 'hand_draw' }, { id: 'trackpad', label: '觸控板', icon: 'rectangle_on_rectangle' }, { id: 'pointer', label: '游標', icon: 'cursor_rays' }];
 function setMode(m) { mode.value = m;localSet('castpane-remote-mode', m); }
@@ -474,9 +477,18 @@ watch(() => view.z > 1.2, (zoomed) => {
   if (zoomed && !zoomNative.value && prefs.resolution !== 'native') zoomSettle = setTimeout(() => { if (view.z > 1.2 && streaming.value) { zoomNative.value = true;showCurrent(); } }, 400);
 });
 onBeforeUnmount(() => clearTimeout(zoomSettle));
+// About 900 Mac pixels across the phone: a text field and its line are readable. Counted
+// from the size the picture is drawn at, which sideways with the keyboard up is set by the
+// little height left: the same zoom there made it smaller than before.
+function readableZoom() {
+  const a = area.value, c = canvas.value;if (!a || !c) return 1;
+  const r = a.getBoundingClientRect(), vw = c.width || 1, vh = c.height || 1;
+  return (r.width / Math.max(1, Math.min(vw, 900))) / Math.max(1e-6, Math.min(r.width / vw, r.height / vh));
+}
+const maxZoom = () => Math.max(5, readableZoom());
 function clampView() {
   const r = area.value.getBoundingClientRect();
-  view.z = Math.min(5, Math.max(1, view.z));
+  view.z = Math.min(maxZoom(), Math.max(1, view.z));
   view.x = Math.min(0, Math.max(r.width - r.width * view.z, view.x));view.y = Math.min(0, Math.max(r.height - r.height * view.z, view.y));
   if (view.z < 1.02) resetView();
 }
@@ -506,6 +518,7 @@ function fitViewport() {
   const vv = window.visualViewport;
   if (!vv || !isTouch) return;
   const covered = window.innerHeight - vv.height > 80;
+  keyboardSideways.value = covered && window.innerWidth > window.innerHeight;
   stageBox.value = covered ? { top: vv.offsetTop + 'px', height: vv.height + 'px', bottom: 'auto', ...(keyboardBarOver ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 42px)' } : {}) } : null;
   clearTimeout(settle);
   if (covered && zoomTo) settle = setTimeout(() => { if (zoomTo && keyboardOpen.value) { focusOn(zoomTo);zoomTo = null; } }, 250);
@@ -528,10 +541,9 @@ function keepInSight(p) {
 // Puts a point of the picture (0…1) in the middle of the area, zoomed so text reads.
 function focusOn(p) {
   const at = areaPoint(p);if (!at) return;
-  const { r, vw, px, py } = at;
+  const { r, px, py } = at;
   if (!beforeKeyboard) beforeKeyboard = { ...view };
-  // About 900 Mac pixels across the phone: a text field and its line are readable.
-  view.z = Math.max(view.z, Math.min(5, Math.max(1.5, (vw / Math.max(1, Math.min(vw, 900))))));
+  view.z = Math.max(view.z, 1.5, readableZoom());
   view.x = r.width / 2 - view.z * px;view.y = r.height * 0.45 - view.z * py;
   clampView();
 }
@@ -668,7 +680,7 @@ function move(e) {
       }
     }
     if (gesture.kind === 'zoom' || gesture.kind === 'pan') {
-      const z = view.z, nz = Math.min(5, Math.max(1, z * (gesture.kind === 'zoom' ? now.d / Math.max(1, last.d) : 1)));
+      const z = view.z, nz = Math.min(maxZoom(), Math.max(1, z * (gesture.kind === 'zoom' ? now.d / Math.max(1, last.d) : 1)));
       const ox = now.cx - r.left, oy = now.cy - r.top;
       view.x = ox - (ox - view.x) * (nz / z) + (now.cx - last.cx);view.y = oy - (oy - view.y) * (nz / z) + (now.cy - last.cy);view.z = nz;
       clampView();
@@ -752,8 +764,10 @@ function followPointer(clientX, clientY) {
   return true;
 }
 let pinchFrom = 1;
-function pinchStart() { pinchFrom = view.z; }
-function pinchChange(e) { if (!isTouch) zoomAt(pinchFrom * e.scale, e.clientX, e.clientY); }
+// Safari's on a computer only: on an iPhone a finger's gesture event, taken here, ended the
+// pointer events the page's own pinch reads (the owner's report, 2026-10-31).
+function pinchStart(e) { if (isTouch) return;e.preventDefault();pinchFrom = view.z; }
+function pinchChange(e) { if (isTouch) return;e.preventDefault();zoomAt(pinchFrom * e.scale, e.clientX, e.clientY); }
 function wheel(e) {
   if (!link) return;
   if (e.ctrlKey || e.metaKey) { zoomAt(view.z * Math.exp(-e.deltaY * (e.deltaMode === 1 ? 16 : 1) * 0.01), e.clientX, e.clientY);return; }
@@ -952,7 +966,7 @@ let rowPress = false;
 function rowRelease() { setTimeout(() => { rowPress = false; }, 300); }
 function typingBlur() {
   // A press on the pointer's ring keeps the keyboard where it is.
-  if ((ringPress || rowPress) && keyboardOpen.value) { setTimeout(() => typing.value?.focus({ preventScroll: true }), 0);return; }
+  if ((ringPress || (rowPress && !compose.value && !panel.value)) && keyboardOpen.value) { setTimeout(() => typing.value?.focus({ preventScroll: true }), 0);return; }
   keyboardOpen.value = false;
   for (const code of sentDown) link?.send({ t: 'key', code, down: false, mods: [] });
   sentDown.clear();
