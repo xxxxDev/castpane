@@ -134,7 +134,7 @@
           <button type="button" class="remote-clip-btn to-mac" @click="pasteToMac"><f7-icon f7="arrow_up_doc" :size="17"/>{{ ct('把剪貼簿放到 Mac') }}</button>
         </div>
         <!-- The keys a phone's keyboard lacks; ⇧ ⌃ ⌥ ⌘ hold for the next key. -->
-        <div v-if="isTouch && (keyboardOpen || panel || compose || clipOpen)" class="remote-keys">
+        <div v-if="isTouch && (keyboardOpen || panel || compose || clipOpen)" class="remote-keys" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
           <template v-if="isTouch">
             <button type="button" class="remote-key tool compose-btn" :class="{on: compose}" :title="ct('輸入文字')" @pointerdown.prevent @mousedown.prevent @click="toggleCompose"><f7-icon f7="pencil" :size="17"/></button>
             <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :title="panel ? ct('鍵盤') : ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon :f7="panel ? 'keyboard' : 'square_grid_2x2'" :size="17"/></button>
@@ -142,6 +142,10 @@
           <button type="button" class="remote-key tool clip-btn" :class="{on: clipOpen}" :title="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="17"/></button>
           <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
           <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
+          <!-- The Mac's desktops and Mission Control, a press away with the keyboard up (the owner's request, 2026-10-31). -->
+          <button type="button" class="remote-key tool space-left" :title="ct('上一個桌面')" @pointerdown.prevent @click="space('ArrowLeft')"><f7-icon f7="arrow_left_square" :size="17"/></button>
+          <button type="button" class="remote-key tool space-right" :title="ct('下一個桌面')" @pointerdown.prevent @click="space('ArrowRight')"><f7-icon f7="arrow_right_square" :size="17"/></button>
+          <button type="button" class="remote-key tool mission" :title="ct('指揮中心')" @pointerdown.prevent @click="space('ArrowUp')"><f7-icon f7="square_grid_2x2" :size="17"/></button>
           <span class="remote-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
         </div>
         <!-- In the phone keyboard's place: pages of keys, swiped sideways (the owner's request,
@@ -813,7 +817,8 @@ function press(k) {
 }
 function toggleCompose() {
   panel.value = false;
-  if (compose.value) { compose.value = false;composeField.value?.blur();return; }
+  // Closing the field goes back to the keyboard, not away from it (the owner's report, 2026-10-31).
+  if (compose.value) { compose.value = false;keyboardOpen.value = true;typing.value?.focus({ preventScroll: true });return; }
   compose.value = true;
   nextTick(() => composeField.value?.focus({ preventScroll: true }));
 }
@@ -942,9 +947,12 @@ function keyDown(e) {
   }
 }
 // Leaving the field lets go of what the computer's keyboard held there.
+// So does a press in the row of keys: it closed the keyboard it sits on (the owner's report, 2026-10-31).
+let rowPress = false;
+function rowRelease() { setTimeout(() => { rowPress = false; }, 300); }
 function typingBlur() {
   // A press on the pointer's ring keeps the keyboard where it is.
-  if (ringPress && keyboardOpen.value) { setTimeout(() => typing.value?.focus({ preventScroll: true }), 0);return; }
+  if ((ringPress || rowPress) && keyboardOpen.value) { setTimeout(() => typing.value?.focus({ preventScroll: true }), 0);return; }
   keyboardOpen.value = false;
   for (const code of sentDown) link?.send({ t: 'key', code, down: false, mods: [] });
   sentDown.clear();
