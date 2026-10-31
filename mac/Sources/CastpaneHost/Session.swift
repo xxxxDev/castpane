@@ -367,6 +367,20 @@ actor Session {
         return min(40_000_000, Int(Double(bitrate) * more))
     }
 
+    /// The most a picture may hold: what 3840 × 2160 does. Displays stacked one above the
+    /// other make a tall "all displays" that the width limit alone leaves at twice that,
+    /// and a phone's page crashed on it (the owner's report, 2026-10-31).
+    static let maxPicturePixels: CGFloat = 3840 * 2160
+
+    /// The picture's size in even pixels: within maxWidth and maxPicturePixels, its shape kept.
+    static func pictureSize(width: CGFloat, height: CGFloat, maxWidth: Int) -> (width: Int, height: Int) {
+        var w = width, h = height
+        if w > CGFloat(maxWidth) { h = h * CGFloat(maxWidth) / w; w = CGFloat(maxWidth) }
+        let over = w * h / maxPicturePixels
+        if over > 1 { w /= over.squareRoot(); h /= over.squareRoot() }
+        return (max(64, Int(w) & ~1), max(64, Int(h) & ~1))
+    }
+
     private func start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool) async {
         await stop()
         await Self.wakeDisplays()
@@ -379,10 +393,9 @@ actor Session {
             // Pixels, not points: a Retina display's full detail, scaled down to fit maxWidth.
             let backing = await MainActor.run { NSScreen.main?.backingScaleFactor ?? 2 }
             let scale = kind == "display" && id != Catalog.allDisplays ? CGFloat(CGDisplayPixelsWide(CGDirectDisplayID(id))) / max(1, found.size.width) : backing
-            var w = found.size.width * max(1, scale), h = found.size.height * max(1, scale)
-            if w > CGFloat(maxWidth) { h = h * CGFloat(maxWidth) / w; w = CGFloat(maxWidth) }
+            let w = found.size.width * max(1, scale), h = found.size.height * max(1, scale)
             guard w.isFinite, h.isFinite else { link.send(json: ["t": "error", "where": "start", "message": "gone"]); return }
-            let width = max(64, Int(min(w, 8192)) & ~1), height = max(64, Int(min(h, 8192)) & ~1)
+            let (width, height) = Self.pictureSize(width: w, height: h, maxWidth: maxWidth)
             let link = self.link
             let output: ScreenEncoder.Output = { data, key, micros, codec in
                 Self.sendVideo(link, data, key: key, micros: micros, codec: codec, width: width, height: height)
