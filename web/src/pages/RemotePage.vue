@@ -494,11 +494,15 @@ let lastTap = null, beforeKeyboard = null, zoomTo = null, settle = 0;
 // Zoomed once, to the field whose tap opened the keyboard, after the keyboard has
 // finished coming up; later taps while it is up do not move the picture (the owner's
 // report, 2026-10-28: a tap elsewhere zoomed to that place instead).
+// On an iPhone the bar above the keyboard (the input method's candidates, ⌃ ⌄ ✓) floats over
+// the bottom of what visualViewport reports, and hid the row of keys: the page cannot turn
+// that bar off, so the row sits above it (the owner's report, 2026-10-31).
+const keyboardBarOver = typeof navigator !== 'undefined' && /iPhone/.test(navigator.userAgent || '');
 function fitViewport() {
   const vv = window.visualViewport;
   if (!vv || !isTouch) return;
   const covered = window.innerHeight - vv.height > 80;
-  stageBox.value = covered ? { top: vv.offsetTop + 'px', height: vv.height + 'px', bottom: 'auto' } : null;
+  stageBox.value = covered ? { top: vv.offsetTop + 'px', height: vv.height + 'px', bottom: 'auto', ...(keyboardBarOver ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 42px)' } : {}) } : null;
   clearTimeout(settle);
   if (covered && zoomTo) settle = setTimeout(() => { if (zoomTo && keyboardOpen.value) { focusOn(zoomTo);zoomTo = null; } }, 250);
 }
