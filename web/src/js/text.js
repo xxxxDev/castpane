@@ -237,6 +237,8 @@ const english = {
 "遠端連線的開始與結束，以及每次登入，也會列在這台 Mac 上 Castpane 設定的「活動」分頁。":"Remote sessions opening and ending, and every sign-in, are also listed on this Mac, in Castpane's settings under Activity.",
 "選電腦登入頁上顯示的數字來登入。看不到那個畫面，就不是你正在用的電腦，請拒絕。":"Pick the number shown on the computer's sign-in page. If you cannot see that screen, it is not your computer: refuse.",
 "還原大小":"Actual size",
+"放大":"Zoom in",
+"縮小":"Zoom out",
 "還沒有失敗的登入":"No failed sign-ins yet",
 "還沒有綁定的手機":"No phone bound yet",
 "還沒有通行密鑰":"No passkeys yet",

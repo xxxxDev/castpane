@@ -49,7 +49,9 @@
           <div class="remote-actions">
             <!-- The screens, desktops and windows fold away for a bigger picture (the owner's request, 2026-10-28). -->
             <button type="button" class="remote-btn fold" :title="headCollapsed ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headCollapsed ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
+            <button v-if="!isTouch" type="button" class="remote-btn zoom-out" :title="ct('縮小')" :disabled="view.z <= 1" @click="zoomStep(1 / 1.25)"><f7-icon f7="minus" :size="16"/></button>
             <button v-if="view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="resetView">1×</button>
+            <button v-if="!isTouch" type="button" class="remote-btn zoom-in" :title="ct('放大')" :disabled="view.z >= 5" @click="zoomStep(1.25)"><f7-icon f7="plus" :size="16"/></button>
             <button v-if="!isTouch" type="button" class="remote-btn" :class="{on: keyboardOpen, hint: keyHint}" :title="ct('鍵盤')" @pointerdown.prevent @mousedown.prevent @click="toggleKeyboard"><f7-icon f7="keyboard" :size="18"/></button>
             <!-- On a phone the rest sit in one menu, so the bar keeps room for windows (the owner's request, 2026-10-28). -->
             <template v-if="isTouch">
@@ -86,7 +88,7 @@
         </div>
         </div>
 
-        <div ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel">
+        <div ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart.prevent="pinchStart" @gesturechange.prevent="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
@@ -615,7 +617,12 @@ function down(e) {
 }
 function move(e) {
   if (!link) return;
-  if (e.pointerType === 'mouse') { const p = toPicture(canvas.value, e.clientX, e.clientY);if (p.inside || e.buttons) sendMove(p);return; }
+  if (e.pointerType === 'mouse') {
+    const { clientX, clientY, buttons } = e, send = () => { const p = toPicture(canvas.value, clientX, clientY);if (p.inside || buttons) sendMove(p); };
+    // The picture moves first: where the pointer falls in it depends on where it now is.
+    if (followPointer(clientX, clientY)) nextTick(() => { if (link) send(); });else send();
+    return;
+  }
   const t = touches.get(e.pointerId);if (!t) return;
   const dx = e.clientX - t.x, dy = e.clientY - t.y;t.x = e.clientX;t.y = e.clientY;
   if (!gesture) return;
@@ -696,8 +703,33 @@ function up(e) {
   if (touches.size === 0) gesture = null;
 }
 function cancel(e) { touches.delete(e.pointerId);clearTimeout(longTimer);if (!touches.size) gesture = null; }
+// A computer has no two fingers to pinch with: a trackpad's pinch (a wheel with Ctrl to
+// most browsers, gesture events to Safari), Ctrl or ⌘ with a mouse wheel, or the bar's
+// buttons zoom instead. A plain wheel keeps scrolling the Mac, so the picture follows the
+// pointer to reach the rest of it (the owner's request, 2026-10-31).
+function zoomAt(z, clientX, clientY) {
+  const r = area.value?.getBoundingClientRect();if (!r) return;
+  const nz = Math.min(5, Math.max(1, z)), ox = clientX - r.left, oy = clientY - r.top;
+  view.x = ox - (ox - view.x) * (nz / view.z);view.y = oy - (oy - view.y) * (nz / view.z);view.z = nz;
+  clampView();
+}
+function zoomStep(by) {
+  const r = area.value?.getBoundingClientRect();if (r) zoomAt(view.z * by, r.left + r.width / 2, r.top + r.height / 2);
+}
+function followPointer(clientX, clientY) {
+  if (view.z <= 1) return false;
+  const r = area.value.getBoundingClientRect(), share = (at, size) => Math.min(1, Math.max(0, at / Math.max(1, size)));
+  const x = (r.width - r.width * view.z) * share(clientX - r.left, r.width), y = (r.height - r.height * view.z) * share(clientY - r.top, r.height);
+  if (x === view.x && y === view.y) return false;
+  view.x = x;view.y = y;
+  return true;
+}
+let pinchFrom = 1;
+function pinchStart() { pinchFrom = view.z; }
+function pinchChange(e) { if (!isTouch) zoomAt(pinchFrom * e.scale, e.clientX, e.clientY); }
 function wheel(e) {
   if (!link) return;
+  if (e.ctrlKey || e.metaKey) { zoomAt(view.z * Math.exp(-e.deltaY * (e.deltaMode === 1 ? 16 : 1) * 0.01), e.clientX, e.clientY);return; }
   const p = toPicture(canvas.value, e.clientX, e.clientY);if (!p.inside) return;
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
   link.send({ t: 'scroll', dx: e.deltaX * unit, dy: e.deltaY * unit, x: p.x, y: p.y });
@@ -935,6 +967,7 @@ function keyUp(e) {
 .remote-area {position:relative;flex:1;min-height:0;touch-action:none;overflow:hidden;}
 .remote-canvas {width:100%;height:100%;object-fit:contain;display:block;cursor:default;transform-origin:0 0;}
 .remote-btn.zoom {font-size:12px;font-weight:600;}
+.remote-btn:disabled {opacity:.35;cursor:default;}
 .remote-canvas.hidden {visibility:hidden;}
 .remote-notice {position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px;background:rgba(0,0,0,.6);font-size:14px;line-height:1.5;}
 .remote-notice p {max-width:520px;margin:0;}

@@ -48,6 +48,8 @@ back, with touch modes made for a small screen.
   (editing keys, the Mac's shortcuts, a number pad, F1–F12), and a field to write a line,
   input method and all, and send it to the Mac's cursor. Held sideways, the tabs move to a
   rail on the right.
+- **At a computer too.** Pinch on a trackpad, Ctrl or ⌘ with the wheel, or the bar's + and − zoom
+  the picture, which then follows your pointer; the wheel alone keeps scrolling the Mac.
 - **Several Macs, one web app.** Other Macs join this one with a one-time code and show up
   beside it on the Remote page. They need no address or account of their own
   ([docs/multi-mac.md](docs/multi-mac.md)).
