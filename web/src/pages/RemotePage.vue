@@ -134,19 +134,19 @@
           <button type="button" class="remote-clip-btn from-mac" @click="copyFromMac"><f7-icon f7="arrow_down_doc" :size="17"/>{{ ct('拷貝 Mac 的剪貼簿') }}</button>
           <button type="button" class="remote-clip-btn to-mac" @click="pasteToMac"><f7-icon f7="arrow_up_doc" :size="17"/>{{ ct('把剪貼簿放到 Mac') }}</button>
         </div>
-        <!-- The keys a phone's keyboard lacks; ⇧ ⌃ ⌥ ⌘ hold for the next key. -->
-        <div v-if="isTouch && (keyboardOpen || panel || compose || clipOpen)" class="remote-keys" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
+        <!-- The keys a phone's keyboard lacks; ⇧ ⌃ ⌥ ⌘ hold for the next key. A computer opens them with the keyboard button, for what its browser or keyboard won't send (the owner's request, 2026-10-31). -->
+        <div v-if="keyboardOpen || panel || compose || (isTouch && clipOpen)" class="remote-keys" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
           <template v-if="isTouch">
             <button type="button" class="remote-key tool compose-btn" :class="{on: compose}" :title="ct('輸入文字')" @pointerdown.prevent @mousedown.prevent @click="toggleCompose"><f7-icon f7="pencil" :size="17"/></button>
             <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :title="panel ? ct('鍵盤') : ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon :f7="panel ? 'keyboard' : 'square_grid_2x2'" :size="17"/></button>
+            <button type="button" class="remote-key tool clip-btn" :class="{on: clipOpen}" :title="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="17"/></button>
           </template>
-          <button type="button" class="remote-key tool clip-btn" :class="{on: clipOpen}" :title="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="17"/></button>
           <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
           <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
           <!-- The row in the order the owner picked (2026-10-31). The Mac's desktops and Mission Control are a press away with the keyboard up. -->
-          <button type="button" class="remote-key tool mission" :title="ct('指揮中心')" @pointerdown.prevent @click="space('ArrowUp')"><f7-icon f7="rectangle_3_offgrid" :size="17"/></button>
-          <button type="button" class="remote-key tool space-left" :title="ct('上一個桌面')" @pointerdown.prevent @click="space('ArrowLeft')"><f7-icon f7="arrow_left_square" :size="17"/></button>
-          <button type="button" class="remote-key tool space-right" :title="ct('下一個桌面')" @pointerdown.prevent @click="space('ArrowRight')"><f7-icon f7="arrow_right_square" :size="17"/></button>
+          <button type="button" class="remote-key tool mission" :title="ct('指揮中心')" @pointerdown.prevent @click="space('ArrowUp')"><f7-icon v-if="isTouch" f7="rectangle_3_offgrid" :size="17"/><template v-else>{{ ct('指揮中心') }}</template></button>
+          <button type="button" class="remote-key tool space-left" :title="ct('上一個桌面')" @pointerdown.prevent @click="space('ArrowLeft')"><f7-icon v-if="isTouch" f7="arrow_left_square" :size="17"/><template v-else>{{ ct('上桌面') }}</template></button>
+          <button type="button" class="remote-key tool space-right" :title="ct('下一個桌面')" @pointerdown.prevent @click="space('ArrowRight')"><f7-icon v-if="isTouch" f7="arrow_right_square" :size="17"/><template v-else>{{ ct('下桌面') }}</template></button>
           <button v-for="k in LAST_KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
         </div>
         <!-- In the phone keyboard's place: pages of keys, swiped sideways (the owner's request,
@@ -833,7 +833,7 @@ function askKeyboard() {
 }
 function toggleKeyboard() {
   keyHint.value = false;autoOpened = false;
-  if (keyboardOpen.value) { keyboardOpen.value = false;typing.value?.blur();return; }
+  if (keyboardOpen.value) { keyboardOpen.value = false;if (isTouch) typing.value?.blur();return; }
   keyboardOpen.value = true;
   askKeyboard();
 }
@@ -844,7 +844,7 @@ function space(code) {
   link?.send({ t: 'key', code, down: true, mods: ['ctrl'] });link?.send({ t: 'key', code, down: false, mods: ['ctrl'] });
   setTimeout(list, 900);
 }
-function toggleMod(id) { if (held.has(id)) held.delete(id);else held.add(id); }
+function toggleMod(id) { if (held.has(id)) held.delete(id);else held.add(id);if (!isTouch) typing.value?.focus({ preventScroll: true }); }
 function releaseMods() { held.clear(); }
 function tap(code) {
   link?.send({ t: 'key', code, down: true, mods: mods() });link?.send({ t: 'key', code, down: false, mods: mods() });releaseMods();
@@ -1023,7 +1023,8 @@ function typingBlur() {
   if (askingKeyboard) return;
   // A press on the pointer's ring keeps the keyboard where it is.
   if ((ringPress || (rowPress && !compose.value && !panel.value)) && keyboardOpen.value) { setTimeout(() => typing.value?.focus({ preventScroll: true }), 0);return; }
-  keyboardOpen.value = false;
+  // On a computer the row stays until its button closes it: the keyboard there isn't going anywhere.
+  if (isTouch) keyboardOpen.value = false;
   for (const code of sentDown) link?.send({ t: 'key', code, down: false, mods: [] });
   sentDown.clear();
 }
@@ -1140,6 +1141,10 @@ function keyUp(e) {
 .remote-head-stats {align-self:center;margin-right:6px;}
 .remote-area-stats {position:absolute;top:4px;left:6px;z-index:1;margin:0;padding:2px 6px;border-radius:6px;background:rgba(0,0,0,.55);color:#ddd;pointer-events:none;}
 .remote-stage:not(.touch) .remote-area {order:2;}
+.remote-stage:not(.touch) .remote-keys {order:3;}
+.remote-stage:not(.touch) .remote-keys > :first-child {margin-left:auto;}
+.remote-stage:not(.touch) .remote-keys > :last-child {margin-right:auto;}
+.remote-stage:not(.touch) .remote-key:not(.mod) + .remote-key.mod, .remote-stage:not(.touch) .remote-key.mission, .remote-stage:not(.touch) .remote-key.space-right + .remote-key, .remote-stage:not(.touch) .remote-key.space-right + .remote-key + .remote-key + .remote-key {margin-left:12px;}
 .remote-stage:not(.touch) .remote-clip {order:1;border-top:0;border-bottom:1px solid rgba(255,255,255,.08);}
 @media (min-width: 800px){.remote-note{max-width:min(828px,calc(100% - 32px));margin-left:auto;margin-right:auto;padding:0 16px;box-sizing:border-box;}}
 </style>

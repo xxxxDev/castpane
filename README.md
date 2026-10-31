@@ -50,7 +50,7 @@ back, with touch modes made for a small screen.
   rail on the right.
 - **At a computer too.** Pinch on a trackpad, Ctrl or ⌘ with the wheel, or the sizes in the top
   bar zoom the picture, which then follows your pointer; the wheel alone keeps scrolling the Mac. On a Windows or Linux keyboard, Ctrl is the Mac's ⌘,
-  the Windows key is ⌃, and F5 reloads.
+  the Windows key is ⌃, and F5 reloads. The keyboard button opens a row of keys under the picture (esc, ⌘ ⌥ ⌃ ⇧, Mission Control, the Mac's desktops, arrows) for shortcuts your browser keeps for itself.
 - **Several Macs, one web app.** Other Macs join this one with a one-time code and show up
   beside it on the Remote page. They need no address or account of their own
   ([docs/multi-mac.md](docs/multi-mac.md)).
