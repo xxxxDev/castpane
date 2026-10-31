@@ -103,6 +103,7 @@
         </div>
 
         <div ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
+          <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
@@ -146,7 +147,8 @@
           <button type="button" class="remote-key tool space-left" :title="ct('上一個桌面')" @pointerdown.prevent @click="space('ArrowLeft')"><f7-icon f7="arrow_left_square" :size="17"/></button>
           <button type="button" class="remote-key tool space-right" :title="ct('下一個桌面')" @pointerdown.prevent @click="space('ArrowRight')"><f7-icon f7="arrow_right_square" :size="17"/></button>
           <button type="button" class="remote-key tool mission" :title="ct('指揮中心')" @pointerdown.prevent @click="space('ArrowUp')"><f7-icon f7="square_grid_2x2" :size="17"/></button>
-          <span class="remote-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
+          <!-- The arrows last, at the row's end (the owner's request, 2026-10-31). -->
+          <button v-for="k in ARROWS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
         </div>
         <!-- In the phone keyboard's place: pages of keys, swiped sideways (the owner's request,
              2026-10-29). -->
@@ -182,7 +184,8 @@ const clipOpen = ref(false), panel = ref(false), pageNo = ref(0), pagesEl = ref(
 const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 const mode = ref(isTouch ? (localGet('castpane-remote-mode') || 'direct') : 'direct');
 const QUALITY_LABEL = { low: '低', standard: '標準', high: '高', max: '最高' };
-const KEYS = [{ code: 'Escape', label: 'esc' }, { code: 'Tab', label: 'tab' }, { code: 'ArrowLeft', label: '←' }, { code: 'ArrowUp', label: '↑' }, { code: 'ArrowDown', label: '↓' }, { code: 'ArrowRight', label: '→' }, { code: 'Backspace', label: '⌫' }, { code: 'Enter', label: '⏎' }];
+const KEYS = [{ code: 'Escape', label: 'esc' }, { code: 'Tab', label: 'tab' }, { code: 'Backspace', label: '⌫' }, { code: 'Enter', label: '⏎' }];
+const ARROWS = [{ code: 'ArrowLeft', label: '←' }, { code: 'ArrowUp', label: '↑' }, { code: 'ArrowDown', label: '↓' }, { code: 'ArrowRight', label: '→' }];
 const MODS = [{ id: 'shift', label: '⇧' }, { id: 'ctrl', label: '⌃' }, { id: 'alt', label: '⌥' }, { id: 'meta', label: '⌘' }];
 // The key panel's pages. A Mac has no Insert, so Tab sits there; the shortcuts are the
 // Mac's own (Mission Control ⌃↑, Show Desktop F11); the number pad types its characters.
@@ -1082,6 +1085,7 @@ function keyUp(e) {
 .remote-zoom .remote-menu {right:auto;left:50%;transform:translateX(-50%);min-width:140px;z-index:5;}
 .remote-btn:disabled {opacity:.35;cursor:default;}
 .remote-head-stats {align-self:center;margin-right:6px;}
+.remote-area-stats {position:absolute;top:4px;left:max(6px,env(safe-area-inset-left));z-index:1;margin:0;padding:2px 6px;border-radius:6px;background:rgba(0,0,0,.55);color:#ddd;pointer-events:none;}
 .remote-stage:not(.touch) .remote-area {order:2;}
 .remote-stage:not(.touch) .remote-clip {order:1;border-top:0;border-bottom:1px solid rgba(255,255,255,.08);}
 @media (min-width: 800px){.remote-note{max-width:min(828px,calc(100% - 32px));margin-left:auto;margin-right:auto;padding:0 16px;box-sizing:border-box;}}
