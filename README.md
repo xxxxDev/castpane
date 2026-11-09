@@ -5,9 +5,20 @@
   </picture>
 </p>
 
-<p align="center">English · <a href="README.zh-TW.md">繁體中文</a></p>
+<h1 align="center">Castpane</h1>
 
-# Castpane
+<p align="center">
+  <b>See and control your own Mac from a phone or another computer.</b><br>
+  One app on the Mac, a browser on the other side, nothing else to install.
+</p>
+
+<p align="center">
+  English · <a href="README.zh-TW.md">繁體中文</a>
+</p>
+
+---
+
+## What it is
 
 Castpane lets you see and control your own Mac from a phone or another computer. You open it
 in a browser, or install it on the phone's Home Screen as an app. The Mac runs one app,

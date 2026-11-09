@@ -5,9 +5,20 @@
   </picture>
 </p>
 
-<p align="center"><a href="README.md">English</a> · 繁體中文</p>
+<h1 align="center">Castpane</h1>
 
-# Castpane
+<p align="center">
+  <b>用手機或另一台電腦，看見並操作自己的 Mac。</b><br>
+  Mac 上裝一個 App，另一邊用瀏覽器就好，不用再裝別的。
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> · 繁體中文
+</p>
+
+---
+
+## 這是什麼
 
 Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用瀏覽器打開就能用，也可以加到手機主畫面當 App。Mac 上只要裝一個 App：**Castpane.app**；手機或另一台電腦什麼都不用裝。
 
