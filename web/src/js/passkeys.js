@@ -1,6 +1,6 @@
-// Passkeys, the page's side (server/services/passkeys.js; the owner's request,
-// 2026-10-08): the browser asks the device (Touch ID, Face ID, Windows Hello, a
-// phone or a password manager) to make a key for this site, or to sign with one.
+// Passkeys, the page's side (server/services/passkeys.js): the browser asks the device
+// (Touch ID, Face ID, Windows Hello, a phone or a password manager) to make a key for
+// this site, or to sign with one.
 import { api } from './api.js';
 import { PRODUCT } from './productConfig.js';
 

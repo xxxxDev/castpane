@@ -1,7 +1,7 @@
 import AppKit
 
-/// The Mac's clipboard as text, read and written for the viewer (the owner's request,
-/// 2026-10-29). What a password manager marks as concealed or transient
+/// The Mac's clipboard as text, read and written for the viewer. What a password
+/// manager marks as concealed or transient
 /// (nspasteboard.org) is never handed out.
 public enum Clipboard {
     /// The most text either way, in UTF-16 units.

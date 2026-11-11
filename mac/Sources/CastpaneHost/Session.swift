@@ -31,7 +31,7 @@ final class VideoGate: @unchecked Sendable {
     /// Frames that may be unshown at once: always 3, more when the round trip is long. Three
     /// was the limit for every link; over a long one (a Mac joined through another, by way of
     /// Cloudflare, about 0.3 s there and back) that held the picture to 8 to 10 frames a
-    /// second however small they were (the owner's report, 2026-10-30). The shortest recent
+    /// second however small they were. The shortest recent
     /// round trip is what the link takes without a queue: enough frames to cover it, and two
     /// more, keep it busy without letting a queue build up behind a slow one.
     static let fewest = 3, most = 16
@@ -203,7 +203,7 @@ actor Session {
     }
 
     /// Tells the page when the Mac's clipboard changes, so a paste there brings what was just
-    /// copied on the Mac (the owner's report, 2026-10-31). Only the count is read: it needs no
+    /// copied on the Mac. Only the count is read: it needs no
     /// permission and says nothing of what is on the clipboard.
     private func watchClipboard() {
         clipboardWatcher = Task {
@@ -227,8 +227,8 @@ actor Session {
             Wake.display()
         }
         // The Mac's own resolution changed while a display was shown: the clicks went where
-        // the old size put them, and the picture kept its old shape, until a reconnect (the
-        // owner's report, 2026-10-30). The same display is started again at its new size.
+        // the old size put them, and the picture kept its old shape, until a reconnect.
+        // The same display is started again at its new size.
         if let s = lastStart, s.kind == "display", target != nil, Self.displaysSignature() != displaysAtStart {
             queued { await self.start(kind: s.kind, id: s.id, maxWidth: s.maxWidth, fps: s.fps, bitrate: s.bitrate, hevc: s.hevc) }
         }
@@ -393,11 +393,11 @@ actor Session {
 
     /// The most a picture may hold: what 3840 × 2160 does. Displays stacked one above the
     /// other make a tall "all displays" that the width limit alone leaves at twice that,
-    /// and a phone's page crashed on it (the owner's report, 2026-10-31).
+    /// and a phone's page crashed on it.
     static let maxPicturePixels: CGFloat = 3840 * 2160
     /// "All displays" holds what one large display sends, not several together: at three
-    /// times the pixels it moved in jerks where a single display was smooth (the owner's
-    /// report, 2026-10-31). Zooming shows each display a little softer; a single one is sharper.
+    /// times the pixels it moved in jerks where a single display was smooth.
+    /// Zooming shows each display a little softer; a single one is sharper.
     static let allDisplaysPixels: CGFloat = 2560 * 1440
 
     /// The picture's size in even pixels: within maxWidth and the pixels allowed, its shape kept.

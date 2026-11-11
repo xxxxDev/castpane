@@ -1,7 +1,7 @@
-// Several Macs in one web app, the hub's side (docs/multi-mac.md; the owner's request,
-// 2026-10-29). Another Mac (a member) joins once with a one-time code and keeps one
-// link out to this server on /member; a remote session on it runs over that link, with
-// every check the hub makes for its own screen (server/remote.js).
+// Several Macs in one web app, the hub's side (docs/multi-mac.md). Another Mac (a member)
+// joins once with a one-time code and keeps one link out to this server on /member; a
+// remote session on it runs over that link, with every check the hub makes for its own
+// screen (server/remote.js).
 //
 // Member → hub, text: {t:'join', code, name} or {t:'hello', id, secret, name} first, then
 // {t:'status', running}, {t:'opened', n}, {t:'failed', n}, {t:'closed', n}.

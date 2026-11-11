@@ -7,7 +7,7 @@ import os
 // screen, which turns the display off after a minute) got nothing: with the display
 // asleep the screen capture lists no displays and sends no frames. Waking it the way a
 // touch of the keyboard would brings the picture, the lock screen included, back; the
-// password can then be typed from the page (the owner's report, 2026-10-30).
+// password can then be typed from the page.
 enum Wake {
     private static let assertion = OSAllocatedUnfairLock<IOPMAssertionID>(initialState: 0)
 

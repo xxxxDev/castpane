@@ -210,7 +210,7 @@ struct LocalAPI {
     /// This Mac's link to another Mac's Castpane (docs/multi-mac.md).
     func member() async throws -> MemberStatus { MemberStatus.decode(try await request("GET", "member")) }
     /// Waits as long as the server does for the other Mac (10 s), and more: the join is
-    /// not reported failed while it may still succeed (the owner's report, 2026-10-29).
+    /// not reported failed while it may still succeed.
     func joinMember(hub: String, code: String) async throws { _ = try await request("POST", "member/join", body: ["hub": hub, "code": code], timeout: 30) }
     func leaveMember() async throws { _ = try await request("POST", "member/leave", body: [:]) }
 }

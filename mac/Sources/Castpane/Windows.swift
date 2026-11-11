@@ -5,8 +5,7 @@ import CastpaneHost
 
 /// The first-run assistant. First what this Mac is for: the one people connect to
 /// (account, permissions, connection, done), or one that shows in another Mac's Castpane
-/// (permissions, join, done), which needs no account or address (the owner's request,
-/// 2026-10-29).
+/// (permissions, join, done), which needs no account or address.
 struct Wizard: View {
     static let doneKey = "wizardDone"
     @EnvironmentObject var model: AppModel
@@ -327,7 +326,7 @@ struct SettingsView: View {
 
 extension SettingsView {
     /// A Mac shown in another Mac's Castpane is reached through that one: its own connection
-    /// choices only stood in the way (the owner's report, 2026-10-30). They come back when it
+    /// choices only stood in the way. They come back when it
     /// leaves, or while a connection of its own is still on, so that can be turned off.
     @ViewBuilder var connection: some View {
         VStack(alignment: .leading, spacing: 0) {

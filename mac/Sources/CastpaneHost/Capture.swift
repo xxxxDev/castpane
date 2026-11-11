@@ -296,7 +296,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Send
     }
 
     /// A screen that stops changing sends no more frames, and the last one, encoded while
-    /// it moved, is the least sharp: text stayed blurred (the owner's report, 2026-10-30).
+    /// it moved, is the least sharp: text stayed blurred.
     /// Once it has stood still for a moment the same picture is encoded again a few times;
     /// each copy spends its bits on what the one before left out. A copy goes only when
     /// every frame before it has been shown, so when the picture moves again (a mouse that

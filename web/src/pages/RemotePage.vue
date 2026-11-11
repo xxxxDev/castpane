@@ -1,7 +1,6 @@
 <template>
-  <!-- Remote (server/remote.js; first made at the owner's request, 2026-10-28, after
-       Sill): this Mac's screen or one of its windows, live, with clicks, scrolls and keys
-       sent back. -->
+  <!-- Remote (server/remote.js; first made after Sill): this Mac's
+       screen or one of its windows, live, with clicks, scrolls and keys sent back. -->
   <f7-page name="remote" class="page-large-static remote-page" @page:afterin="load">
     <f7-navbar :title="ct('遠端')" large></f7-navbar>
 
@@ -11,8 +10,7 @@
 
     <f7-block-title>{{ ct('連線到 Mac') }}</f7-block-title>
     <div class="remote-tiles">
-      <!-- This Mac, then the other Macs that joined it (docs/multi-mac.md; the owner's
-           request, 2026-10-29). -->
+      <!-- This Mac, then the other Macs that joined it (docs/multi-mac.md). -->
       <div v-for="m in machines" :key="m.id" class="remote-tile-wrap">
         <button type="button" class="remote-tile" :class="{disabled: !m.running || !supported, member: !m.local}" @click="connect(m)">
           <div class="remote-tile-shot"><img v-if="shots[m.id]" :src="shots[m.id]" alt=""/><f7-icon v-else f7="desktopcomputer" :size="44"/></div>
@@ -32,8 +30,8 @@
     <Teleport to="body">
       <div v-if="streaming" class="remote-stage" :class="{touch: isTouch}" :style="stageBox" @contextmenu.prevent>
         <!-- The bar: every window, the Desktop first, as Sill's bar of thumbnails. -->
-        <!-- The Mac's desktops first, then the windows on the one picked (the owner's
-             request, 2026-10-28): whole screens, each desktop, full-screen apps, the Dock. -->
+        <!-- The Mac's desktops first, then the windows on the one picked: whole
+             screens, each desktop, full-screen apps, the Dock. -->
         <div class="remote-head" :class="{collapsed: headFolded}">
         <div v-if="groups.length > 1 && !headFolded" class="remote-desks" role="tablist">
           <button v-for="g in groups" :key="g.key" type="button" class="remote-desk" :class="{active: g.key === groupKey, current: g.current}" @click="groupKey = g.key">{{ g.label }}<span class="remote-desk-count">{{ g.items.length }}</span></button>
@@ -47,10 +45,10 @@
             </button>
           </div>
           <div class="remote-actions">
-            <!-- The screens, desktops and windows fold away for a bigger picture (the owner's request, 2026-10-28). -->
+            <!-- The screens, desktops and windows fold away for a bigger picture. -->
             <button type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headFolded ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
             <button v-if="isTouch && view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="resetView">1×</button>
-            <!-- A computer: the picture's size, and what the bottom bar used to hold (the owner's request, 2026-10-31). -->
+            <!-- A computer: the picture's size, and what the bottom bar used to hold. -->
             <template v-if="!isTouch">
               <span class="remote-stats remote-head-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
               <div class="remote-zoom">
@@ -65,7 +63,7 @@
             </template>
             <button v-if="!isTouch" type="button" class="remote-btn" :class="{on: keyboardOpen, hint: keyHint}" :title="ct('鍵盤')" @pointerdown.prevent @mousedown.prevent @click="toggleKeyboard"><f7-icon f7="keyboard" :size="18"/></button>
             <button v-if="!isTouch && canFullscreen" type="button" class="remote-btn fullscreen" :class="{on: fullscreen}" :title="ct('全螢幕顯示')" @pointerdown.prevent @mousedown.prevent @click="toggleFullscreen"><f7-icon :f7="fullscreen ? 'arrow_down_right_arrow_up_left' : 'arrow_up_left_arrow_down_right'" :size="17"/></button>
-            <!-- On a phone the rest sit in one menu, so the bar keeps room for windows (the owner's request, 2026-10-28). -->
+            <!-- On a phone the rest sit in one menu, so the bar keeps room for windows. -->
             <template v-if="isTouch">
               <button type="button" class="remote-btn more" :class="{on: menuOpen}" :title="ct('更多')" @pointerdown.prevent @mousedown.prevent @click="menuOpen = !menuOpen;settingsOpen = false"><f7-icon f7="ellipsis" :size="18"/></button>
             </template>
@@ -77,7 +75,7 @@
           </div>
         </div>
         <div v-if="menuOpen" ref="menuEl" class="remote-menu" :style="menuMax ? {maxHeight: menuMax + 'px'} : null" @pointerdown.stop>
-          <!-- On a phone the keyboard lives here (the owner's request, 2026-10-28). -->
+          <!-- On a phone the keyboard lives here. -->
           <button type="button" class="remote-menu-item keyboard" @pointerdown.prevent @mousedown.prevent @click="menuOpen = false;toggleKeyboard()"><f7-icon f7="keyboard" :size="18"/>{{ keyboardOpen ? ct('收起鍵盤') : ct('打開鍵盤') }}</button>
           <button type="button" class="remote-menu-item clipboard" @click="menuOpen = false;clipOpen = true"><f7-icon f7="doc_on_clipboard" :size="18"/>{{ ct('剪貼簿') }}</button>
           <div class="remote-menu-label">{{ ct('畫面大小') }}</div>
@@ -116,7 +114,7 @@
             <template v-else><f7-preloader :size="28"/><p>{{ notice || ct('連線中…') }}</p></template>
           </div>
           <!-- Pointer mode: the Mac's pointer drawn here (its black arrow with a white edge), with a ring below it to drag it
-               by, so the finger never covers what it points at (the owner's idea, 2026-10-28). -->
+               by, so the finger never covers what it points at. -->
           <template v-if="mode === 'pointer' && isTouch && hasPicture && handle">
             <svg class="remote-arrow" :style="{left: handle.cx + 'px', top: handle.cy + 'px'}" width="22" height="30" viewBox="0 0 22 30" aria-hidden="true"><path d="M3 2.5 L3 23 L8.1 18.3 L11.4 26.2 L14.9 24.7 L11.7 17 L18.5 17 Z" fill="#000" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>
             <div class="remote-ring" :class="{active: ring.active, holding: ring.holding}" :style="{left: handle.rx + 'px', top: handle.ry + 'px'}" @touchstart.stop.prevent @pointerdown.stop.prevent="ringDown" @pointermove.stop.prevent="ringMove" @pointerup.stop.prevent="ringUp" @pointercancel.stop.prevent="ringUp"></div>
@@ -125,17 +123,17 @@
         </div>
 
         <!-- The pencil's field: text written on the phone, input method and all, and sent
-             to where the Mac's cursor is in one go (the owner's request, 2026-10-29). -->
+             to where the Mac's cursor is in one go. -->
         <div v-if="compose" class="remote-compose" @pointerdown.stop>
           <input ref="composeField" v-model="composeText" class="remote-compose-field" type="text" enterkeyhint="send" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" :placeholder="ct('打好字，送到 Mac 的游標位置')" @keydown="composeKey">
           <button type="button" class="remote-compose-send" :disabled="!composeText" @pointerdown.prevent @mousedown.prevent @click="sendCompose">{{ ct('送出') }}</button>
         </div>
-        <!-- The clipboard both ways (the owner's request, 2026-10-29). -->
+        <!-- The clipboard both ways. -->
         <div v-if="clipOpen" class="remote-clip" @pointerdown.stop>
           <button type="button" class="remote-clip-btn from-mac" @click="copyFromMac"><f7-icon f7="arrow_down_doc" :size="17"/>{{ ct('拷貝 Mac 的剪貼簿') }}</button>
           <button type="button" class="remote-clip-btn to-mac" @click="pasteToMac"><f7-icon f7="arrow_up_doc" :size="17"/>{{ ct('把剪貼簿放到 Mac') }}</button>
         </div>
-        <!-- The keys a phone's keyboard lacks; ⇧ ⌃ ⌥ ⌘ hold for the next key. A computer opens them with the keyboard button, for what its browser or keyboard won't send (the owner's request, 2026-10-31). -->
+        <!-- The keys a phone's keyboard lacks; ⇧ ⌃ ⌥ ⌘ hold for the next key. A computer opens them with the keyboard button, for what its browser or keyboard won't send. -->
         <div v-if="keyboardOpen || panel || compose || (isTouch && clipOpen)" class="remote-keys" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
           <template v-if="isTouch">
             <button type="button" class="remote-key tool compose-btn" :class="{on: compose}" :title="ct('輸入文字')" @pointerdown.prevent @mousedown.prevent @click="toggleCompose"><f7-icon f7="pencil" :size="17"/></button>
@@ -144,14 +142,13 @@
           </template>
           <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
           <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
-          <!-- The row in the order the owner picked (2026-10-31). The Mac's desktops and Mission Control are a press away with the keyboard up. -->
+          <!-- The Mac's desktops and Mission Control are a press away with the keyboard up. -->
           <button type="button" class="remote-key tool mission" :title="ct('指揮中心')" @pointerdown.prevent @click="space('ArrowUp')"><f7-icon v-if="isTouch" f7="rectangle_3_offgrid" :size="17"/><template v-else>{{ ct('指揮中心') }}</template></button>
           <button type="button" class="remote-key tool space-left" :title="ct('上一個桌面')" @pointerdown.prevent @click="space('ArrowLeft')"><f7-icon v-if="isTouch" f7="arrow_left_square" :size="17"/><template v-else>{{ ct('上桌面') }}</template></button>
           <button type="button" class="remote-key tool space-right" :title="ct('下一個桌面')" @pointerdown.prevent @click="space('ArrowRight')"><f7-icon v-if="isTouch" f7="arrow_right_square" :size="17"/><template v-else>{{ ct('下桌面') }}</template></button>
           <button v-for="k in LAST_KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
         </div>
-        <!-- In the phone keyboard's place: pages of keys, swiped sideways (the owner's request,
-             2026-10-29). -->
+        <!-- In the phone keyboard's place: pages of keys, swiped sideways. -->
         <div v-if="panel" class="remote-panel" @pointerdown.stop>
           <div ref="pagesEl" class="remote-pages" @scroll.passive="pageScroll">
             <div v-for="pg in PAGES" :key="pg.id" class="remote-page-grid" :class="['cols-' + pg.cols, 'page-' + pg.id]">
@@ -204,8 +201,8 @@ const PAGES = [
     ...'789-456*123/'.split('').map((c) => ({ text: c, label: c })), { text: '0', label: '0' }, { text: '.', label: '.' }, { code: 'Backspace', label: '⌫' }, { text: '+', label: '+' }] },
   { id: 'fn', name: '功能鍵', cols: 4, keys: Array.from({ length: 12 }, (_, i) => ({ code: 'F' + (i + 1), label: 'F' + (i + 1) })) },
 ];
-// Native resolution by default: text on a Retina screen kept at 1920 across was soft (the
-// owner's report, 2026-10-30). Choices kept from before then (v missing) had 1920 as the
+// Native resolution by default: text on a Retina screen kept at 1920 across was soft.
+// Choices kept from before this change (v missing) had 1920 as the
 // default and move to native; one picked since stays.
 const prefs = reactive({ quality: 'standard', resolution: 'native', fps: 60, ...(JSON.parse(localGet('castpane-remote-prefs') || '{}')) });
 if (prefs.v !== 2) { if (prefs.resolution === '1920') prefs.resolution = 'native';prefs.v = 2;localSet('castpane-remote-prefs', JSON.stringify(prefs)); }
@@ -236,13 +233,13 @@ async function load() {
 onMounted(load);
 onBeforeUnmount(() => { disconnect(); });
 // The Macs as they are now: one that joins, comes online or stops sharing shows up without
-// a reload (the owner's report, 2026-10-30: a Mac that had just joined stayed Offline).
+// a reload (a Mac that had just joined stayed Offline).
 const listTimer = setInterval(() => { if (!streaming.value && document.visibilityState === 'visible') load(); }, 5000);
 onBeforeUnmount(() => clearInterval(listTimer));
 // Out of sight (another tab, another app, the phone locked) the session ends: the Mac stops
 // capturing for nobody. Back within ten minutes, it opens again on the same Mac and the same
-// screen or window by itself; it used to leave you at the list of Macs (the owner's report,
-// 2026-10-30). Longer, it may be someone else's turn by then, so it waits for a tap.
+// screen or window by itself; it used to leave you at the list of Macs.
+// Longer, it may be someone else's turn by then, so it waits for a tap.
 const RESUME_WITHIN = 10 * 60 * 1000;
 let lastMachine = null, resume = null, resumeItem = null;
 const machineKey = (m) => (m.local ? 'local' : m.id);
@@ -265,8 +262,8 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', onHidden)
 async function getPass(fresh = false) {
   const kept = sessionGet('castpane-remote-pass');
   if (!fresh && kept && Date.parse(kept.expiresAt) > Date.now() + 60000) return kept.pass;
-  // A passkey first (Face ID, Touch ID): no password or code then (the owner's request,
-  // 2026-10-28). Cancelled, refused or none: the password, as before.
+  // A passkey first (Face ID, Touch ID): no password or code then.
+  // Cancelled, refused or none: the password, as before.
   if (passkeysWork()) {
     try {
       const passkey = await passkeyAgain('/remote/pass/passkey');
@@ -331,7 +328,7 @@ async function connect(m, retried = false) {
 
 // Whether the last tap was on a text field: the Mac said so for the point under the
 // finger, or the focus went into a field with this tap (a web page's field often answers
-// the point with the text inside it, not the field; the owner's report, 2026-10-28), or
+// the point with the text inside it, not the field), or
 // the text cursor is now right where the finger was.
 let focusWas = null;
 const tappedFieldNow = (msg) => (probeAnswer?.n === probeN && !!probeAnswer.editable)
@@ -385,7 +382,7 @@ function onMessage(msg) {
     // (from before Remote, or a tap beside it) opens nothing and zooms nowhere.
     if (msg.editable && !keyboardOpen.value) {
       // Otherwise nothing lights up: a field keeping the focus while you tap elsewhere is
-      // normal, and a light that stays on said nothing (the owner's report, 2026-10-28).
+      // normal, and a light that stays on said nothing.
       if (tappedField && isTouch && document.activeElement === typing.value) { keyboardOpen.value = true;autoOpened = true; }
       else if (!isTouch) keyHint.value = true;
     } else if (!msg.editable && autoOpened) { keyboardOpen.value = false;autoOpened = false; }
@@ -464,7 +461,7 @@ function disconnect() {
 }
 const headCollapsed = ref(localGet('castpane-remote-head') === 'folded');
 // Held sideways with the keyboard up there is little height left: the bar of windows folds
-// away for that time, or the picture has almost none (the owner's report, 2026-10-31).
+// away for that time, or the picture has almost none.
 const keyboardSideways = ref(false), headFolded = computed(() => headCollapsed.value || keyboardSideways.value);
 function toggleHead() { headCollapsed.value = !headCollapsed.value;localSet('castpane-remote-head', headCollapsed.value ? 'folded' : 'open');menuOpen.value = false;settingsOpen.value = false; }
 const MODES = [{ id: 'direct', label: '直接點', icon: 'hand_draw' }, { id: 'trackpad', label: '觸控板', icon: 'rectangle_on_rectangle' }, { id: 'pointer', label: '游標', icon: 'cursor_rays' }];
@@ -512,17 +509,17 @@ function flushMove() { if (raf) { cancelAnimationFrame(raf);raf = 0; } if (pendi
 function sendMove(p) { pending = p;if (!raf) raf = requestAnimationFrame(() => { raf = 0;if (pending) link?.send({ t: 'move', x: pending.x, y: pending.y });pending = null; }); }
 // With the phone's keyboard up, the stage fits what is left above it, and the text
 // field just tapped is zoomed in and brought to the middle; the keyboard down, the
-// picture goes back as it was (the owner's request, 2026-10-28).
+// picture goes back as it was.
 const stageBox = ref(null);
 let lastTap = null, beforeKeyboard = null, zoomTo = null, settle = 0;
 // Zoomed once, to the field whose tap opened the keyboard, after the keyboard has
-// finished coming up; later taps while it is up do not move the picture (the owner's
-// report, 2026-10-28: a tap elsewhere zoomed to that place instead).
+// finished coming up; later taps while it is up do not move the picture (a
+// tap elsewhere zoomed to that place instead).
 // On an iPhone the bar above the keyboard (the input method's candidates, ⌃ ⌄ ✓) can float
 // over the bottom of what visualViewport reports, and hid the row of keys; the page cannot turn
 // that bar off, so the row then sits above it. At other times the height already ends above
-// the bar, and the same room left a gap that took the picture's place. Measured on the owner's
-// iPhone (2026-10-31), the share of the screen covered: upright 36% with the bar over it, 45%
+// the bar, and the same room left a gap that took the picture's place. Measured on an
+// iPhone, the share of the screen covered: upright 36% with the bar over it, 45%
 // without; sideways 53% and 68%. The lines are halfway; other keyboards may differ.
 const keyboardBarOver = typeof navigator !== 'undefined' && /iPhone/.test(navigator.userAgent || '');
 function barOverViewport(height, tall) {
@@ -530,7 +527,7 @@ function barOverViewport(height, tall) {
   return covered < (tall ? 0.41 : 0.61);
 }
 // The menu ends above the bottom of what is showing and scrolls: held sideways it did not
-// fit, and what was below the screen could not be reached (the owner's report, 2026-10-31).
+// fit, and what was below the screen could not be reached.
 const menuEl = ref(null), menuMax = ref(0);
 function fitMenu() {
   nextTick(() => {
@@ -542,7 +539,7 @@ watch([menuOpen, headFolded, stageBox], fitMenu);
 if (typeof window !== 'undefined') { window.addEventListener('resize', fitMenu);onBeforeUnmount(() => window.removeEventListener('resize', fitMenu)); }
 // iOS can take the keyboard away with nothing to say so but the height coming back (a
 // screenshot does), the field keeping its focus. Counted as closed once it has stayed away,
-// not during a turn of the phone (the owner's report, 2026-10-31).
+// not during a turn of the phone.
 let wasCovered = false, goneCheck = 0;
 function keyboardGone() {
   clearTimeout(goneCheck);
@@ -558,7 +555,7 @@ function fitViewport() {
   if (!vv || !isTouch) return;
   // A viewport that reports no height (visibleHeight.js) sends nothing when the keyboard
   // moves either: with it open, what is left is estimated. The keyboard took 44% of the
-  // screen on the owner's iPhone; other keyboards may differ.
+  // screen on one iPhone; other keyboards may differ.
   const broken = viewportBroken(vv), tall = window.innerHeight >= window.innerWidth;
   const height = !broken ? vv.height : keyboardOpen.value ? window.innerHeight - Math.round((tall ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height)) * 0.44) : window.innerHeight;
   const covered = window.innerHeight - height > 80;
@@ -577,7 +574,7 @@ function areaPoint(p) {
   return { r, vw, px: (r.width - pw) / 2 + p.x * pw, py: (r.height - ph) / 2 + p.y * ph };
 }
 // The text cursor kept in sight while typing: moved back to the middle when it
-// leaves the part shown (the owner's request, 2026-10-28: zoom by the cursor).
+// leaves the part shown (zoom by the cursor).
 function keepInSight(p) {
   const at = areaPoint(p);if (!at || view.z <= 1) return;
   const sx = view.x + view.z * at.px, sy = view.y + view.z * at.py, m = 40;
@@ -609,7 +606,7 @@ const ring = reactive({ active: false, holding: false, dragging: false });
 let ringSide = 'below';
 const cursorTick = ref(0);
 // The area's size: the ring is placed again when it changes (the keyboard going away
-// left it above the pointer; the owner's report, 2026-10-28).
+// left it above the pointer).
 const areaSize = ref('');
 let areaWatch = null;
 watch(area, (el) => {
@@ -624,7 +621,7 @@ const handle = computed(() => {
   const at = area.value && canvas.value ? areaPoint(cursor) : null;if (!at) return null;
   const cx = view.x + view.z * at.px, cy = view.y + view.z * at.py, R = 34, gap = 92;
   // Below the pointer when there is room, above it near the bottom; never switched while
-  // the ring is being dragged, so the finger stays on it (the owner's reports, 2026-10-28).
+  // the ring is being dragged, so the finger stays on it.
   if (!ringPress) ringSide = cy + gap + R <= at.r.height ? 'below' : 'above';
   return { cx, cy, rx: Math.min(at.r.width - R, Math.max(R, cx)), ry: ringSide === 'below' ? Math.min(at.r.height - R, cy + gap) : Math.max(R, cy - gap) };
 });
@@ -637,7 +634,7 @@ function ringDown(e) {
   ring.active = true;
   probeAnswer = null;link.send({ t: 'probe', x: cursor.x, y: cursor.y, n: ++probeN });
   // Held still it turns orange: let go then for a right-click, or drag on to drag on
-  // the Mac with the button held (the owner's question, 2026-10-28: left and right).
+  // the Mac with the button held (left and right).
   clearTimeout(longTimer);
   longTimer = setTimeout(() => { if (ringPress && ringPress.moved < 8) ring.holding = true; }, 450);
 }
@@ -739,8 +736,7 @@ function move(e) {
     gesture.pinch = { ...last, d: now.d, cx: now.cx, cy: now.cy };
     clearTimeout(longTimer);
   } else if (mode.value !== 'trackpad' && view.z > 1 && gesture.moved > 10 && gesture.kind !== 'done') {
-    // Zoomed in, one finger moves the picture around; two fingers scroll the Mac (the
-    // owner's request, 2026-10-28).
+    // Zoomed in, one finger moves the picture around; two fingers scroll the Mac.
     gesture.kind = 'pan1';
     view.x += dx;view.y += dy;clampView();
     clearTimeout(longTimer);
@@ -767,7 +763,7 @@ function up(e) {
   if (gesture.kind === 'tap' && quick && gesture.moved < 10 && touches.size === 0) {
     const p = mode.value === 'trackpad' ? cursor : toPicture(canvas.value, t.sx, t.sy);
     // The black bars around the picture are not the Mac: a tap there clicks nothing
-    // (it used to land on the picture's edge; the owner's report, 2026-10-28).
+    // (it used to land on the picture's edge).
     if (mode.value !== 'trackpad' && !p.inside) { gesture = null;return; }
     // Pointer mode: a tap elsewhere only brings the pointer there; the ring clicks.
     if (mode.value === 'pointer') { moveCursor(p);sendMove(cursor);gesture = null;return; }
@@ -788,7 +784,7 @@ function cancel(e) { touches.delete(e.pointerId);clearTimeout(longTimer);if (!to
 // A computer has no two fingers to pinch with: a trackpad's pinch (a wheel with Ctrl to
 // most browsers, gesture events to Safari), Ctrl or ⌘ with a mouse wheel, or the sizes in
 // the bar zoom instead (the phone's sit in its menu). A plain wheel keeps scrolling the Mac, so the picture follows the
-// pointer to reach the rest of it (the owner's request, 2026-10-31).
+// pointer to reach the rest of it.
 function zoomAt(z, clientX, clientY) {
   const r = area.value?.getBoundingClientRect();if (!r) return;
   const nz = Math.min(5, Math.max(1, z)), ox = clientX - r.left, oy = clientY - r.top;
@@ -813,7 +809,7 @@ function followPointer(clientX, clientY) {
 }
 let pinchFrom = 1;
 // Safari's on a computer only: on an iPhone a finger's gesture event, taken here, ended the
-// pointer events the page's own pinch reads (the owner's report, 2026-10-31).
+// pointer events the page's own pinch reads.
 function pinchStart(e) { if (isTouch) return;e.preventDefault();pinchFrom = view.z; }
 function pinchChange(e) { if (isTouch) return;e.preventDefault();zoomAt(pinchFrom * e.scale, e.clientX, e.clientY); }
 function wheel(e) {
@@ -826,8 +822,8 @@ function wheel(e) {
 
 // ---- keys ----
 // Brings the keyboard up, also one iOS took away while the field kept the focus (a screenshot),
-// when a tap on a text field found it gone and only the row left (the owner's report,
-// 2026-10-31): focused already, a focus would do nothing. iOS brings it up only within the
+// when a tap on a text field found it gone and only the row left:
+// focused already, a focus would do nothing. iOS brings it up only within the
 // press and not for inputmode none, so both are settled here and now.
 let askingKeyboard = false;
 function askKeyboard() {
@@ -901,7 +897,7 @@ function press(k) {
 }
 function toggleCompose() {
   panel.value = false;
-  // Closing the field goes back to the keyboard, not away from it (the owner's report, 2026-10-31).
+  // Closing the field goes back to the keyboard, not away from it.
   if (compose.value) { compose.value = false;keyboardOpen.value = true;typing.value?.focus({ preventScroll: true });return; }
   compose.value = true;
   nextTick(() => composeField.value?.focus({ preventScroll: true }));
@@ -969,13 +965,13 @@ async function pasteToMac() {
   put(s);
 }
 // ⌘V on this computer's keyboard pasted the Mac's own clipboard, not what was just copied
-// here (the owner's report, 2026-10-30). The browser's paste now brings this computer's
+// here. The browser's paste now brings this computer's
 // text: it goes on the Mac's clipboard first, then ⌘V. A paste with no text, or none at
 // all, still sends ⌘V, for what the Mac has copied itself.
 let pasteMods = null, pasteTimer = null, clipSetWait = null;
 // But something copied on the Mac is what a paste means while this page keeps the focus: this
-// computer's clipboard still held the older text, which went over it (the owner's report,
-// 2026-10-31). Away from the page, this computer may have copied something newer.
+// computer's clipboard still held the older text, which went over it.
+// Away from the page, this computer may have copied something newer.
 let macCopied = false;
 const leftPage = () => { macCopied = false; };
 if (typeof window !== 'undefined') { window.addEventListener('blur', leftPage);onBeforeUnmount(() => window.removeEventListener('blur', leftPage)); }
@@ -1017,8 +1013,7 @@ function composeKey(e) {
 function compositionEnd(e) { sendText(e.data || '');if (typing.value) typing.value.value = ''; }
 const sentDown = new Set();
 // A keyboard not made for a Mac (Windows, Linux): Ctrl is where its shortcuts are, so it
-// goes as ⌘ and the Windows key as ⌃, Ctrl+R as ⌘R; F5, which reloads there, as ⌘R too
-// (the owner's report, 2026-10-31).
+// goes as ⌘ and the Windows key as ⌃, Ctrl+R as ⌘R; F5, which reloads there, as ⌘R too.
 const otherKeyboard = typeof navigator !== 'undefined' && !/Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
 // A hardware keyboard: shortcuts and keys that type nothing go as keys; what types
 // text goes through beforeinput, so input methods work.
@@ -1060,7 +1055,7 @@ function keyDown(e) {
   }
 }
 // Leaving the field lets go of what the computer's keyboard held there.
-// So does a press in the row of keys: it closed the keyboard it sits on (the owner's report, 2026-10-31).
+// So does a press in the row of keys: it closed the keyboard it sits on.
 let rowPress = false;
 function rowRelease() { setTimeout(() => { rowPress = false; }, 300); }
 function typingBlur() {
@@ -1136,8 +1131,8 @@ function keyUp(e) {
 .remote-menu-sep {height:1px;background:rgba(255,255,255,.1);margin:4px 6px;}
 .remote-stage .remote-menu-item .remote-menu-check {margin-left:auto;color:#0a84ff;}
 .remote-pad-hint {position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:11px;color:rgba(255,255,255,.45);pointer-events:none;}
-/* One slim row that scrolls sideways, above the phone's keyboard (the owner's report,
-   2026-10-28: the keys had grown to one full-width row each). */
+/* One slim row that scrolls sideways, above the phone's keyboard (the
+   keys had grown to one full-width row each). */
 .remote-keys {display:flex;flex-wrap:nowrap;align-items:center;gap:5px;padding:5px 8px;overflow-x:auto;scrollbar-width:none;background:rgba(28,28,30,.96);border-top:1px solid rgba(255,255,255,.08);}
 .remote-keys::-webkit-scrollbar {display:none;}
 .remote-stage .remote-key {display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:auto;min-width:36px;height:30px;padding:0 8px;margin:0;border-radius:7px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:13px;line-height:1;cursor:pointer;}

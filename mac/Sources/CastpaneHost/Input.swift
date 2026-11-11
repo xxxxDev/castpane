@@ -59,8 +59,8 @@ final class Input {
 
     /// A key by the browser's KeyboardEvent.code, with the modifiers held.
     /// What a Mac keyboard itself adds to these keys. macOS's own shortcuts on them (Mission
-    /// Control ⌃↑, Show Desktop F11, the desktops ⌃← ⌃→) answer only with it (the owner's
-    /// report, 2026-10-29: Mission Control and Show Desktop did nothing).
+    /// Control ⌃↑, Show Desktop F11, the desktops ⌃← ⌃→) answer only with it (without
+    /// it Mission Control and Show Desktop did nothing).
     static func keyFlags(_ code: String) -> CGEventFlags {
         if code.hasPrefix("Arrow") { return [.maskNumericPad, .maskSecondaryFn] }
         if ["Home", "End", "PageUp", "PageDown", "Delete", "Help"].contains(code) || (code.hasPrefix("F") && Int(code.dropFirst()) != nil) { return .maskSecondaryFn }
@@ -73,7 +73,7 @@ final class Input {
         if mods.contains("ctrl") { f.insert(.maskControl) }
         if mods.contains("alt") { f.insert(.maskAlternate) }
         if mods.contains("meta") { f.insert(.maskCommand) }
-        // Only while the key is down: ⌃ kept after ⌃← went on every later click (the owner's report, 2026-10-31).
+        // Only while the key is down: ⌃ kept after ⌃← went on every later click.
         flags = down ? f : []
         guard let vk = Keys.map[code], let e = CGEvent(keyboardEventSource: source, virtualKey: vk, keyDown: down) else { return }
         if down { keysDown.insert(vk) } else { keysDown.remove(vk) }

@@ -108,7 +108,7 @@ export function codeOfChar(ch) {
 }
 
 // A Windows or Linux keyboard's habits, as the Mac's own keys: Ctrl is otherwise simply ⌘, and
-// Ctrl+← would go to the line's start, not a word back (the owner's report, 2026-10-31).
+// Ctrl+← would go to the line's start, not a word back.
 export function otherKeyboardKey({ code, ctrl, alt, shift, win }) {
   if (win) return null;
   const s = shift ? ['shift'] : [], arrow = /^Arrow(Left|Right)$/.test(code);
