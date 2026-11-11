@@ -27,9 +27,11 @@ open mac/build/Castpane.app
 
 `build-app.sh` builds for this Mac's architecture and copies the Node that `node` runs
 (or `CASTPANE_NODE_BIN`). The server and the web app are copied when they have been
-built; `server/` must hold its own `node_modules`. Everything is signed ad hoc with the
-hardened runtime, so macOS asks again for Screen Recording and Accessibility after each
-new build.
+built; `server/` must hold its own `node_modules`. Everything is signed with the hardened
+runtime: ad hoc by default, so macOS asks again for Screen Recording and Accessibility after
+each new build, or with a certificate given in `signing.env` or the environment, which keeps
+the permissions across builds (releases use the project's own certificate; see
+[docs/development.md](../docs/development.md#signing)).
 
 ## Notes
 
@@ -64,6 +66,6 @@ new build.
   state and every use of the input poster are isolated to it, and the per-frame path
   uses only the locked video gate, capture and link.
 - Launch at login uses `SMAppService.mainApp`, which works only when running from
-  Castpane.app. With an ad hoc signature, Login Items may list it as from an
+  Castpane.app. Without a Developer ID signature, Login Items may list it as from an
   unidentified developer.
 - Pausing sharing closes `host.sock`; the server then treats Castpane as not running.

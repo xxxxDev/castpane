@@ -47,7 +47,7 @@ const paint = () => {
     lines.forEach((t, i) => g.fillText(t, x + 40, y + 130 + i * 50));
   };
   win(260, 200, 1180, 820, 'Notes', ['Groceries', '— oat milk', '— lemons', '— coffee beans', '', 'Call the plumber on Thursday'], false);
-  win(1260, 520, 1080, 700, 'Terminal', ['$ npm test', '✔ 191 tests passed', '$ git status', 'nothing to commit, working tree clean', '$ █'], true);
+  win(1260, 520, 1080, 700, 'Terminal', ['$ npm run build', '✓ built in 1.84s', '$ git status', 'nothing to commit, working tree clean', '$ █'], true);
   g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.roundRect(860, 1460, 840, 112, 30); g.fill();
   ['#5ac8fa', '#ff9f0a', '#30d158', '#bf5af2', '#ff375f', '#64d2ff'].forEach((col, i) => { g.fillStyle = col; g.beginPath(); g.roundRect(894 + i * 132, 1478, 96, 76, 20); g.fill(); });
 };

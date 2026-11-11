@@ -154,8 +154,10 @@ unreadable, so the server refuses to start in that state instead of making a new
   mode, appends its own peer after it). In the Cloudflare modes, a program on this Mac (any
   user's) that connects to `127.0.0.1` directly can still set it, and so choose the address its
   own attempts are counted, blocked and logged under.
-- **Ad hoc signing.** v0.1 is not signed with a Developer ID or notarized. macOS cannot tell you
-  who built it, and asks for the permissions again after each rebuild.
+- **No Developer ID.** Releases are signed with the project's own certificate, not an Apple
+  Developer ID, and are not notarized, so macOS cannot tell you who built them. A build of your
+  own is signed ad hoc unless you give it a certificate, and then macOS asks for the
+  permissions again after each rebuild.
 - **The browser and the phone.** Castpane trusts the browser to keep its cookies and passkeys.
   A compromised phone or browser is a compromised session.
 

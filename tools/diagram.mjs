@@ -36,7 +36,7 @@ code{font:12.5px Menlo,monospace;color:var(--fg);background:rgba(127,127,127,.14
   <div class="box"><b>Connection</b><small>Cloudflare Tunnel (quick or your domain) or Tailscale, always HTTPS</small></div>
  </div>
  <div class="mac">
-  <div class="t">Castpane.app <span>· menu bar, setup, settings · signed ad hoc</span></div>
+  <div class="t">Castpane.app <span>· menu bar, setup, settings · hardened runtime, not notarized</span></div>
   <div class="grid">
    <div class="box"><b>Node server</b><small><code>server/start.js</code> on 127.0.0.1. Sign-in, passkeys, two-step, users, devices, push, audit, the PWA, the <code>/remote</code> relay.</small></div>
    <div class="box"><b>Capture core</b><small>ScreenCaptureKit, VideoToolbox H.264, input posting. Holds Screen Recording and Accessibility.</small></div>
