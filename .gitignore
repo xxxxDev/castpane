@@ -24,7 +24,6 @@ test-results/
 .local/
 server/logs/
 
-# The test suites are kept privately and not published.
 /server/tests/
 /web/tests/
 /mac/Tests/

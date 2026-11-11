@@ -38,6 +38,7 @@ identity=${CASTPANE_SIGN_IDENTITY:--}
 keychain_args=""
 if [ "$identity" != "-" ] && [ -n "${CASTPANE_SIGN_KEYCHAIN:-}" ]; then
   if [ -n "${CASTPANE_SIGN_KEYCHAIN_PASSWORD_FILE:-}" ]; then
+    # -p shows the password in the process list while this runs; it unlocks only the signing keychain, and without -p security would prompt.
     security unlock-keychain -p "$(cat "$CASTPANE_SIGN_KEYCHAIN_PASSWORD_FILE")" "$CASTPANE_SIGN_KEYCHAIN"
   fi
   keychain_args="--keychain $CASTPANE_SIGN_KEYCHAIN"

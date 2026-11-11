@@ -422,8 +422,8 @@ const groups = computed(() => {
 const groupKey = ref('');
 const shownItems = computed(() => (groups.value.find((g) => g.key === groupKey.value) || groups.value[0])?.items || []);
 // Whichever holds what is shown, so the highlighted group matches the picture (opening,
-// the whole screen is shown while the current desktop's tab used to be highlighted; a
-// tester's report, 2026-10-29); the desktop shown now when nothing is shown yet.
+// the whole screen is shown while the current desktop's tab used to be highlighted); the
+// desktop shown now when nothing is shown yet.
 watch(groups, (gs) => {
   if (gs.some((g) => g.key === groupKey.value)) return;
   const holding = current.value && gs.find((g) => g.items.some((w) => w.kind === current.value.kind && w.id === current.value.id));
@@ -718,8 +718,7 @@ function move(e) {
       else if (travel > 16) {
         gesture.kind = 'scroll2';
         // One axis for the whole scroll, the one it started along, as a Mac trackpad
-        // does: a slightly slanted two-finger drag used to scroll nothing in many apps
-        // (a tester's report, 2026-10-29).
+        // does: a slightly slanted two-finger drag used to scroll nothing in many apps.
         gesture.axis = Math.abs(now.cx - last.cx0) > Math.abs(now.cy - last.cy0) ? 'x' : 'y';
       }
     }

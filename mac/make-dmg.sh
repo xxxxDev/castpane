@@ -5,8 +5,9 @@
 #
 # The image holds the app and a shortcut to Applications, so it installs by dragging one
 # onto the other. It is written to mac/build/Castpane-<version>-<arch>.dmg. The app inside
-# keeps its ad hoc signature: the image is not signed or notarized, so on another Mac the
-# first launch needs "Open Anyway" (docs/setup.md, "Install from a release").
+# keeps the signature build-app.sh gave it (ad hoc, or a release's certificate); the image
+# itself is not signed or notarized, so on another Mac the first launch needs "Open Anyway"
+# (docs/setup.md, "From a release").
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 app="$here/build/Castpane.app"

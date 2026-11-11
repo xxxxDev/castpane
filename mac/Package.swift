@@ -5,7 +5,6 @@
 //
 // CastpaneCore holds the pure logic (config files, backoff, tunnel state and the parsing
 // of cloudflared's output) so it can be unit tested without a screen or a network.
-import Foundation
 import PackageDescription
 
 let package = Package(
@@ -39,9 +38,3 @@ let package = Package(
     ],
     swiftLanguageModes: [.v6]
 )
-
-// The test suites are kept separately; when they are present next to this file, build them.
-if FileManager.default.fileExists(atPath: Context.packageDirectory + "/Tests/CastpaneCoreTests") {
-    package.targets.append(.testTarget(name: "CastpaneCoreTests", dependencies: ["CastpaneCore", "CastpaneHost"],
-                                       path: "Tests/CastpaneCoreTests"))
-}

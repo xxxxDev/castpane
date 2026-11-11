@@ -37,7 +37,7 @@ enum Catalog {
     /// ScreenCaptureKit's objects, passed between tasks as they are (they are not changed after).
     struct Unchecked<T>: @unchecked Sendable { let value: T; init(_ value: T) { self.value = value } }
 
-    /// ScreenCaptureKit can leave a call unanswered for good (an Intel Mac mini, 2026-10-30:
+    /// ScreenCaptureKit can leave a call unanswered for good (seen on an Intel Mac mini:
     /// the list never came, so the page stayed on Connecting). The answer is waited for this
     /// long at most; nil after that, and a late answer is dropped.
     static func within<T: Sendable>(_ seconds: Double, _ work: @escaping @Sendable () async throws -> T) async throws -> T? {
@@ -125,7 +125,7 @@ enum Catalog {
     /// front, which also takes the Mac to the desktop (Space) the window is on.
     ///
     /// Each Accessibility call waits for the window's app to answer. It runs off the main
-    /// thread, and waits a second at most: an app that hangs (found on a tester's Mac) must
+    /// thread, and waits a second at most: an app that hangs must
     /// not freeze Castpane's menu, nor keep the viewer at "Switching…".
     static func bringForward(_ id: CGWindowID, pid: pid_t) {
         // Castpane's own windows (the setup assistant, Settings) are in the list too; they
