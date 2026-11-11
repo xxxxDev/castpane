@@ -160,6 +160,11 @@ use Castpane. A Cloudflare tunnel needs nothing on the phone, for when that matt
 
 [docs/setup.md](docs/setup.md) explains each connection mode and its trade-offs.
 
+## Limits
+
+Developer ID signing and notarization (releases are signed with the project's own
+certificate instead), and audio.
+
 ## Documentation
 
 - [docs/setup.md](docs/setup.md): installing, permissions, the three connection modes.
@@ -170,17 +175,23 @@ use Castpane. A Cloudflare tunnel needs nothing on the phone, for when that matt
   process contract.
 - [docs/development.md](docs/development.md): layout, running from source, checking a change.
 - [mac/README.md](mac/README.md): building the Mac app.
+- [SECURITY.md](SECURITY.md): how to report a vulnerability.
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to propose a change.
 - [BRAND.md](BRAND.md): the logo, which the MIT License does not cover.
 
-## Not yet
+## Security
 
-Developer ID signing and notarization (releases are signed with the project's own
-certificate instead), and audio.
+Whoever signs in as an admin can control your Mac, as you. See [SECURITY.md](SECURITY.md) for
+the security model and how to report a vulnerability privately.
+
+## Contributing
+
+Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE). `server/` and `web/` grew from an MIT-licensed shared PWA base
-whose notice is kept in the license file.
+The code is under the [MIT License](LICENSE). The Castpane logo (in this README, the app and
+web icons) isn't: see [BRAND.md](BRAND.md). `server/` and `web/` grew from an MIT-licensed
+shared PWA base whose notice is kept in the license file.
 
-The Castpane logo (in this README, the app and web icons) belongs to [V-AX](https://v-ax.com)
-and is **not** covered by the MIT License. See [BRAND.md](BRAND.md).
+Made by [V-AX](https://v-ax.com).

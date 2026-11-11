@@ -161,5 +161,4 @@ unreadable, so the server refuses to start in that state instead of making a new
 
 ## Reporting a problem
 
-Please report security problems privately to the maintainers rather than in a public issue,
-with steps to reproduce.
+See [SECURITY.md](../SECURITY.md) for how to report a vulnerability privately.
