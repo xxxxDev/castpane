@@ -522,7 +522,12 @@ const maxZoom = () => Math.max(5, readableZoom());
 function clampView() {
   const r = area.value.getBoundingClientRect();
   view.z = Math.min(maxZoom(), Math.max(1, view.z));
-  view.x = Math.min(0, Math.max(r.width - r.width * view.z, view.x));view.y = Math.min(0, Math.max(r.height - r.height * view.z, view.y));
+  // Kept to the picture itself, not the bars beside it: a zoomed picture that ends inside
+  // the area (it grew taller when the keyboard went down) showed a black band there.
+  const c = canvas.value, vw = c?.width || 1, vh = c?.height || 1, fit = Math.min(r.width / vw, r.height / vh);
+  const pw = vw * fit * view.z, ph = vh * fit * view.z, ox = (r.width - vw * fit) / 2 * view.z, oy = (r.height - vh * fit) / 2 * view.z;
+  const keep = (at, size, pic, off) => (pic >= size ? Math.min(-off, Math.max(size - pic - off, at)) : (size - pic) / 2 - off);
+  view.x = keep(view.x, r.width, pw, ox);view.y = keep(view.y, r.height, ph, oy);
   if (view.z < 1.02) resetView();
 }
 // The area grows and shrinks (the keyboard, the pencil's field, the clipboard's row) while the
