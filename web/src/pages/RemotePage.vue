@@ -497,6 +497,14 @@ function clampView() {
   view.x = Math.min(0, Math.max(r.width - r.width * view.z, view.x));view.y = Math.min(0, Math.max(r.height - r.height * view.z, view.y));
   if (view.z < 1.02) resetView();
 }
+// The area grows and shrinks (the keyboard, the pencil's field, the clipboard's row) while the
+// picture is zoomed: kept inside it, or it was left out of sight, all black (the owner's
+// recording, 2026-11-12).
+if (typeof ResizeObserver !== 'undefined') {
+  const sized = new ResizeObserver(() => { if (view.z > 1 && area.value) clampView(); });
+  watch(area, (el, old) => { if (old) sized.unobserve(old);if (el) sized.observe(el); });
+  onBeforeUnmount(() => sized.disconnect());
+}
 function twoFingers() {
   const [a, b] = [...touches.values()];
   return { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
