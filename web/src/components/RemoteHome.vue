@@ -47,7 +47,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
 const props = defineProps({ name: { type: String, default: '' }, windows: { type: Array, default: () => [] }, apps: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, launching: { type: String, default: '' }, notice: { type: String, default: '' } });
 const emit = defineEmits(['open', 'app', 'desktop', 'leave', 'all']);
-// One card an app, its window used last on top; then the apps running with no window.
+// One card an app with a window open, its window used last on top. Apps running with no
+// window (helpers in the background, menu-bar apps) are left to All apps.
 const openApps = computed(() => {
   const seen = new Map();
   for (const w of props.windows) {
@@ -55,7 +56,6 @@ const openApps = computed(() => {
     if (seen.has(key)) seen.get(key).count++;
     else seen.set(key, { key, bundle: w.bundle || '', name: w.app || w.title, window: w, count: 1 });
   }
-  for (const a of props.apps) if (a.running && !seen.has(a.bundle)) seen.set(a.bundle, { key: a.bundle, bundle: a.bundle, name: a.name, app: a, count: 0 });
   return [...seen.values()];
 });
 const allOpen = ref(false), query = ref(''), page = ref(0), pagesEl = ref(null);
