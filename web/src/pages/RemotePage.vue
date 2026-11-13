@@ -49,7 +49,7 @@
             <button v-if="labs" type="button" class="remote-btn home" :title="ct('首頁')" @click="goHome"><f7-icon f7="square_grid_2x2" :size="17"/></button>
             <!-- The screens, desktops and windows fold away for a bigger picture. -->
             <button type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headFolded ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
-            <button v-if="isTouch && view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="resetView">1×</button>
+            <button v-if="isTouch && view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
             <!-- A computer: the picture's size, and what the bottom bar used to hold. -->
             <template v-if="!isTouch">
               <span class="remote-stats remote-head-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
@@ -80,7 +80,7 @@
         <div v-if="appMode === 'app'" class="remote-apphead">
           <button type="button" class="remote-apphead-back" @click="goHome"><f7-icon f7="chevron_left" :size="17"/>{{ ct('首頁') }}</button>
           <div class="remote-apphead-title">{{ appTitle }}</div>
-          <button v-if="view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="resetView">1×</button>
+          <button v-if="view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
           <button type="button" class="remote-btn keyboard" :class="{on: keyboardOpen}" :title="ct('鍵盤')" @pointerdown.prevent @mousedown.prevent @click="toggleKeyboard"><f7-icon f7="keyboard" :size="18"/></button>
           <button type="button" class="remote-btn more" :class="{on: menuOpen}" :title="ct('更多')" @pointerdown.prevent @mousedown.prevent @click="menuOpen = !menuOpen;settingsOpen = false"><f7-icon f7="ellipsis" :size="18"/></button>
         </div>
@@ -120,7 +120,7 @@
         <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
-          <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
+          <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
               <f7-icon f7="lock_shield" :size="36"/>
@@ -551,6 +551,9 @@ const touches = new Map();
 // (a desktop is small on a phone); at full size two fingers scroll the Mac.
 const view = reactive({ z: 1, x: 0, y: 0 });
 function resetView() { view.z = 1;view.x = 0;view.y = 0; }
+// Zoomed in or out by the page (a text field, the keyboard, 1×, a size picked): eased in a
+// moment, not jumped; under a finger it follows at once.
+const smoothZoom = ref(false);
 // Zoomed in for a moment on a picture smaller than native: the Mac sends it at native size
 // from then on (until another window or screen is picked), so zooming shows real detail.
 let zoomSettle = 0;
@@ -667,6 +670,7 @@ function areaPoint(p) {
 // The text cursor kept in sight while typing: moved back to the middle when it
 // leaves the part shown (zoom by the cursor).
 function keepInSight(p) {
+  smoothZoom.value = true;
   const at = areaPoint(p);if (!at || view.z <= 1) return;
   const sx = view.x + view.z * at.px, sy = view.y + view.z * at.py, m = 40;
   if (sx >= m && sx <= at.r.width - m && sy >= m && sy <= at.r.height - m) return;
@@ -674,6 +678,7 @@ function keepInSight(p) {
 }
 // Puts a point of the picture (0…1) in the middle of the area, zoomed so text reads.
 function focusOn(p) {
+  smoothZoom.value = true;
   const at = areaPoint(p);if (!at) return;
   const { r, px, py } = at;
   view.z = Math.max(view.z, 1.5, readableZoom());
@@ -681,6 +686,10 @@ function focusOn(p) {
   clampView();
 }
 watch(keyboardOpen, (open) => {
+  // An app's window made this device's shape (Labs) is made the shape left above the
+  // keyboard instead (refitSoon), its text the size it was: zooming in as well came in two
+  // steps, the second when the window's new picture arrived, and stayed when the keyboard went.
+  if (appMode.value === 'app' && fitSize) { zoomTo = null;smoothZoom.value = true;resetView();nextTick(fitViewport);return; }
   // No keyboard came up over the page (a hardware keyboard): nothing waits to zoom.
   if (open) { zoomTo = lastTap && Date.now() - lastTap.at < 5000 ? { ...lastTap } : null;nextTick(fitViewport);setTimeout(() => { if (!stageBox.value) zoomTo = null; }, 1500); }
   // The keyboard down, the zoom stays and the cursor's line where it was: going back to the
@@ -762,6 +771,8 @@ function click(p, b = 0) {
 const pixelScale = () => { const r = canvas.value.getBoundingClientRect();return (canvas.value.width || 1) / Math.max(1, r.width); };
 
 function down(e) {
+  // A finger on the picture moves it itself: no easing behind it.
+  smoothZoom.value = false;
   if (!link || settingsOpen.value || menuOpen.value || sizeOpen.value) { settingsOpen.value = false;menuOpen.value = false;sizeOpen.value = false;return; }
   // A button over the picture (asking for the permission) keeps its own tap.
   if (e.target.closest?.('button')) return;
@@ -887,10 +898,12 @@ function zoomAt(z, clientX, clientY) {
 }
 const ZOOMS = [1, 1.5, 2, 3, 5], sizeOpen = ref(false);
 function zoomStep(by) {
+  smoothZoom.value = true;
   const r = area.value?.getBoundingClientRect();if (r) zoomAt(view.z * by, r.left + r.width / 2, r.top + r.height / 2);
 }
 const zoomIs = (z) => Math.abs(view.z - z) < 0.02;
 function setZoom(z) {
+  smoothZoom.value = true;
   const r = area.value?.getBoundingClientRect();if (r) zoomAt(z, r.left + r.width / 2, r.top + r.height / 2);
 }
 function followPointer(clientX, clientY) {
@@ -1152,7 +1165,7 @@ function refitSoon() {
     const r = area.value?.getBoundingClientRect(), w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);
     if (!r || !w || appMode.value !== 'app' || (Math.abs(r.width - fitSize.width) < 40 && Math.abs(r.height - fitSize.height) < 40)) return;
     if (await fitTo(w)) show(w);
-  }, 700);
+  }, 350);
 }
 // The bottom bar: sideways to the app used before (right) or after (left), up for the cards.
 let bar = null, barAt = 0;
@@ -1417,6 +1430,7 @@ function keyUp(e) {
 .remote-btn.danger {background:rgba(255,69,58,.25);color:#ff6961;}
 .remote-area {position:relative;flex:1;min-height:0;touch-action:none;overflow:hidden;}
 .remote-canvas {width:100%;height:100%;object-fit:contain;display:block;cursor:default;transform-origin:0 0;}
+.remote-canvas.smooth {transition:transform .28s cubic-bezier(.2, .8, .2, 1);}
 .remote-btn.zoom {font-size:12px;font-weight:600;}
 .remote-canvas.hidden {visibility:hidden;}
 .remote-notice {position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px;background:rgba(0,0,0,.6);font-size:14px;line-height:1.5;}

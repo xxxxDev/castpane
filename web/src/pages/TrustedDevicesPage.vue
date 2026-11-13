@@ -3,13 +3,11 @@
        (server/services/trustedDevices.js): how long trust lasts, and removing them. -->
   <f7-page name="trusted" class="page-large-static" ptr :ptr-mousewheel="true" @ptr:refresh="refresh" @page:afterin="load">
     <f7-navbar :title="ct('信任的裝置')" :back-link="t('back')"></f7-navbar>
-    <f7-block-title>{{ ct('信任多久') }}</f7-block-title>
-    <f7-block class="trusted-days">
-      <div class="segmented segmented-strong">
-        <button v-for="d in options" :key="d" type="button" class="button" :class="{'button-active': d === days}" @click="setDays(d)">{{ d }} {{ ct('天') }}</button>
-      </div>
-      <p class="trusted-note">{{ ct('從最後一次用信任連線算起；每次連線都會重新計算。') }}</p>
-    </f7-block>
+    <f7-list inset strong-ios class="trusted-days">
+      <!-- A row and a menu, as Settings' language. -->
+      <f7-list-item link no-chevron :title="ct('信任多久')" :after="days + ' ' + ct('天')" :footer="ct('從最後一次用信任連線算起；每次連線都會重新計算。')" class="trusted-days-row" @click.prevent="openDays($event)"><template #media><f7-icon f7="clock"/></template></f7-list-item>
+    </f7-list>
+    <GlassDropdown :open="daysOpen" :point="daysPoint" :items="dayItems" :selected="days" @close="daysOpen = false" @select="pickDays"/>
     <f7-block-title>{{ ct('目前信任的裝置') }}</f7-block-title>
     <f7-block v-if="!devices.length" class="trusted-empty">{{ ct('還沒有信任的裝置。在那台裝置的「設定 › 帳號」打開「信任這台裝置」。') }}</f7-block>
     <f7-list v-else inset strong-ios class="trusted-list">
@@ -25,11 +23,12 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { f7 } from 'framework7-vue';
 import { t } from '../js/i18n.js';
 import { ct } from '../js/text.js';
 import { api } from '../js/api.js';
+import GlassDropdown from '../components/GlassDropdown.vue';
 
 const days = ref(30), options = ref([30, 60, 90, 180]), devices = ref([]);
 const day = (iso) => { const d = new Date(iso);return `${d.getMonth() + 1}/${d.getDate()}`; };
@@ -39,6 +38,10 @@ async function load() {
   catch (e) { f7.dialog.alert(e.message); }
 }
 async function refresh(done) { try { await load(); } finally { done(); } }
+const daysOpen = ref(false), daysPoint = ref({ clientX: 0, clientY: 0 });
+const dayItems = computed(() => options.value.map((d) => ({ value: d, label: `${d} ${ct('天')}` })));
+function openDays(e) { daysPoint.value = { clientX: e?.clientX ?? 0, clientY: e?.clientY ?? 0 };daysOpen.value = true; }
+function pickDays(item) { daysOpen.value = false;setDays(item?.value ?? item); }
 async function setDays(d) {
   try { days.value = (await api('/remote/trusted/days', { method: 'PUT', body: JSON.stringify({ days: d }) })).days; }
   catch (e) { f7.dialog.alert(e.message); }
@@ -56,8 +59,6 @@ function removeAll() {
 </script>
 
 <style>
-.trusted-days .segmented {max-width:420px;}
-.trusted-note {margin:10px 0 0;font-size:13px;opacity:.65;}
 .trusted-empty {font-size:14px;opacity:.7;}
 .trusted-remove {color:var(--f7-color-red);font-size:15px;}
 </style>
