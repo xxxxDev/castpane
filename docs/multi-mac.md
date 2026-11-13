@@ -16,7 +16,9 @@ own; it shows its screen only through the hub, to the hub's admins.
    (`data/members.json`, 0600). The member keeps the secret in its own `data/member.json`
    (0600).
 3. From then on the member connects with `{t:"hello", id, secret, name}`, and reconnects by
-   itself, with back-off, when the link drops.
+   itself, with back-off, when the link drops. Both sides ping every 30 seconds; a link with no
+   answer by the next ping is closed, so one cut off without a word (behind a tunnel, say)
+   comes back, and the hub lists that Mac offline meanwhile.
 
 A member is opened through the hub's address. Its own Settings › Connection says so and
 points to Other Macs (leave there to use it on its own); it shows the connection choices

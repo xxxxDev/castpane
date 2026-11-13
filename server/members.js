@@ -51,7 +51,7 @@ function newCode() {
 }
 
 // file: data/members.json, [{id, name, hash, pairedAt}], this account's alone (0600).
-function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openMs = OPEN_MS } = {}) {
+function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openMs = OPEN_MS, heartbeatMs = 30000 } = {}) {
   let list = load();
   const codes = new Map();
   const links = new Map();
@@ -118,9 +118,15 @@ function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openM
     const send = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
     const out = (reason) => { try { ws.close(1008, reason); } catch { /* gone */ } setTimeout(() => { try { ws.terminate(); } catch { /* gone */ } }, 2000).unref?.(); };
     const timer = setTimeout(() => out('no hello'), helloMs);
+    // A Mac gone without a word (its link cut somewhere between) is listed offline once a
+    // ping goes unanswered, not online for good.
+    let alive = true;
+    const beat = setInterval(() => { if (!alive) return evict(); alive = false; try { ws.ping(); } catch { /* closing */ } }, heartbeatMs);
+    beat.unref?.();
+    ws.on('pong', () => { alive = true; });
     ws.on('error', () => {});
     ws.on('close', () => {
-      clearTimeout(timer); said();
+      clearTimeout(timer); clearInterval(beat); said();
       if (link) { link.end(); if (links.get(link.id) === link) links.delete(link.id); }
     });
     ws.on('message', (raw, binary) => {

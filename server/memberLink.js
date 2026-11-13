@@ -33,7 +33,7 @@ function hubOrigin(text) {
 
 // home: CASTPANE_HOME. connectHost() and tokenOf(): this Mac's capture core
 // (server/remote.js). running(): whether its socket is there.
-function createMemberLink({ home, file = path.join(home, 'data', 'member.json'), connectHost, tokenOf, running, name = () => os.hostname().replace(/\.local$/, ''), retryMs = [1000, 60000], timeoutMs = 10000, onChange = () => {} } = {}) {
+function createMemberLink({ home, file = path.join(home, 'data', 'member.json'), connectHost, tokenOf, running, name = () => os.hostname().replace(/\.local$/, ''), retryMs = [1000, 60000], timeoutMs = 10000, heartbeatMs = 30000, onChange = () => {} } = {}) {
   let config = load(), ws = null, state = config ? 'connecting' : 'off', retry = null, delay = retryMs[0], session = null, poll = null, wasRunning = null, stopped = false;
   let blockedUntil = 0, joinGen = 0, auditMinute = 0, audited = 0;
   const mayAudit = () => { const m = Math.floor(Date.now() / 60000); if (m !== auditMinute) { auditMinute = m; audited = 0; } return ++audited <= 30; };
@@ -134,6 +134,13 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     ws = sock;
     let welcomed = false;
     sock.on('open', () => sendJson(sock, { t: 'hello', id: config.id, secret: config.secret, name: name() }));
+    // A link the hub no longer has, with nothing said about it (a restart behind a tunnel),
+    // stayed "connected" here and never came back: a ping each while, and no answer by the
+    // next one ends it, so it connects again.
+    let alive = true;
+    const beat = setInterval(() => { if (!alive) return sock.terminate(); alive = false; try { sock.ping(); } catch { /* closing */ } }, heartbeatMs);
+    beat.unref?.();
+    sock.on('pong', () => { alive = true; });
     sock.on('message', (raw, binary) => {
       if (ws !== sock) return;
       if (binary) {
@@ -149,6 +156,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     });
     sock.on('error', () => {});
     sock.on('close', () => {
+      clearInterval(beat);
       if (ws !== sock) return;
       ws = null; endSession(false);
       if (stopped || !config) return;
