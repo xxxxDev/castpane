@@ -56,6 +56,8 @@
       </f7-list-item>
       <f7-list-item v-if="handheld" link :title="ct('掃碼登入')" class="scan-login-row" @click.prevent="goScanLogin"><template #media><f7-icon f7="qrcode_viewfinder" /></template></f7-list-item>
       <f7-list-item link :title="ct('裝置')" class="devices-row" @click.prevent="goDevices"><template #media><f7-icon f7="device_phone_portrait" /></template></f7-list-item>
+      <!-- An admin's device trusted to open Remote without asking each time (js/trust.js). -->
+      <f7-list-item v-if="currentUser?.role === 'admin'" :title="ct('信任這台裝置')" :footer="trustFooter" class="trust-row"><template #media><f7-icon f7="hand_thumbsup"/></template><template #after><label class="toggle"><input type="checkbox" :aria-label="ct('信任這台裝置')" :checked="trust.trusted" :disabled="trustBusy" @change="onTrustToggle($event)"/><span class="toggle-icon"></span></label></template></f7-list-item>
       <f7-list-item link :title="ct('通行密鑰')" class="passkeys-row" @click.prevent="goPasskeys"><template #media><f7-icon f7="checkmark_shield" /></template></f7-list-item>
       <f7-list-item link :title="ct('兩步驟驗證')" :after="currentUser?.twoStep ? ct('已開啟') : ct('未開啟')" class="two-step-row" @click.prevent="goTwoStep"><template #media><f7-icon f7="lock_shield" /></template></f7-list-item>
       <f7-list-item link :title="t('changePassword')" @click.prevent="goChangePassword">
@@ -102,6 +104,7 @@ import { forceAppUpdate } from '../js/pwa-update.js';
 import { isHandheld } from '../js/qrLogin.js';
 import { updateDialog, setUpdateDialog } from '../js/updatePrompt.js';
 import { labsOn, setLabs } from '../js/labs.js';
+import { trustState, trustThisDevice, untrust } from '../js/trust.js';
 import { sidebarAuto, setSidebarAuto } from '../js/sidebarState.js';
 import { fetchLatestBuildId, hasNewVersion } from '../versionCheck.js';
 import GlassDropdown from '../components/GlassDropdown.vue';
@@ -277,7 +280,23 @@ const desktop = ref(!!desktopQuery?.matches);
 const onDesktopChange = () => { desktop.value = !!desktopQuery?.matches; };
 desktopQuery?.addEventListener?.('change', onDesktopChange);
 onBeforeUnmount(() => desktopQuery?.removeEventListener?.('change', onDesktopChange));
+// This device trusted to open Remote, and for how many days from its last use.
+const trust = ref({ trusted: false, expiresAt: null, days: 30 }), trustBusy = ref(false);
+const trustFooter = computed(() => trust.value.trusted
+  ? `${ct('已信任，')}${new Date(trust.value.expiresAt).toLocaleDateString()} ${ct('到期；每次連線會再延長')} ${trust.value.days} ${ct('天。')}`
+  : `${ct('信任後')} ${trust.value.days} ${ct('天內，從這台裝置連線不用再輸入密碼或通行密鑰；每次連線都會重新計算。打開時要驗證一次。')}`);
+async function loadTrust() { if (currentUser.value?.role !== 'admin') return;try { trust.value = await trustState(); } catch { /* left as it was */ } }
+async function onTrustToggle(e) {
+  const on = e.target.checked;
+  trustBusy.value = true;
+  try {
+    if (on) { const r = await trustThisDevice();if (r) trust.value = r; }
+    else trust.value = { ...trust.value, ...(await untrust()), expiresAt: null };
+  } catch (err) { f7.dialog.alert(err.message); }
+  finally { trustBusy.value = false;e.target.checked = trust.value.trusted; }
+}
 onMounted(() => {
+  loadTrust();
   document.addEventListener('visibilitychange', rereadPush);
   // The switch is free as soon as the state is read, and after three seconds
   // whatever happens: it used to wait for the repair below, which on a desktop

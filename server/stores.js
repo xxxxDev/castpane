@@ -26,6 +26,8 @@ const pushDeliveriesDB = datastore('push-deliveries.db');
 const loginDevicesDB = datastore('login-devices.db');
 // Passkeys: the public half of each (server/services/passkeys.js).
 const passkeysDB = datastore('passkeys.db');
+// Devices an admin trusts to open Remote without asking again (server/services/trustedDevices.js).
+const trustedDevicesDB = datastore('trusted-devices.db');
 
 // Periodic cleanup: logout only removes the current token's row, so sessions
 // that lapse by idle-timeout are never deleted and would accumulate over time
@@ -46,7 +48,7 @@ const recurringSweep = setInterval(sweepExpiredSessions, 60 * 60 * 1000);
 initialSweep.unref();
 recurringSweep.unref();
 
-module.exports = { loginDevicesDB, passkeysDB,
+module.exports = { loginDevicesDB, passkeysDB, trustedDevicesDB,
   usersDB,
   sessionsDB,
   userLifecycleTransitionsDB,

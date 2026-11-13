@@ -30,6 +30,7 @@ export const TAB_PAGES = {
     {route: '/user/', path: '/admin/users/:id', id: ID, parent: '/users/', admin: true},
     {route: '/security/', path: '/admin/security', parent: '/admin/', admin: true},
     {route: '/devices/', path: '/admin/devices', parent: '/admin/', admin: true},
+    {route: '/trusted/', path: '/admin/trusted', parent: '/admin/', admin: true},
   ],
 };
 

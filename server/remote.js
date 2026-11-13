@@ -146,7 +146,22 @@ function connectHost({ home = HOME() } = {}) {
 const sharedPasses = createPasses();
 
 // members: server/members.js, the other Macs (docs/multi-mac.md), or null for this Mac alone.
-function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/authController'), passes = sharedPasses, home = HOME, members = null, publicOrigin = () => require('./siteConfig').publicOrigin() } = {}) {
+function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/authController'), passes = sharedPasses, home = HOME, members = null, publicOrigin = () => require('./siteConfig').publicOrigin(), trustedOf = () => require('./services/trustedDevices').sharedTrustedDevices(), usersOf = () => require('./stores').usersDB } = {}) {
+  const trust = require('./services/trustedDevices');
+  const { isHttpsRequest } = require('./middlewares/requestGuards');
+  const setTrustCookie = (req, res, value, expiresAt) => res.cookie(trust.COOKIE, value, trust.cookieOptions(isHttpsRequest(req), Math.max(0, expiresAt - Date.now())));
+  const clearTrustCookie = (req, res) => res.clearCookie(trust.COOKIE, trust.cookieOptions(isHttpsRequest(req)));
+  const trustCookie = (req) => (typeof req.cookies?.[trust.COOKIE] === 'string' ? req.cookies[trust.COOKIE] : '');
+  // The admin's passkey, or their password (and two-step code), asked again: false when
+  // it was refused (the answer is sent).
+  async function againOrRefused(req, res, purpose) {
+    if (req.body?.passkey) {
+      try { await auth.adminPasskeyAgain(req, req.body.passkey); return true; } catch { res.status(400).json({ message: 'Passkey not accepted', code: 'PASSKEY_REFUSED' }); return false; }
+    }
+    if (!(await auth.adminAgain(req, res, purpose, 'remote'))) return false;
+    auth.adminGranted(req, 'remote');
+    return true;
+  }
   const adminOnly = (req, res, next) => (req.role === 'admin' ? next() : res.status(403).json({ message: 'Admin only' }));
   const chain = [verifyToken, adminOnly, (req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); }];
   // The machines the page lists: this Mac, then the others that joined it.
@@ -174,9 +189,18 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
   }
   // The admin's own passkey instead of the password and code, when they have one.
   app.post('/api/remote/pass/passkey', ...chain, async (req, res, next) => { try { res.json((await auth.adminPasskeyStart(req)) || { challenge: null }); } catch (e) { next(e); } });
-  // A pass to open the stream: the admin's passkey, or their password and two-step code.
+  // A pass to open the stream: the admin's passkey, or their password and two-step code,
+  // or a device this admin trusts (its cookie), which stays in date for the days set.
   app.post('/api/remote/pass', ...chain, async (req, res, next) => {
     try {
+      if (req.body?.trusted === true) {
+        const device = await trustedOf().use(req.userId, trustCookie(req));
+        if (!device) { clearTrustCookie(req, res);return res.status(409).json({ message: 'This device is not trusted', code: 'NOT_TRUSTED' }); }
+        setTrustCookie(req, res, trustCookie(req), device.expiresAt);
+        const issued = passes.issue(req.userId, sessionToken(req) || req.headers.authorization || '');
+        audit({ source: 'remote', action: 'pass', username: req.username, via: 'trusted', device: device.label, ip: resolveClientIp(req) });
+        return res.json(issued);
+      }
       if (req.body?.passkey) {
         try { await auth.adminPasskeyAgain(req, req.body.passkey); } catch (e) { return res.status(e.status || 400).json({ message: 'Passkey not accepted', code: 'PASSKEY_REFUSED' }); }
       } else {
@@ -187,6 +211,65 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
       audit({ source: 'remote', action: 'pass', username: req.username, via: req.body?.passkey ? 'passkey' : 'password', ip: resolveClientIp(req) });
       res.json(issued);
     } catch (e) { try { auth.adminKept(req); } catch { /* nothing granted */ } next(e); }
+  });
+  // This device, trusted or not, and for how long.
+  app.get('/api/remote/trust', ...chain, async (req, res, next) => {
+    try {
+      const t = trustedOf(), device = await t.find(req.userId, trustCookie(req));
+      res.json({ trusted: !!device, expiresAt: device ? new Date(device.expiresAt).toISOString() : null, days: await t.days() });
+    } catch (e) { next(e); }
+  });
+  // Trust this device: asked again first, as for a pass.
+  app.post('/api/remote/trust', ...chain, async (req, res, next) => {
+    try {
+      if (!(await againOrRefused(req, res, 'remote-trust'))) return;
+      const t = trustedOf();
+      await t.forget(trustCookie(req));
+      const made = await t.trust(req.userId, req.headers['user-agent']);
+      setTrustCookie(req, res, made.cookie, made.expiresAt);
+      audit({ source: 'remote', action: 'trust', username: req.username, ip: resolveClientIp(req) });
+      res.json({ trusted: true, expiresAt: new Date(made.expiresAt).toISOString(), days: await t.days() });
+    } catch (e) { try { auth.adminKept(req); } catch { /* nothing granted */ } next(e); }
+  });
+  // No longer trust this device.
+  app.delete('/api/remote/trust', ...chain, async (req, res, next) => {
+    try {
+      await trustedOf().forget(trustCookie(req));
+      clearTrustCookie(req, res);
+      audit({ source: 'remote', action: 'untrust', username: req.username, ip: resolveClientIp(req) });
+      res.json({ trusted: false });
+    } catch (e) { next(e); }
+  });
+  // The admin page: every trusted device, how long trust lasts, and removing them.
+  app.get('/api/remote/trusted', ...chain, async (req, res, next) => {
+    try {
+      const t = trustedOf(), devices = await t.list(), users = usersOf();
+      const names = {};
+      for (const id of new Set(devices.map((d) => d.userId))) names[id] = await new Promise((ok) => users.findOne({ _id: id }, (e, u) => ok(u?.username || '')));
+      res.json({ days: await t.days(), options: trust.DAYS, devices: devices.map(({ userId, ...d }) => ({ ...d, username: names[userId] || '' })) });
+    } catch (e) { next(e); }
+  });
+  app.put('/api/remote/trusted/days', ...chain, async (req, res, next) => {
+    try {
+      const days = await trustedOf().setDays(req.body?.days);
+      audit({ source: 'remote', action: 'trust-days', days, username: req.username, ip: resolveClientIp(req) });
+      res.json({ days });
+    } catch (e) { if (e.status === 400) return res.status(400).json({ message: e.message }); next(e); }
+  });
+  app.delete('/api/remote/trusted/:id', ...chain, async (req, res, next) => {
+    try {
+      if (!(await trustedOf().remove(req.params.id))) return res.status(404).json({ message: 'No such device' });
+      audit({ source: 'remote', action: 'untrust', device: String(req.params.id), username: req.username, ip: resolveClientIp(req) });
+      res.json({ ok: true });
+    } catch (e) { next(e); }
+  });
+  app.delete('/api/remote/trusted', ...chain, async (req, res, next) => {
+    try {
+      await trustedOf().removeEvery();
+      clearTrustCookie(req, res);
+      audit({ source: 'remote', action: 'untrust-all', username: req.username, ip: resolveClientIp(req) });
+      res.json({ ok: true });
+    } catch (e) { next(e); }
   });
   // Whether a pass the page kept is still good: a restart of the server ends them all, and
   // the page then opened the picture only to be sent back for the password.

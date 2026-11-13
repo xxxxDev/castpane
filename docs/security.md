@@ -11,6 +11,14 @@ what protects that, where the secrets are, and what Castpane cannot stop.
 - **An admin:** everything, and Remote. Opening Remote asks again: the admin's own passkey, or
   their password and, with two-step on, a code. That gives a pass for 8 hours, for that admin
   and that sign-in only, kept in the server's memory (a restart ends every pass).
+  An admin may trust a device (**Settings › Account › Trust this device**, which asks again
+  once): from it, a pass is given with no password or passkey for 30, 60, 90 or 180 days (set
+  in **Admin › Trusted devices**) from its last use. The device keeps an HttpOnly, SameSite=Strict
+  cookie for `/api`, its id and a 256-bit secret; the server keeps only the secret's SHA-256.
+  Signing out on that device, a new password, the account disabled, deleted or reset, turning
+  it off or removing it on the admin page ends it at once. Each pass given this way is in the
+  audit log. Whoever holds that signed-in, trusted device can open Remote: trust only a device
+  you keep with you.
 
 ## What Castpane guarantees
 

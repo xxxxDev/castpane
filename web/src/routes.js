@@ -9,6 +9,7 @@ import PasskeysPage from './pages/PasskeysPage.vue';
 import UsersPage from './pages/UsersPage.vue';
 import UserEditPage from './pages/UserEditPage.vue';
 import SecurityPage from './pages/SecurityPage.vue';
+import TrustedDevicesPage from './pages/TrustedDevicesPage.vue';
 
 // Tab-view roots. Each F7 view owns its own router stack and resolves its url here.
 export default [
@@ -34,4 +35,6 @@ export default [
   { path: '/user/', component: UserEditPage },
   // Sign-in defence: what was tried and which addresses are blocked.
   { path: '/security/', component: SecurityPage },
+  // Devices trusted to open Remote without asking each time.
+  { path: '/trusted/', component: TrustedDevicesPage },
 ];

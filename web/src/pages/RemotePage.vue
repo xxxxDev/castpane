@@ -203,6 +203,7 @@ import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
 import RemoteHome from '../components/RemoteHome.vue';
+import { trustedPass } from '../js/trust.js';
 
 // labs: the Labs tab's page (js/labs.js), the Mac's apps first; the Remote tab's has the whole screen.
 const props = defineProps({ labs: { type: Boolean, default: false } });
@@ -327,6 +328,9 @@ async function getPass(fresh = false) {
     if (ok) return kept.pass;
     sessionSet('castpane-remote-pass', null);
   }
+  // A device trusted for it (Settings › Account): nothing to ask (js/trust.js).
+  const trusted = await trustedPass();
+  if (trusted) { sessionSet('castpane-remote-pass', trusted);return trusted.pass; }
   // A passkey first (Face ID, Touch ID): no password or code then.
   // Cancelled, refused or none: the password, as before.
   if (passkeysWork()) {
@@ -1089,11 +1093,22 @@ function fitTo(w) {
   const r = area.value?.getBoundingClientRect();
   if (!r || !r.width || prefs.fit === false || !isTouch || w.desk?.fullscreen || w.here === false) return Promise.resolve(null);
   const size = { width: Math.max(240, Math.round(r.width)), height: Math.max(240, Math.round(r.height)) };
-  return new Promise((resolve) => {
-    const done = (m) => { clearTimeout(t);fitWait = null;fitSize = m?.ok ? size : null;resolve(m); };
+  const ask = (want) => new Promise((resolve) => {
+    const done = (m) => { clearTimeout(t);fitWait = null;resolve(m); };
     const t = setTimeout(() => done(null), 2000);
     fitWait = done;
-    link?.send({ t: 'fit', id: w.id, ...size });
+    link?.send({ t: 'fit', id: w.id, ...want });
+  });
+  return ask(size).then(async (m) => {
+    // An app wider than it can be made (a browser's least width): made taller too, to the
+    // device's shape, so the picture fills it top to bottom rather than leaving bands; as
+    // tall as the Mac's screen allows.
+    if (m?.ok && m.width > size.width + 8) {
+      const taller = await ask({ width: m.width, height: Math.min(8000, Math.round(m.width * size.height / size.width)) });
+      if (taller?.ok) m = taller;
+    }
+    fitSize = m?.ok ? size : null;
+    return m;
   });
 }
 async function openWindow(w, keepOrder = false) {

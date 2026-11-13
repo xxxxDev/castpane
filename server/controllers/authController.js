@@ -13,6 +13,10 @@ const { resolveLivePrincipal } = require('../services/livePrincipal');
 const { hashSessionToken } = require('../services/sessionTokens');
 const { compactQuietly } = require('../services/compactQuietly');
 const { isHttpsRequest, isPasskeyOrigin } = require('../middlewares/requestGuards');
+const TRUST = require('../services/trustedDevices');
+// A device trusted to open Remote goes with the account's other credentials (a new password,
+// the account disabled, deleted or reset): every loginDevices.removeAll here removes these too.
+const trustedDevices = () => TRUST.sharedTrustedDevices();
 const { defaultUserOrder } = require('../services/userOrder');
 const {
   LIFECYCLE_STATUS,
@@ -721,6 +725,10 @@ exports._applySignInRescue = applySignInRescue;
 exports.logout = (req, res) => {
   const token = req.cookies.session_id || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
   res.clearCookie('session_id', { path: '/' });
+  // Signing out on a trusted device ends its trust too (services/trustedDevices.js).
+  const trustValue = req.cookies?.[TRUST.COOKIE];
+  if (typeof trustValue === 'string') trustedDevices().forget(trustValue).catch((e) => console.error(`trust not ended at sign-out: ${e.message}`));
+  res.clearCookie(TRUST.COOKIE, TRUST.cookieOptions(isHttpsRequest(req)));
 
   // A string or nothing (app.js drops a parsed j:{…} cookie as well; checked here too
   // so the handler does not depend on that).
@@ -875,7 +883,7 @@ exports.changePassword = (req, res) => {
             const signInsGo = () => {
               qrRequests.revokeUser(req.userId);twoStepTickets.revokeUser(req.userId);endPasskeyChallenges(req.userId);
               const mine = hashSessionToken(req.sessionToken || req.cookies.session_id);
-              return Promise.all([removeSessionsOrFail({ userId: req.userId, tokenHash: { $ne: mine } }), passkeyStore.removeAll(req.userId), loginDevices.removeAll(req.userId)]);
+              return Promise.all([removeSessionsOrFail({ userId: req.userId, tokenHash: { $ne: mine } }), passkeyStore.removeAll(req.userId), loginDevices.removeAll(req.userId), trustedDevices().removeAll(req.userId)]);
             };
             // A write the store reports as failed may have been made all the same (NeDB
             // changes the row in memory before it saves it): the code stays spent (see
@@ -1225,7 +1233,7 @@ function updateUserNow(req, res) {
           try { require('../productAccountHooks').onDemoted(id); } catch (error) { console.error(`full-access cleanup failed: ${error.message}`); }
         }
         const signInsGone = !signInsChange ? Promise.resolve()
-          : Promise.all([removeSessionsOrFail({ userId: id }), loginDevices.removeAll(id)]);
+          : Promise.all([removeSessionsOrFail({ userId: id }), loginDevices.removeAll(id), trustedDevices().removeAll(id)]);
         signInsGone.then(() => {
         usersDB.findOne({ _id: id }, (readErr, user) => {
           if (readErr || !user) return res.status(404).json({ message: 'User not found' });
@@ -1306,7 +1314,7 @@ async function lifecycleAction(req, res, action, successMessage) {
     // may have landed meanwhile.
     const now = action === 'enable' ? await findUser({ _id: req.params.id }) : null;
     if (action === 'enable' && now && !isActiveUser(now)) {
-      try { await Promise.all([loginDevices.removeAll(req.params.id), passkeyStore.removeAll(req.params.id)]); } catch (e) { console.error('enable: old passkeys or phones not removed:', e.message); return res.status(500).json({ message: 'Not enabled: its old passkeys or bound phones could not be removed first. Try again.', code: 'CREDENTIAL_CLEANUP_INCOMPLETE' }); }
+      try { await Promise.all([loginDevices.removeAll(req.params.id), trustedDevices().removeAll(req.params.id), passkeyStore.removeAll(req.params.id)]); } catch (e) { console.error('enable: old passkeys or phones not removed:', e.message); return res.status(500).json({ message: 'Not enabled: its old passkeys or bound phones could not be removed first. Try again.', code: 'CREDENTIAL_CLEANUP_INCOMPLETE' }); }
     }
     const result = await lifecycleService()[`${action}User`]({
       targetUserId: req.params.id,
@@ -1319,7 +1327,7 @@ async function lifecycleAction(req, res, action, successMessage) {
     let left = null;
     if (action === 'disable' || action === 'delete') {
       qrRequests.revokeUser(req.params.id);twoStepTickets.revokeUser(req.params.id);endPasskeyChallenges(req.params.id);
-      try { await Promise.all([loginDevices.removeAll(req.params.id), passkeyStore.removeAll(req.params.id)]); } catch (e) { left = e; console.error(`${action}: passkeys or bound phones not removed:`, e.message); }
+      try { await Promise.all([loginDevices.removeAll(req.params.id), trustedDevices().removeAll(req.params.id), passkeyStore.removeAll(req.params.id)]); } catch (e) { left = e; console.error(`${action}: passkeys or bound phones not removed:`, e.message); }
       // A disable keeps what the security log holds for the account, its protection
       // and its counts: off and on again must not be a way round them. A delete forgets it all.
       if (action === 'delete') security.forgetUser(req.params.id, before?.username);
@@ -1360,7 +1368,7 @@ async function purgeUserFootprint(userId) {
     // Castpane). Without it,
     // deleting an account would leave every message on disk for ever, reachable by nobody.
     Promise.resolve().then(() => require('../productAccountHooks').onPurge(id)),
-    loginDevices.removeAll(id),
+    loginDevices.removeAll(id), trustedDevices().removeAll(id),
     passkeyStore.removeAll(id),
     Promise.resolve().then(() => { qrRequests.revokeUser(id); twoStepTickets.revokeUser(id);endPasskeyChallenges(id); }),
   ]);
@@ -1475,7 +1483,7 @@ function resetUserPasswordNow(req, res) {
           // Waited for: the password is new, and the old ways in are gone before the
           // admin is told so; the same request again finishes what did not go.
           adminGranted(req, id);
-          Promise.all([removeSessionsOrFail({ userId: id }), loginDevices.removeAll(id), passkeyStore.removeAll(id)]).then(() => {
+          Promise.all([removeSessionsOrFail({ userId: id }), loginDevices.removeAll(id), trustedDevices().removeAll(id), passkeyStore.removeAll(id)]).then(() => {
             compactQuietly(usersDB, 'users');
             res.json({ message: 'Password reset' });
           }, (e) => { console.error('reset: sign-ins not all removed:', e.message); res.status(500).json(CLEANUP_INCOMPLETE); });

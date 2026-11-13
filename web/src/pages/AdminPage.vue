@@ -15,6 +15,7 @@
     <f7-list inset class="cc-settings-list">
       <f7-list-item link class="security-row" :title="ct('登入防禦')" @click.prevent="go('/security/')"><template #media><f7-icon f7="shield_lefthalf_fill"/></template></f7-list-item>
       <f7-list-item link class="devices-row" :title="ct('裝置')" @click.prevent="go('/devices/')"><template #media><f7-icon f7="device_phone_portrait"/></template></f7-list-item>
+      <f7-list-item link class="trusted-row" :title="ct('信任的裝置')" @click.prevent="go('/trusted/')"><template #media><f7-icon f7="hand_thumbsup"/></template></f7-list-item>
     </f7-list>
     <p class="admin-note">{{ ct('遠端連線的開始與結束，以及每次登入，也會列在這台 Mac 上 Castpane 設定的「活動」分頁。') }}</p>
   </f7-page>
