@@ -94,8 +94,11 @@ enum Catalog {
             if let id = Spaces.of(w.windowID), let d = desks[id] {
                 desk = ["id": d.id, "number": d.number, "display": d.display, "fullscreen": d.fullscreen, "current": d.current]
             }
+            // An app in the Dock (an ordinary one), not a menu-bar helper or a background
+            // agent that keeps a window it never shows: Labs lists only these.
+            let regular = w.owningApplication.flatMap { NSRunningApplication(processIdentifier: $0.processID) }?.activationPolicy == .regular
             items.append(["kind": "window", "id": Int(w.windowID), "title": w.title ?? "", "app": w.owningApplication?.applicationName ?? "",
-                          "here": w.isOnScreen, "desk": desk,
+                          "here": w.isOnScreen, "desk": desk, "dock": regular,
                           "bundle": w.owningApplication?.bundleIdentifier ?? "",
                           "width": Int(w.frame.width), "height": Int(w.frame.height),
                           "thumb": await thumb(filter, w.frame.size, thumbWidth) ?? ""])

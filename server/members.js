@@ -278,7 +278,7 @@ function item(x) {
   const d = x.desk && typeof x.desk === 'object' && !Array.isArray(x.desk) ? x.desk : {};
   return pick({
     kind: x.kind, id: x.id, title: str(x.title, 300) ?? '', app: str(x.app, 200) ?? '', bundle: str(x.bundle, 200),
-    width: int(x.width) ?? 0, height: int(x.height) ?? 0, here: bool(x.here), all: bool(x.all),
+    width: int(x.width) ?? 0, height: int(x.height) ?? 0, here: bool(x.here), all: bool(x.all), dock: bool(x.dock),
     thumb: typeof x.thumb === 'string' && x.thumb.length <= 512 * 1024 && THUMB.test(x.thumb) ? x.thumb : '',
     desk: pick({ id: int(d.id), number: int(d.number), display: int(d.display), fullscreen: bool(d.fullscreen), current: bool(d.current) }),
   });

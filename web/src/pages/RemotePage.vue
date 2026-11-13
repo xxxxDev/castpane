@@ -1045,7 +1045,9 @@ const iconsKey = () => `castpane-icons-${machine}`, recentKey = () => `castpane-
 const orderedWindows = computed(() => {
   const rank = (w) => { const i = recent.value.indexOf(w.id);return i >= 0 ? i : 1000 + (w.here === false ? 1 : 0); };
   const area = (w) => (w.width || 0) * (w.height || 0);
-  return items.value.filter((w) => w.kind === 'window').sort((a, b) => rank(a) - rank(b) || area(b) - area(a));
+  // Only apps in the Dock: a menu-bar helper's hidden window (a settings panel never shown)
+  // was listed as if open. A Mac from before says nothing (dock undefined): all of them.
+  return items.value.filter((w) => w.kind === 'window' && w.dock !== false).sort((a, b) => rank(a) - rank(b) || area(b) - area(a));
 });
 const recentWindows = computed(() => orderedWindows.value.slice(0, 12));
 const appTitle = computed(() => { const w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);return w ? w.app || w.title : ''; });
