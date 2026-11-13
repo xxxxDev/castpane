@@ -134,6 +134,26 @@ enum Catalog {
         // Castpane's own windows (the setup assistant, Settings) are in the list too; they
         // need no raising, and activating Castpane would only pull its windows in front.
         guard pid != ProcessInfo.processInfo.processIdentifier else { return }
+        raise(id, pid: pid)
+        // Brought forward the way a click on its Dock icon does it (Launch Services): that also
+        // switches to the desktop its window is on. NSRunningApplication.activate from this
+        // app, which is not in front, was ignored, and a window on another desktop stayed there.
+        DispatchQueue.main.async {
+            guard let app = NSRunningApplication(processIdentifier: pid) else { return }
+            if let url = app.bundleURL {
+                let config = NSWorkspace.OpenConfiguration()
+                config.activates = true
+                // Once on its desktop, this window on top of the app's others.
+                NSWorkspace.shared.openApplication(at: url, configuration: config) { _, _ in
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { raise(id, pid: pid) }
+                }
+            } else { _ = app.activate() }
+        }
+    }
+
+    /// Out of the Dock and raised, through Accessibility: it lists only the windows on the
+    /// desktop shown, so a window on another one is raised after the switch.
+    private static func raise(_ id: CGWindowID, pid: pid_t) {
         let app = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(app, 1)
         var value: CFTypeRef?
@@ -146,17 +166,6 @@ enum Catalog {
                 AXUIElementSetAttributeValue(w, kAXMainAttribute as CFString, kCFBooleanTrue)
                 break
             }
-        }
-        // Brought forward the way a click on its Dock icon does it (Launch Services): that also
-        // switches to the desktop its window is on. NSRunningApplication.activate from this
-        // app, which is not in front, was ignored, and a window on another desktop stayed there.
-        DispatchQueue.main.async {
-            guard let app = NSRunningApplication(processIdentifier: pid) else { return }
-            if let url = app.bundleURL {
-                let config = NSWorkspace.OpenConfiguration()
-                config.activates = true
-                NSWorkspace.shared.openApplication(at: url, configuration: config)
-            } else { _ = app.activate() }
         }
     }
 
