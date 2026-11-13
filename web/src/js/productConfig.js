@@ -13,6 +13,7 @@ export const PRODUCT = Object.freeze({
     loginKey: 'castpane-login-key', // qrLogin.js
     passkeyOffer: 'castpane-passkey-offer', // passkeys.js
     updateDialog: 'castpane-update-dialog', // updatePrompt.js
+    labs: 'castpane-labs', // labs.js
     sidebarFolded: 'castpane-sidebar-folded', // sidebarState.js
     sidebarAuto: 'castpane-sidebar-auto', // sidebarState.js
     language: 'castpane-lang', // i18n.js

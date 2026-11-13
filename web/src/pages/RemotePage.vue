@@ -1,8 +1,9 @@
 <template>
   <!-- Remote (server/remote.js; first made after Sill): this Mac's
        screen or one of its windows, live, with clicks, scrolls and keys sent back. -->
-  <f7-page name="remote" class="page-large-static remote-page" @page:afterin="load">
-    <f7-navbar :title="ct('遠端')" large></f7-navbar>
+  <f7-page :name="labs ? 'labs' : 'remote'" class="page-large-static remote-page" @page:afterin="load">
+    <f7-navbar :title="labs ? ct('實驗') : ct('遠端')" large></f7-navbar>
+    <p v-if="labs" class="remote-note labs-note">{{ ct('以 App 為主，把 Mac 上開著的 App 當成這台裝置的 App 來用。這是實驗功能，可以在設定裡關掉。') }}</p>
 
     <p class="remote-note">{{ ct('在這裡看到並操作這台 Mac 的畫面，或其中一個視窗。只有管理員能用，開始前要再驗證一次（有通行密鑰就用密鑰，沒有就輸入密碼），8 小時內不用再驗證。') }}</p>
     <f7-block v-if="!supported" class="remote-error" role="alert">{{ ct('這個瀏覽器不支援影片解碼（WebCodecs），請改用新版的 Edge、Chrome 或 Safari。') }}</f7-block>
@@ -45,6 +46,7 @@
             </button>
           </div>
           <div class="remote-actions">
+            <button v-if="labs" type="button" class="remote-btn home" :title="ct('首頁')" @click="goHome"><f7-icon f7="square_grid_2x2" :size="17"/></button>
             <!-- The screens, desktops and windows fold away for a bigger picture. -->
             <button type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headFolded ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
             <button v-if="isTouch && view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="resetView">1×</button>
@@ -65,7 +67,6 @@
             <button v-if="!isTouch && canFullscreen" type="button" class="remote-btn fullscreen" :class="{on: fullscreen}" :title="ct('全螢幕顯示')" @pointerdown.prevent @mousedown.prevent @click="toggleFullscreen"><f7-icon :f7="fullscreen ? 'arrow_down_right_arrow_up_left' : 'arrow_up_left_arrow_down_right'" :size="17"/></button>
             <!-- On a phone the rest sit in one menu, so the bar keeps room for windows. -->
             <template v-if="isTouch">
-              <button type="button" class="remote-btn home" :title="ct('首頁')" @click="goHome"><f7-icon f7="square_grid_2x2" :size="17"/></button>
               <button type="button" class="remote-btn more" :class="{on: menuOpen}" :title="ct('更多')" @pointerdown.prevent @mousedown.prevent @click="menuOpen = !menuOpen;settingsOpen = false"><f7-icon f7="ellipsis" :size="18"/></button>
             </template>
             <template v-else>
@@ -116,7 +117,7 @@
         </div>
         </div>
 
-        <RemoteHome v-if="appMode === 'home'" :name="machineName" :recent="recentWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect"/>
+        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
@@ -202,6 +203,9 @@ import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
 import RemoteHome from '../components/RemoteHome.vue';
+
+// labs: the Labs tab's page (js/labs.js), the Mac's apps first; the Remote tab's has the whole screen.
+const props = defineProps({ labs: { type: Boolean, default: false } });
 import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, otherKeyboardKey, QUALITY, RESOLUTION, STEPS, autoStep } from '../js/remoteStream.js';
 
 const supported = remoteSupported();
@@ -1002,25 +1006,26 @@ function sendCompose() {
   composeField.value?.focus({ preventScroll: true });
 }
 // ---- apps ----
-// A phone or tablet opens on the Mac's apps (RemoteHome.vue), and an app's window then fills
-// it, made the device's shape on the Mac so its text reads as the device's own apps and a
-// finger can hit its buttons; the whole screen is one choice among them. A computer keeps
-// the whole screen first.
+// The Labs page opens on the Mac's open apps (RemoteHome.vue), and an app's window then fills
+// it, made a phone's or tablet's shape on the Mac so its text reads as the device's own apps
+// and a finger can hit its buttons; the whole screen is one choice among them. The Remote
+// page keeps the whole screen as it was.
 const appMode = ref('desktop'), apps = ref([]), icons = reactive({}), launching = ref(''), switcherOpen = ref(false), cardSwipe = reactive({});
 const machineName = ref(''), recent = ref([]);
 let iconsAsked = new Set(), launchTimer = 0, fitWait = null, fitSize = null, fitTimer = 0;
 const iconsKey = () => `castpane-icons-${machine}`, recentKey = () => `castpane-recent-${machine}`;
 // The windows used last first, then those on the Mac's screen now.
-const recentWindows = computed(() => {
+const orderedWindows = computed(() => {
   const rank = (w) => { const i = recent.value.indexOf(w.id);return i >= 0 ? i : 1000 + (w.here === false ? 1 : 0); };
-  return items.value.filter((w) => w.kind === 'window').sort((a, b) => rank(a) - rank(b)).slice(0, 12);
+  return items.value.filter((w) => w.kind === 'window').sort((a, b) => rank(a) - rank(b));
 });
+const recentWindows = computed(() => orderedWindows.value.slice(0, 12));
 const appTitle = computed(() => { const w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);return w ? w.app || w.title : ''; });
 function startApps(m) {
   machineName.value = m.name || '';
   // Back after a while away: as it was (the whole screen, the home or an app's window).
-  appMode.value = resumeMode === 'desktop' || !isTouch ? 'desktop' : 'home';resumeMode = null;
-  apps.value = [];launching.value = '';switcherOpen.value = false;iconsAsked = new Set();
+  appMode.value = props.labs && resumeMode !== 'desktop' ? 'home' : 'desktop';resumeMode = null;
+  apps.value = [];launching.value = '';switcherOpen.value = false;iconsAsked = new Set();iconsAll = false;
   for (const k of Object.keys(icons)) delete icons[k];
   try { Object.assign(icons, JSON.parse(localGet(iconsKey()) || '{}')); } catch { /* none kept */ }
   try { recent.value = JSON.parse(localGet(recentKey()) || '[]').filter(Number.isInteger); } catch { recent.value = []; }
@@ -1028,8 +1033,11 @@ function startApps(m) {
 function used(id) { recent.value = [id, ...recent.value.filter((x) => x !== id)].slice(0, 20);localSet(recentKey(), JSON.stringify(recent.value)); }
 // Icons the page has not kept, 40 at a time; kept on this device (the browser's own storage),
 // so the home opens at once next time and only new apps are fetched.
-function askIcons() {
-  const missing = apps.value.filter((a) => !icons[a.bundle] && !iconsAsked.has(a.bundle)).slice(0, 40).map((a) => a.bundle);
+// The open apps' first; every app's once all of them are shown.
+let iconsAll = false;
+function askIcons(all = false) {
+  if (all) iconsAll = true;
+  const missing = apps.value.filter((a) => (iconsAll || a.running) && !icons[a.bundle] && !iconsAsked.has(a.bundle)).slice(0, 40).map((a) => a.bundle);
   if (!missing.length) return;
   for (const b of missing) iconsAsked.add(b);
   link?.send({ t: 'icons', bundles: missing });
@@ -1069,9 +1077,11 @@ onBeforeUnmount(() => { clearInterval(launchTimer);clearTimeout(fitTimer); });
 // The window made the shape of the area it fills here, in points as this page's pixels:
 // its text then comes out the size of this device's own. An app that cannot be that
 // narrow keeps the width it can have, and the picture fits as before.
+// A window in full screen or on another desktop is shown as it is: resizing one there kept
+// the picture at Connecting (a mail app's full-screen window).
 function fitTo(w) {
   const r = area.value?.getBoundingClientRect();
-  if (!r || !r.width || prefs.fit === false || !isTouch) return Promise.resolve(null);
+  if (!r || !r.width || prefs.fit === false || !isTouch || w.desk?.fullscreen || w.here === false) return Promise.resolve(null);
   const size = { width: Math.max(240, Math.round(r.width)), height: Math.max(240, Math.round(r.height)) };
   return new Promise((resolve) => {
     const done = (m) => { clearTimeout(t);fitWait = null;fitSize = m?.ok ? size : null;resolve(m); };

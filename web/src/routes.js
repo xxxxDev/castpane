@@ -14,6 +14,8 @@ import SecurityPage from './pages/SecurityPage.vue';
 export default [
   // Remote: this Mac's screen and input, for an admin (server/remote.js).
   { path: '/remote/', component: RemotePage },
+  // Labs: the Mac's apps used as a phone's own (Settings › System › Labs turns it on).
+  { path: '/labs/', component: RemotePage, options: { props: { labs: true } } },
 
   { path: '/settings/', component: SettingsPage },
   // Settings detail push (within the #view-settings router stack).

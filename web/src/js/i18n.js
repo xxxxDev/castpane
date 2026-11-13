@@ -23,6 +23,7 @@ const dict = {
   en: {
     back: '← Back',
     tabRemote: 'Remote',
+    tabLabs: 'Labs',
     tabSettings: 'Settings',
     tabAdmin: 'Admin',
     sectionAccount: 'Account',
@@ -110,6 +111,7 @@ const dict = {
   'zh-TW': {
     back: '← 上一步',
     tabRemote: '遠端',
+    tabLabs: '實驗',
     tabSettings: '設定',
     tabAdmin: '管理',
     sectionAccount: '帳號',
