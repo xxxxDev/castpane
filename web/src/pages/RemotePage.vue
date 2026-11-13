@@ -128,7 +128,7 @@
              to where the Mac's cursor is in one go. -->
         <div v-if="compose" class="remote-compose" @pointerdown.stop>
           <input ref="composeField" v-model="composeText" class="remote-compose-field" type="text" enterkeyhint="send" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" :placeholder="ct('打好字，送到 Mac 的游標位置')" @keydown="composeKey">
-          <button type="button" class="remote-compose-send" :disabled="!composeText" @pointerdown.prevent @mousedown.prevent @click="sendCompose">{{ ct('送出') }}</button>
+          <button type="button" class="remote-compose-send" @pointerdown.prevent @mousedown.prevent @click="sendCompose">{{ ct('送出') }}</button>
         </div>
         <!-- The clipboard both ways. -->
         <div v-if="clipOpen" class="remote-clip" @pointerdown.stop>
@@ -953,9 +953,11 @@ function toggleCompose() {
   compose.value = true;
   nextTick(() => composeField.value?.focus({ preventScroll: true }));
 }
+// Empty, Send is Return on the Mac: what was just put in its field goes too, without
+// leaving the pencil's field for the keyboard.
 function sendCompose() {
   const s = composeText.value;
-  if (!s) return;
+  if (!s) { tap('Enter');composeField.value?.focus({ preventScroll: true });return; }
   const chars = [...s];
   for (let i = 0; i < chars.length; i += 1000) link?.send({ t: 'text', s: chars.slice(i, i + 1000).join('') });
   composeText.value = '';releaseMods();
