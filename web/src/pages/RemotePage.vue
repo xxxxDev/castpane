@@ -32,11 +32,11 @@
         <!-- The bar: every window, the Desktop first, as Sill's bar of thumbnails. -->
         <!-- The Mac's desktops first, then the windows on the one picked: whole
              screens, each desktop, full-screen apps, the Dock. -->
-        <div class="remote-head" :class="{collapsed: headFolded}">
-        <div v-if="groups.length > 1 && !headFolded" class="remote-desks" role="tablist">
+        <div v-if="appMode !== 'home'" class="remote-head" :class="{collapsed: headFolded && appMode === 'desktop'}">
+        <div v-if="appMode === 'desktop' && groups.length > 1 && !headFolded" class="remote-desks" role="tablist">
           <button v-for="g in groups" :key="g.key" type="button" class="remote-desk" :class="{active: g.key === groupKey, current: g.current}" @click="groupKey = g.key">{{ g.label }}<span class="remote-desk-count">{{ g.items.length }}</span></button>
         </div>
-        <div class="remote-bar">
+        <div v-if="appMode === 'desktop'" class="remote-bar">
           <div v-if="!headFolded" class="remote-thumbs" role="tablist">
             <button v-for="w in shownItems" :key="w.kind + w.id" type="button" class="remote-thumb" :class="{active: current && current.kind === w.kind && current.id === w.id}" :title="w.app ? w.app + ' · ' + w.title : w.title" @click="show(w)">
               <img v-if="w.thumb" :src="w.thumb" alt=""/><f7-icon v-else :f7="w.kind === 'display' ? 'desktopcomputer' : 'macwindow'" :size="20"/>
@@ -65,6 +65,7 @@
             <button v-if="!isTouch && canFullscreen" type="button" class="remote-btn fullscreen" :class="{on: fullscreen}" :title="ct('全螢幕顯示')" @pointerdown.prevent @mousedown.prevent @click="toggleFullscreen"><f7-icon :f7="fullscreen ? 'arrow_down_right_arrow_up_left' : 'arrow_up_left_arrow_down_right'" :size="17"/></button>
             <!-- On a phone the rest sit in one menu, so the bar keeps room for windows. -->
             <template v-if="isTouch">
+              <button type="button" class="remote-btn home" :title="ct('首頁')" @click="goHome"><f7-icon f7="square_grid_2x2" :size="17"/></button>
               <button type="button" class="remote-btn more" :class="{on: menuOpen}" :title="ct('更多')" @pointerdown.prevent @mousedown.prevent @click="menuOpen = !menuOpen;settingsOpen = false"><f7-icon f7="ellipsis" :size="18"/></button>
             </template>
             <template v-else>
@@ -74,7 +75,19 @@
             </template>
           </div>
         </div>
+        <!-- An app's own bar: back to the home, its name, the keyboard and the rest. -->
+        <div v-if="appMode === 'app'" class="remote-apphead">
+          <button type="button" class="remote-apphead-back" @click="goHome"><f7-icon f7="chevron_left" :size="17"/>{{ ct('首頁') }}</button>
+          <div class="remote-apphead-title">{{ appTitle }}</div>
+          <button v-if="view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="resetView">1×</button>
+          <button type="button" class="remote-btn keyboard" :class="{on: keyboardOpen}" :title="ct('鍵盤')" @pointerdown.prevent @mousedown.prevent @click="toggleKeyboard"><f7-icon f7="keyboard" :size="18"/></button>
+          <button type="button" class="remote-btn more" :class="{on: menuOpen}" :title="ct('更多')" @pointerdown.prevent @mousedown.prevent @click="menuOpen = !menuOpen;settingsOpen = false"><f7-icon f7="ellipsis" :size="18"/></button>
+        </div>
         <div v-if="menuOpen" ref="menuEl" class="remote-menu" :style="menuMax ? {maxHeight: menuMax + 'px'} : null" @pointerdown.stop>
+          <template v-if="appMode === 'app'">
+            <button type="button" class="remote-menu-item go-desktop" @click="menuOpen = false;goDesktop()"><f7-icon f7="desktopcomputer" :size="18"/>{{ ct('整個螢幕（遠端桌面）') }}</button>
+            <button type="button" class="remote-menu-item fit-toggle" @click="toggleFit"><f7-icon f7="rectangle_compress_vertical" :size="18"/>{{ prefs.fit === false ? ct('視窗配合這台裝置：關') : ct('視窗配合這台裝置：開') }}</button>
+          </template>
           <!-- On a phone the keyboard lives here. -->
           <button type="button" class="remote-menu-item keyboard" @pointerdown.prevent @mousedown.prevent @click="menuOpen = false;toggleKeyboard()"><f7-icon f7="keyboard" :size="18"/>{{ keyboardOpen ? ct('收起鍵盤') : ct('打開鍵盤') }}</button>
           <button type="button" class="remote-menu-item clipboard" @click="menuOpen = false;clipOpen = true"><f7-icon f7="doc_on_clipboard" :size="18"/>{{ ct('剪貼簿') }}</button>
@@ -103,7 +116,8 @@
         </div>
         </div>
 
-        <div ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
+        <RemoteHome v-if="appMode === 'home'" :name="machineName" :recent="recentWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect"/>
+        <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
@@ -124,6 +138,20 @@
           <div v-if="mode === 'trackpad' && isTouch && hasPicture" class="remote-pad-hint">{{ ct('觸控板：滑動移動游標，點一下按一下，兩指滑動捲動') }}</div>
         </div>
 
+        <!-- A phone's own way between apps: the bar at the bottom slid sideways goes to the app
+             used before or after, slid up shows the open windows as cards. -->
+        <div v-if="appMode === 'app' && isTouch && !keyboardOpen && !compose && !panel" class="remote-homebar" @pointerdown="barDown" @pointermove="barMove" @pointerup="barUp" @pointercancel="barUp"><span></span></div>
+        <div v-if="switcherOpen" class="remote-switcher" @pointerdown.self="switcherOpen = false">
+          <div class="remote-switcher-cards">
+            <div v-for="w in recentWindows" :key="w.id" class="remote-switcher-card" :data-id="w.id" :style="cardSwipe[w.id] ? {transform: `translateY(${cardSwipe[w.id]}px)`, opacity: Math.max(0.2, 1 + cardSwipe[w.id] / 300)} : null"
+                 @pointerdown="cardDown($event, w)" @pointermove="cardMove($event, w)" @pointerup="cardUp($event, w)" @pointercancel="cardUp($event, w)">
+              <div class="remote-switcher-name">{{ w.app || w.title }}</div>
+              <img v-if="w.thumb" :src="w.thumb" alt=""/>
+              <div v-else class="remote-switcher-blank"><img v-if="icons[w.bundle]" :src="icons[w.bundle]" alt=""/></div>
+            </div>
+          </div>
+          <div class="remote-switcher-hint">{{ ct('點一下打開，往上滑在 Mac 上關掉') }}</div>
+        </div>
         <!-- The pencil's field: text written on the phone, input method and all, and sent
              to where the Mac's cursor is in one go. -->
         <div v-if="compose" class="remote-compose" @pointerdown.stop>
@@ -173,6 +201,7 @@ import { api } from '../js/api.js';
 import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
+import RemoteHome from '../components/RemoteHome.vue';
 import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, otherKeyboardKey, QUALITY, RESOLUTION, STEPS, autoStep } from '../js/remoteStream.js';
 
 const supported = remoteSupported();
@@ -267,18 +296,18 @@ onBeforeUnmount(() => clearInterval(listTimer));
 // screen or window by itself; it used to leave you at the list of Macs.
 // Longer, it may be someone else's turn by then, so it waits for a tap.
 const RESUME_WITHIN = 10 * 60 * 1000;
-let lastMachine = null, resume = null, resumeItem = null;
+let lastMachine = null, resume = null, resumeItem = null, resumeMode = null;
 const machineKey = (m) => (m.local ? 'local' : m.id);
 const onHidden = async () => {
   if (document.visibilityState === 'hidden' && streaming.value) {
-    resume = lastMachine && { key: machineKey(lastMachine), item: current.value, at: Date.now() };
+    resume = lastMachine && { key: machineKey(lastMachine), item: current.value, mode: appMode.value, at: Date.now() };
     disconnect();
   } else if (document.visibilityState === 'visible' && !streaming.value) {
     const r = resume;resume = null;
     await load();
     if (!r || Date.now() - r.at > RESUME_WITHIN || streaming.value || document.visibilityState !== 'visible') return;
     const m = machines.value.find((x) => machineKey(x) === r.key);
-    if (m?.running) { resumeItem = r.item;connect(m); }
+    if (m?.running) { resumeItem = r.item;resumeMode = r.mode;connect(m); }
   }
 };
 document.addEventListener('visibilitychange', onHidden);
@@ -339,6 +368,7 @@ async function connect(m, retried = false) {
   try { pass = await getPass(retried); } catch (e) { return f7.dialog.alert(adminProblem(e) || e.message); }
   if (!pass) return;
   streaming.value = true;hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;
+  startApps(m);
   await nextTick();
   link = openRemote({
     pass, machine: machine === 'local' ? '' : machine, canvas: canvas.value,
@@ -364,9 +394,12 @@ function onMessage(msg) {
   if (msg.t === 'status') {
     const missing = [!msg.screen && ct('螢幕與系統錄音'), !msg.accessibility && ct('輔助使用')].filter(Boolean);
     permission.value = missing.join('、');
-    if (msg.screen) list();
+    if (msg.screen) { list();if (appMode.value === 'home') link?.send({ t: 'apps' }); }
+    // Without the permissions there is nothing to show: the notice that asks for them.
+    else if (appMode.value === 'home') appMode.value = 'desktop';
   } else if (msg.t === 'list') {
     items.value = msg.items || [];
+    if (appMode.value !== 'desktop') { appsListed();return; }
     if (!current.value && items.value.length) {
       const back = resumeItem && items.value.find((w) => w.kind === resumeItem.kind && w.id === resumeItem.id);
       resumeItem = null;
@@ -375,6 +408,8 @@ function onMessage(msg) {
   } else if (msg.t === 'started') {
     if (!current.value || current.value.kind !== msg.kind || current.value.id !== msg.id) resetView();
     current.value = { kind: msg.kind, id: msg.id };notice.value = '';
+  } else if (msg.t === 'apps' || msg.t === 'icons' || msg.t === 'launched' || msg.t === 'fitted') {
+    appsMessage(msg);
   } else if (msg.t === 'caret') {
     if (keyboardOpen.value && Array.isArray(msg.caret) && !zoomTo) keepInSight({ x: msg.caret[0] + msg.caret[2] / 2, y: msg.caret[1] + msg.caret[3] / 2 });
   } else if (msg.t === 'probe') {
@@ -533,7 +568,7 @@ function clampView() {
 // The area grows and shrinks (the keyboard, the pencil's field, the clipboard's row) while the
 // picture is zoomed: kept inside it, or it was left out of sight, all black.
 if (typeof ResizeObserver !== 'undefined') {
-  const sized = new ResizeObserver(() => { if (view.z > 1 && area.value) clampView(); });
+  const sized = new ResizeObserver(() => { if (view.z > 1 && area.value) clampView();refitSoon(); });
   watch(area, (el, old) => { if (old) sized.unobserve(old);if (el) sized.observe(el); });
   onBeforeUnmount(() => sized.disconnect());
 }
@@ -717,6 +752,7 @@ function down(e) {
   // A button over the picture (asking for the permission) keeps its own tap.
   if (e.target.closest?.('button')) return;
   try { area.value.setPointerCapture?.(e.pointerId); } catch {}
+  if (edgeDown(e)) return;
   const p = toPicture(canvas.value, e.clientX, e.clientY);
   if (e.pointerType === 'mouse') {
     if (!p.inside) return;
@@ -737,6 +773,7 @@ function down(e) {
   } else if (touches.size === 2) { gesture = { kind: 'two', moved: 0, t: performance.now() };clearTimeout(longTimer); }
 }
 function move(e) {
+  if (edge?.id === e.pointerId) return;
   if (!link) return;
   if (e.pointerType === 'mouse') {
     const { clientX, clientY, buttons } = e, send = () => { const p = toPicture(canvas.value, clientX, clientY);if (p.inside || buttons) sendMove(p); };
@@ -796,6 +833,7 @@ function move(e) {
   }
 }
 function up(e) {
+  if (edge?.id === e.pointerId) return edgeUp(e);
   if (!link) return;
   if (e.pointerType === 'mouse') { const p = toPicture(canvas.value, e.clientX, e.clientY);link.send({ t: 'button', b: e.button === 2 ? 1 : e.button === 1 ? 2 : 0, down: false, x: p.x, y: p.y });return; }
   const t = touches.get(e.pointerId);touches.delete(e.pointerId);clearTimeout(longTimer);
@@ -822,7 +860,7 @@ function up(e) {
   if (touches.size === 1 && ['two', 'zoom', 'pan', 'scroll2'].includes(gesture.kind)) gesture = { kind: 'done', moved: 0 };
   if (touches.size === 0) gesture = null;
 }
-function cancel(e) { touches.delete(e.pointerId);clearTimeout(longTimer);if (!touches.size) gesture = null; }
+function cancel(e) { if (edge?.id === e.pointerId) edge = null;touches.delete(e.pointerId);clearTimeout(longTimer);if (!touches.size) gesture = null; }
 // A computer has no two fingers to pinch with: a trackpad's pinch (a wheel with Ctrl to
 // most browsers, gesture events to Safari), Ctrl or ⌘ with a mouse wheel, or the sizes in
 // the bar zoom instead (the phone's sit in its menu). A plain wheel keeps scrolling the Mac, so the picture follows the
@@ -963,6 +1001,168 @@ function sendCompose() {
   composeText.value = '';releaseMods();
   composeField.value?.focus({ preventScroll: true });
 }
+// ---- apps ----
+// A phone or tablet opens on the Mac's apps (RemoteHome.vue), and an app's window then fills
+// it, made the device's shape on the Mac so its text reads as the device's own apps and a
+// finger can hit its buttons; the whole screen is one choice among them. A computer keeps
+// the whole screen first.
+const appMode = ref('desktop'), apps = ref([]), icons = reactive({}), launching = ref(''), switcherOpen = ref(false), cardSwipe = reactive({});
+const machineName = ref(''), recent = ref([]);
+let iconsAsked = new Set(), launchTimer = 0, fitWait = null, fitSize = null, fitTimer = 0;
+const iconsKey = () => `castpane-icons-${machine}`, recentKey = () => `castpane-recent-${machine}`;
+// The windows used last first, then those on the Mac's screen now.
+const recentWindows = computed(() => {
+  const rank = (w) => { const i = recent.value.indexOf(w.id);return i >= 0 ? i : 1000 + (w.here === false ? 1 : 0); };
+  return items.value.filter((w) => w.kind === 'window').sort((a, b) => rank(a) - rank(b)).slice(0, 12);
+});
+const appTitle = computed(() => { const w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);return w ? w.app || w.title : ''; });
+function startApps(m) {
+  machineName.value = m.name || '';
+  // Back after a while away: as it was (the whole screen, the home or an app's window).
+  appMode.value = resumeMode === 'desktop' || !isTouch ? 'desktop' : 'home';resumeMode = null;
+  apps.value = [];launching.value = '';switcherOpen.value = false;iconsAsked = new Set();
+  for (const k of Object.keys(icons)) delete icons[k];
+  try { Object.assign(icons, JSON.parse(localGet(iconsKey()) || '{}')); } catch { /* none kept */ }
+  try { recent.value = JSON.parse(localGet(recentKey()) || '[]').filter(Number.isInteger); } catch { recent.value = []; }
+}
+function used(id) { recent.value = [id, ...recent.value.filter((x) => x !== id)].slice(0, 20);localSet(recentKey(), JSON.stringify(recent.value)); }
+// Icons the page has not kept, 40 at a time; kept on this device (the browser's own storage),
+// so the home opens at once next time and only new apps are fetched.
+function askIcons() {
+  const missing = apps.value.filter((a) => !icons[a.bundle] && !iconsAsked.has(a.bundle)).slice(0, 40).map((a) => a.bundle);
+  if (!missing.length) return;
+  for (const b of missing) iconsAsked.add(b);
+  link?.send({ t: 'icons', bundles: missing });
+}
+function appsMessage(msg) {
+  if (msg.t === 'apps') { apps.value = msg.apps || [];askIcons(); }
+  else if (msg.t === 'icons') {
+    Object.assign(icons, msg.icons || {});
+    try { localSet(iconsKey(), JSON.stringify(icons)); } catch { /* full: kept for now only */ }
+    askIcons();
+  } else if (msg.t === 'launched') {
+    if (!msg.ok && launching.value === msg.bundle) { launching.value = '';toast(ct('這個 App 打不開')); }
+  } else if (msg.t === 'fitted') { fitWait?.(msg); }
+}
+// The list came: a window of the app being opened, or the one to come back to.
+function appsListed() {
+  if (launching.value) {
+    const w = items.value.find((x) => x.kind === 'window' && x.bundle === launching.value);
+    if (w) { launching.value = '';clearInterval(launchTimer);openWindow(w); }
+  } else if (resumeItem && appMode.value === 'home') {
+    const w = items.value.find((x) => x.kind === resumeItem.kind && x.id === resumeItem.id);
+    resumeItem = null;
+    if (w?.kind === 'window') openWindow(w);
+  }
+}
+function openApp(a) {
+  const w = recentWindows.value.find((x) => x.bundle === a.bundle);
+  if (w) return openWindow(w);
+  // Not open, or open with no window: started (or asked for a window), then shown once it has one.
+  launching.value = a.bundle;
+  link?.send({ t: 'launch', bundle: a.bundle });
+  clearInterval(launchTimer);
+  let tries = 0;
+  launchTimer = setInterval(() => { if (!launching.value || ++tries > 15) { clearInterval(launchTimer);if (launching.value) { launching.value = '';toast(ct('這個 App 沒有開出視窗')); } return; } list(); }, 1000);
+}
+onBeforeUnmount(() => { clearInterval(launchTimer);clearTimeout(fitTimer); });
+// The window made the shape of the area it fills here, in points as this page's pixels:
+// its text then comes out the size of this device's own. An app that cannot be that
+// narrow keeps the width it can have, and the picture fits as before.
+function fitTo(w) {
+  const r = area.value?.getBoundingClientRect();
+  if (!r || !r.width || prefs.fit === false || !isTouch) return Promise.resolve(null);
+  const size = { width: Math.max(240, Math.round(r.width)), height: Math.max(240, Math.round(r.height)) };
+  return new Promise((resolve) => {
+    const done = (m) => { clearTimeout(t);fitWait = null;fitSize = m?.ok ? size : null;resolve(m); };
+    const t = setTimeout(() => done(null), 2000);
+    fitWait = done;
+    link?.send({ t: 'fit', id: w.id, ...size });
+  });
+}
+async function openWindow(w, keepOrder = false) {
+  switcherOpen.value = false;menuOpen.value = false;settingsOpen.value = false;
+  if (!keepOrder) used(w.id);
+  if (appMode.value !== 'app') { appMode.value = 'app';mode.value = 'direct'; }
+  resetView();hasPicture.value = false;notice.value = ct('正在打開…');
+  await nextTick();
+  await fitTo(w);
+  show(w);
+}
+function goHome() {
+  menuOpen.value = false;settingsOpen.value = false;switcherOpen.value = false;compose.value = false;panel.value = false;clipOpen.value = false;
+  if (keyboardOpen.value) { keyboardOpen.value = false;typing.value?.blur(); }
+  link?.send({ t: 'stop' });
+  current.value = null;hasPicture.value = false;fitSize = null;
+  appMode.value = 'home';
+  list();link?.send({ t: 'apps' });
+}
+function goDesktop() {
+  appMode.value = 'desktop';switcherOpen.value = false;
+  mode.value = localGet('castpane-remote-mode') || 'direct';
+  const d = items.value.find((x) => x.kind === 'display' && !x.all) || items.value[0];
+  if (!d) return;
+  show(d);
+  groupKey.value = groups.value.find((g) => g.items.some((w) => w.kind === d.kind && w.id === d.id))?.key || groupKey.value;
+}
+function toggleFit() {
+  menuOpen.value = false;
+  prefs.fit = prefs.fit === false;localSet('castpane-remote-prefs', JSON.stringify(prefs));
+  const w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);
+  if (!w) return;
+  if (prefs.fit === false) { link?.send({ t: 'unfit' });fitSize = null;setTimeout(showCurrent, 300); } else openWindow(w, true);
+}
+// The keyboard up or down changes the room the window has: made that shape again (once
+// the size has settled), and its picture started again at it.
+function refitSoon() {
+  if (appMode.value !== 'app' || !fitSize || prefs.fit === false) return;
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(async () => {
+    const r = area.value?.getBoundingClientRect(), w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);
+    if (!r || !w || appMode.value !== 'app' || (Math.abs(r.width - fitSize.width) < 40 && Math.abs(r.height - fitSize.height) < 40)) return;
+    if (await fitTo(w)) show(w);
+  }, 700);
+}
+// The bottom bar: sideways to the app used before (right) or after (left), up for the cards.
+let bar = null, barAt = 0;
+function barDown(e) { bar = { x: e.clientX, y: e.clientY };try { e.target.setPointerCapture(e.pointerId); } catch { /* gone */ } }
+function barMove() {}
+function barUp(e) {
+  if (!bar) return;
+  const dx = e.clientX - bar.x, dy = e.clientY - bar.y;bar = null;
+  if (dy < -40 && -dy > Math.abs(dx)) { switcherOpen.value = true;return; }
+  if (Math.abs(dx) < 40) return;
+  const list = recentWindows.value;if (list.length < 2) return;
+  const here = list.findIndex((w) => current.value && w.id === current.value.id);
+  // Going through them in a row keeps the order, as an iPhone does; it settles on the last.
+  barAt = here < 0 ? 0 : here;
+  const next = list[(barAt + (dx > 0 ? 1 : list.length - 1)) % list.length];
+  openWindow(next, true);
+  clearTimeout(barSettle);barSettle = setTimeout(() => { if (current.value) used(current.value.id); }, 3000);
+}
+let barSettle = 0;
+onBeforeUnmount(() => clearTimeout(barSettle));
+// A card slid up closes its window on the Mac; a tap opens it.
+let card = null;
+function cardDown(e, w) { card = { id: w.id, y: e.clientY, moved: 0 };try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* gone */ } }
+function cardMove(e, w) { if (!card || card.id !== w.id) return;const dy = e.clientY - card.y;card.moved = Math.max(card.moved, Math.abs(dy));cardSwipe[w.id] = Math.min(0, dy); }
+function cardUp(e, w) {
+  if (!card || card.id !== w.id) return;
+  const dy = e.clientY - card.y, moved = card.moved;card = null;
+  if (dy < -120) { link?.send({ t: 'close', id: w.id });recent.value = recent.value.filter((x) => x !== w.id);items.value = items.value.filter((x) => !(x.kind === 'window' && x.id === w.id));delete cardSwipe[w.id];return; }
+  delete cardSwipe[w.id];
+  if (moved < 10) openWindow(w);
+}
+// From the left edge, a finger slid right goes back to the home, as an iPhone's back.
+let edge = null;
+function edgeDown(e) {
+  if (appMode.value !== 'app' || e.pointerType === 'mouse' || !area.value) return false;
+  if (e.clientX - area.value.getBoundingClientRect().left > 18) return false;
+  edge = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  return true;
+}
+function edgeUp(e) { const g = edge;edge = null;if (g && e.clientX - g.x > 70 && Math.abs(e.clientY - g.y) < 80) goHome(); }
+
 // ---- clipboard ----
 const toast = (text) => f7.toast.create({ text, closeTimeout: 2200 }).open();
 let clipWait = null;
@@ -1248,6 +1448,19 @@ function keyUp(e) {
 .remote-zoom .remote-menu {right:auto;left:50%;transform:translateX(-50%);min-width:140px;z-index:5;}
 .remote-btn:disabled {opacity:.35;cursor:default;}
 .remote-head-stats {align-self:center;margin-right:6px;}
+.remote-apphead {display:flex;align-items:center;gap:6px;padding:4px 8px;}
+.remote-stage .remote-apphead-back {flex:0 0 auto;display:inline-flex;align-items:center;gap:2px;width:auto;height:34px;margin:0;padding:0 8px 0 2px;border:0;background:none;color:#0a84ff;font-size:16px;cursor:pointer;}
+.remote-apphead-title {flex:1;min-width:0;text-align:center;font-size:15px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.remote-homebar {flex:0 0 auto;height:22px;display:flex;align-items:center;justify-content:center;touch-action:none;}
+.remote-homebar span {width:120px;height:5px;border-radius:3px;background:rgba(255,255,255,.7);}
+.remote-switcher {position:absolute;inset:0;z-index:5;background:rgba(0,0,0,.82);display:flex;flex-direction:column;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}
+.remote-switcher-cards {display:flex;gap:14px;overflow-x:auto;scrollbar-width:none;padding:0 24px;scroll-snap-type:x mandatory;}
+.remote-switcher-card {flex:0 0 62%;max-width:300px;scroll-snap-align:center;touch-action:pan-x;cursor:pointer;transition:opacity .15s;}
+.remote-switcher-name {color:#fff;font-size:14px;margin:0 0 6px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.remote-switcher-card img {display:block;width:100%;aspect-ratio:3/5;object-fit:cover;object-position:top;border-radius:16px;background:#2c2c2e;}
+.remote-switcher-blank {width:100%;aspect-ratio:3/5;border-radius:16px;background:#2c2c2e;display:flex;align-items:center;justify-content:center;}
+.remote-switcher-blank img {width:64px;height:64px;}
+.remote-switcher-hint {margin-top:16px;text-align:center;color:#aaa;font-size:13px;}
 .remote-area-stats {position:absolute;top:4px;left:6px;z-index:1;margin:0;padding:2px 6px;border-radius:6px;background:rgba(0,0,0,.55);color:#ddd;pointer-events:none;}
 .remote-stage:not(.touch) .remote-area {order:2;}
 .remote-stage:not(.touch) .remote-keys {order:3;}

@@ -48,6 +48,13 @@ back, with touch modes made for a small screen.
 
 ## Features
 
+- **The Mac's apps, as a phone's.** On a phone or tablet Castpane opens on the Mac's apps: the
+  windows you used last, then every app, running or not. Tap one and its window fills the
+  screen, made the device's shape on the Mac so its text and buttons are the size of the
+  device's own apps, and you use it with your finger, with no pointer to move. Slide the bar
+  at the bottom to the app before, up for all of them as cards (slide a card up to close that
+  window), or in from the left edge for the home. The window goes back as it was when you
+  leave it. The whole screen is one choice at the bottom.
 - **Your screen or one window.** Pick a whole display, a desktop (Space), a full-screen app or a
   single window. The list is grouped by desktop, with thumbnails.
 - **Asleep or locked.** Connecting wakes the Mac's display, and it stays on while you watch;
