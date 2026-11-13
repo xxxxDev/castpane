@@ -498,8 +498,7 @@ function clampView() {
   if (view.z < 1.02) resetView();
 }
 // The area grows and shrinks (the keyboard, the pencil's field, the clipboard's row) while the
-// picture is zoomed: kept inside it, or it was left out of sight, all black (the owner's
-// recording, 2026-11-12).
+// picture is zoomed: kept inside it, or it was left out of sight, all black.
 if (typeof ResizeObserver !== 'undefined') {
   const sized = new ResizeObserver(() => { if (view.z > 1 && area.value) clampView(); });
   watch(area, (el, old) => { if (old) sized.unobserve(old);if (el) sized.observe(el); });
@@ -887,8 +886,8 @@ function beforeInput(e) {
   else if (e.inputType === 'deleteContentForward') tap('Delete');
   else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') pasteAtCursor(e.data || e.dataTransfer?.getData('text') || '', true);
 }
-// Text that came in some way beforeinput could not stop (the iPhone keyboard's own
-// suggestion to paste what Safari copied sent nothing: the owner's recording, 2026-11-12).
+// Text that came in some way beforeinput could not stop (on an iPhone, the keyboard's own
+// suggestion to paste what Safari copied sent nothing).
 // Several lines go by the Mac's paste, so a terminal does not run them one by one.
 let composing = false;
 function typedAnyway(e) {
@@ -968,7 +967,7 @@ async function copyFromMac() {
 }
 // What this device copied, pasted where the Mac's cursor is in one press: it goes on the
 // Mac's clipboard, then ⌘V. Putting it there and pressing ⌘V were two steps, the first
-// easily mistaken for the other button (the owner's recording, 2026-11-12).
+// easily mistaken for the other button.
 async function pasteToMac() {
   clipOpen.value = false;
   let s = null;
