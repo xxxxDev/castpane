@@ -110,6 +110,15 @@ enum Fit {
         AXUIElementSetAttributeValue(w, "AXFullScreen" as CFString, on ? kCFBooleanTrue : kCFBooleanFalse)
     }
 
+    /// Whether a window is in the Dock, and putting it there.
+    static func isMinimized(_ w: AXUIElement) -> Bool {
+        var v: CFTypeRef?
+        return AXUIElementCopyAttributeValue(w, kAXMinimizedAttribute as CFString, &v) == .success && (v as? Bool) == true
+    }
+    static func minimize(_ w: AXUIElement) {
+        AXUIElementSetAttributeValue(w, kAXMinimizedAttribute as CFString, kCFBooleanTrue)
+    }
+
     /// Presses the window's close button.
     static func close(_ w: AXUIElement) {
         var button: CFTypeRef?

@@ -126,6 +126,11 @@ actor Session {
     /// The app that was in front before a window was brought forward for the viewer: put
     /// back in front (and its desktop with it) when the viewer leaves the windows.
     private var inFront: pid_t?
+    /// The window brought forward and how it was out of sight before: its app hidden, the
+    /// window in the Dock, or closed with its app left running (Teams, Jump Desktop). It
+    /// goes back so when the viewer leaves it or turns to another window.
+    private var away: (id: CGWindowID, pid: pid_t, how: Away)?
+    private enum Away { case hidden, minimized, closed }
 
     /// `onHello` runs once, on the reader's thread, when the hello carried the token and
     /// before anything is answered; false (the server stopped meanwhile) ends the session.
@@ -190,7 +195,7 @@ actor Session {
             case .end:
                 watcher?.cancel()
                 clipboardWatcher?.cancel()
-                queued { await self.unfit(); await self.stop(); await self.putBack() }
+                queued { await self.unfit(); await self.stop(); await self.restore() }
             }
         }
     }
@@ -297,7 +302,7 @@ actor Session {
             }
         case let .start(kind, id, maxWidth, fps, bitrate, hevc):
             queued { await self.start(kind: kind, id: id, maxWidth: maxWidth, fps: fps, bitrate: bitrate, hevc: hevc) }
-        case .stop: queued { await self.unfit(); await self.stop(); await self.putBack() }
+        case .stop: queued { await self.unfit(); await self.stop(); await self.restore() }
         case .apps:
             let link = self.link
             Task { @MainActor in link.send(json: ["t": "apps", "apps": Apps.list()]) }
@@ -459,9 +464,9 @@ actor Session {
             target = found
             windowFrame = nil
             frameCheckedAt = 0
-            if found.windowID == nil { await putBack() }
+            if found.windowID == nil { await restore() }
             if let pid = found.pid, let wid = found.windowID {
-                await noteFront()
+                await note(wid, pid: pid)
                 Catalog.bringForward(wid, pid: pid)
                 // On another desktop or in the Dock: wait for macOS to bring it here.
                 if !found.here { for _ in 0..<20 where !Catalog.isHere(wid) { try? await Task.sleep(nanoseconds: 100_000_000) } }
@@ -498,7 +503,7 @@ actor Session {
             }
             try? await Task.sleep(nanoseconds: 400_000_000)
         }
-        await noteFront()
+        await note(id, pid: pid)
         Catalog.bringForward(id, pid: pid)
         for _ in 0..<20 where !Catalog.isHere(id) { try? await Task.sleep(nanoseconds: 100_000_000) }
         let result: (CGRect, CGRect)? = await MainActor.run {
@@ -534,18 +539,46 @@ actor Session {
         windowFrame = nil; frameCheckedAt = 0
     }
 
-    /// The app in front now, kept the first time a window is brought forward.
-    private func noteFront() async {
-        guard inFront == nil else { return }
+    /// Before a window is brought forward: the app in front now (kept from the first one),
+    /// and how this window was out of sight, if it was. One brought forward before and
+    /// now left for another goes back first.
+    private func note(_ id: CGWindowID, pid: pid_t) async {
+        if let a = away, a.id != id { await putAway() }
         let me = ProcessInfo.processInfo.processIdentifier
-        inFront = await MainActor.run { NSWorkspace.shared.frontmostApplication?.processIdentifier }.flatMap { $0 == me ? nil : $0 }
+        let front = await MainActor.run { NSWorkspace.shared.frontmostApplication?.processIdentifier }
+        if inFront == nil, let front, front != me { inFront = front }
+        guard away?.id != id, !Catalog.isHere(id) else { return }
+        let how: Away? = await MainActor.run {
+            if NSRunningApplication(processIdentifier: pid)?.isHidden == true { return .hidden }
+            if let w = Fit.axWindow(id, pid: pid), Fit.isMinimized(w) { return .minimized }
+            // Not on the screen though its desktop is one shown: closed, its app still running.
+            if let space = Spaces.of(id), Spaces.desks()[space]?.current == true { return .closed }
+            return nil
+        }
+        if let how { away = (id, pid, how) }
     }
 
-    /// The app that was in front before puts the Mac back on its desktop.
-    private func putBack() async {
-        guard let pid = inFront else { return }
+    /// The window brought forward goes back out of sight as it was: its app hidden again
+    /// (for a closed one too: closing it might lose its work), or into the Dock.
+    private func putAway() async {
+        guard let a = away else { return }
+        away = nil
+        await MainActor.run {
+            switch a.how {
+            case .minimized: if let w = Fit.axWindow(a.id, pid: a.pid) { Fit.minimize(w) }
+            case .hidden, .closed: _ = NSRunningApplication(processIdentifier: a.pid)?.hide()
+            }
+        }
+    }
+
+    /// As it was before the viewer: the window out of sight again, and the app that was in
+    /// front back in front, which takes the Mac back to its desktop (not when it is the
+    /// window's own app, which that would show again).
+    private func restore() async {
+        let pid = inFront, hid = away?.pid
         inFront = nil
-        Catalog.activate(pid)
+        await putAway()
+        if let pid, pid != hid { Catalog.activate(pid) }
     }
 
     func stop() async {
