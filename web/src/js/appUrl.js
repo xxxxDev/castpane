@@ -15,6 +15,7 @@ const SETTINGS_PAGES = [
   {route: '/change-password/', path: '/settings/password', parent: '/settings/'},
   {route: '/scan-login/', path: '/settings/scan-login', parent: '/settings/'},
   {route: '/devices/', path: '/settings/devices', parent: '/settings/'},
+  {route: '/no-fit/', path: '/settings/no-fit', parent: '/settings/'},
 ];
 const TAB_PAGES = {...PRODUCT_PAGES, 'view-settings': SETTINGS_PAGES};
 const byRoute = new Map(Object.values(TAB_PAGES).flat().map((page) => [page.route, page]));

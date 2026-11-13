@@ -10,6 +10,7 @@ import UsersPage from './pages/UsersPage.vue';
 import UserEditPage from './pages/UserEditPage.vue';
 import SecurityPage from './pages/SecurityPage.vue';
 import TrustedDevicesPage from './pages/TrustedDevicesPage.vue';
+import NoFitPage from './pages/NoFitPage.vue';
 
 // Tab-view roots. Each F7 view owns its own router stack and resolves its url here.
 export default [
@@ -24,6 +25,8 @@ export default [
   // QR sign-in: this phone as a login key, and the account's devices.
   { path: '/scan-login/', component: ScanLoginPage },
   { path: '/devices/', component: DevicesPage },
+  // Labs: the apps whose windows are left at their own size.
+  { path: '/no-fit/', component: NoFitPage },
   // Two-step sign-in and passkeys for this account.
   { path: '/two-step/', component: TwoStepPage },
   { path: '/passkeys/', component: PasskeysPage },

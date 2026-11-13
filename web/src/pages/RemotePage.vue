@@ -87,6 +87,7 @@
         <div v-if="menuOpen" ref="menuEl" class="remote-menu" :style="menuMax ? {maxHeight: menuMax + 'px'} : null" @pointerdown.stop>
           <template v-if="appMode === 'app'">
             <button type="button" class="remote-menu-item go-desktop" @click="menuOpen = false;goDesktop()"><f7-icon f7="desktopcomputer" :size="18"/>{{ ct('整個螢幕（遠端桌面）') }}</button>
+            <button v-if="currentWindow?.bundle" type="button" class="remote-menu-item never-fit" @click="toggleNever"><f7-icon :f7="neverFits(currentWindow.bundle) ? 'checkmark_square' : 'square'" :size="18"/>{{ ct('這個 App 永不調整') }}</button>
             <button type="button" class="remote-menu-item fit-toggle" @click="toggleFit"><f7-icon f7="rectangle_compress_vertical" :size="18"/>{{ prefs.fit === false ? ct('視窗配合這台裝置：關') : ct('視窗配合這台裝置：開') }}</button>
           </template>
           <!-- On a phone the keyboard lives here. -->
@@ -204,6 +205,7 @@ import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
 import RemoteHome from '../components/RemoteHome.vue';
 import { trustedPass } from '../js/trust.js';
+import { neverFits, setNever, noteNarrow, noteApps } from '../js/noFit.js';
 
 // labs: the Labs tab's page (js/labs.js), the Mac's apps first; the Remote tab's has the whole screen.
 const props = defineProps({ labs: { type: Boolean, default: false } });
@@ -463,7 +465,7 @@ function onMessage(msg) {
     } else if (!msg.editable && autoOpened) { keyboardOpen.value = false;autoOpened = false; }
     else if (!msg.editable) keyHint.value = false;
   } else if (msg.t === 'config') {
-    hasPicture.value = true;
+    hasPicture.value = true;clearTimeout(noPicture);
   } else if (msg.t === 'error') {
     notice.value = msg.message === 'not-running' ? ct('Castpane 沒有在執行') : msg.where === 'host' ? ct('Castpane 沒有回應，請稍後再試') : msg.message === 'gone' ? ct('這個視窗已經關閉') : msg.message;
     if (msg.where === 'start') list();
@@ -1038,9 +1040,12 @@ const machineName = ref(''), recent = ref([]);
 let iconsAsked = new Set(), launchTimer = 0, fitWait = null, fitSize = null, fitTimer = 0;
 const iconsKey = () => `castpane-icons-${machine}`, recentKey = () => `castpane-recent-${machine}`;
 // The windows used last first, then those on the Mac's screen now.
+// The windows used last first, then those on the screen, then the larger: an app's hidden
+// window (Teams has one, 800 × 600, never drawn) comes after its real ones.
 const orderedWindows = computed(() => {
   const rank = (w) => { const i = recent.value.indexOf(w.id);return i >= 0 ? i : 1000 + (w.here === false ? 1 : 0); };
-  return items.value.filter((w) => w.kind === 'window').sort((a, b) => rank(a) - rank(b));
+  const area = (w) => (w.width || 0) * (w.height || 0);
+  return items.value.filter((w) => w.kind === 'window').sort((a, b) => rank(a) - rank(b) || area(b) - area(a));
 });
 const recentWindows = computed(() => orderedWindows.value.slice(0, 12));
 const appTitle = computed(() => { const w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);return w ? w.app || w.title : ''; });
@@ -1066,7 +1071,7 @@ function askIcons(all = false) {
   link?.send({ t: 'icons', bundles: missing });
 }
 function appsMessage(msg) {
-  if (msg.t === 'apps') { apps.value = msg.apps || [];askIcons(); }
+  if (msg.t === 'apps') { apps.value = msg.apps || [];noteApps(apps.value);askIcons(); }
   else if (msg.t === 'icons') {
     Object.assign(icons, msg.icons || {});
     try { localSet(iconsKey(), JSON.stringify(icons)); } catch { /* full: kept for now only */ }
@@ -1104,7 +1109,7 @@ onBeforeUnmount(() => { clearInterval(launchTimer);clearTimeout(fitTimer); });
 // shown (one left there stayed at Connecting), and puts it back when another app opens.
 function fitTo(w) {
   const r = area.value?.getBoundingClientRect();
-  if (!r || !r.width || prefs.fit === false || !isTouch) return Promise.resolve(null);
+  if (!r || !r.width || prefs.fit === false || !isTouch || neverFits(w.bundle)) return Promise.resolve(null);
   const size = { width: Math.max(240, Math.round(r.width)), height: Math.max(240, Math.round(r.height)) };
   const ask = (want) => new Promise((resolve) => {
     const done = (m) => { clearTimeout(t);fitWait = null;resolve(m); };
@@ -1118,6 +1123,7 @@ function fitTo(w) {
     // device's shape, so the picture fills it top to bottom rather than leaving bands; as
     // tall as the Mac's screen allows.
     if (m?.ok && m.width > size.width + 8) {
+      noteNarrow(w.bundle, w.app || w.title, m.width);
       const taller = await ask({ width: m.width, height: Math.min(8000, Math.round(m.width * size.height / size.width)) });
       if (taller?.ok) m = taller;
     }
@@ -1125,7 +1131,20 @@ function fitTo(w) {
     return m;
   });
 }
-async function openWindow(w, keepOrder = false) {
+// A window that sends no picture (hidden, never drawn): the app's next window instead, once.
+let noPicture = 0;
+onBeforeUnmount(() => clearTimeout(noPicture));
+function watchPicture(w, tried) {
+  clearTimeout(noPicture);
+  noPicture = setTimeout(() => {
+    if (hasPicture.value || appMode.value !== 'app' || !current.value || current.value.id !== w.id) return;
+    const next = orderedWindows.value.find((x) => x.bundle && x.bundle === w.bundle && x.id !== w.id && !tried.has(x.id));
+    if (!next) return;
+    recent.value = recent.value.filter((x) => x !== w.id);
+    openWindow(next, false, new Set([...tried, w.id]));
+  }, 5000);
+}
+async function openWindow(w, keepOrder = false, tried = new Set()) {
   switcherOpen.value = false;menuOpen.value = false;settingsOpen.value = false;
   if (!keepOrder) used(w.id);
   if (appMode.value !== 'app') { appMode.value = 'app';mode.value = 'direct'; }
@@ -1133,6 +1152,7 @@ async function openWindow(w, keepOrder = false) {
   await nextTick();
   await fitTo(w);
   show(w);
+  watchPicture(w, tried);
 }
 function goHome() {
   menuOpen.value = false;settingsOpen.value = false;switcherOpen.value = false;compose.value = false;panel.value = false;clipOpen.value = false;
@@ -1149,6 +1169,15 @@ function goDesktop() {
   if (!d) return;
   show(d);
   groupKey.value = groups.value.find((g) => g.items.some((w) => w.kind === d.kind && w.id === d.id))?.key || groupKey.value;
+}
+const currentWindow = computed(() => items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id) || null);
+// This app on or off the list of those left at their own size (js/noFit.js).
+function toggleNever() {
+  menuOpen.value = false;
+  const w = currentWindow.value;if (!w) return;
+  const on = !neverFits(w.bundle);
+  setNever(w.bundle, w.app || w.title, on);
+  if (on) { link?.send({ t: 'unfit' });fitSize = null;setTimeout(showCurrent, 300); } else openWindow(w, true);
 }
 function toggleFit() {
   menuOpen.value = false;

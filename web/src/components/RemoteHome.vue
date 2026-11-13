@@ -104,7 +104,7 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-home-card.launching .remote-home-shot, .remote-home-app.launching .remote-home-icon {opacity:.5;animation:remote-home-pulse 1s ease-in-out infinite alternate;}
 @keyframes remote-home-pulse {to {opacity:1;}}
 .remote-stage .remote-home-desktop {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;margin:22px 0 0;padding:0;border:0;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;font-size:15px;cursor:pointer;}
-.remote-launchpad {position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;background:rgba(30,30,46,.96);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);padding:calc(env(safe-area-inset-top) + 12px) 0 calc(env(safe-area-inset-bottom) + 12px);}
+.remote-launchpad {position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;background:rgba(18,18,20,.97);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);padding:calc(env(safe-area-inset-top) + 12px) 0 calc(env(safe-area-inset-bottom) + 12px);}
 .remote-launchpad-top {display:flex;gap:10px;align-items:center;padding:0 16px 12px;}
 .remote-launchpad-search {flex:1;min-width:0;height:36px;box-sizing:border-box;padding:0 14px;border-radius:18px;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:16px;}
 .remote-stage .remote-launchpad-close {flex:0 0 auto;width:36px;height:36px;margin:0;padding:0;border:0;border-radius:18px;background:rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
