@@ -236,6 +236,8 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
     try {
       await trustedOf().forget(trustCookie(req));
       clearTrustCookie(req, res);
+      // A pass this device already got from its trust ends too, and with it a picture open now.
+      passes.end(req.userId);
       audit({ source: 'remote', action: 'untrust', username: req.username, ip: resolveClientIp(req) });
       res.json({ trusted: false });
     } catch (e) { next(e); }
@@ -258,7 +260,11 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
   });
   app.delete('/api/remote/trusted/:id', ...chain, async (req, res, next) => {
     try {
-      if (!(await trustedOf().remove(req.params.id))) return res.status(404).json({ message: 'No such device' });
+      const owner = await trustedOf().remove(req.params.id);
+      if (!owner) return res.status(404).json({ message: 'No such device' });
+      // A device found and removed here must not keep the pass it already got from its
+      // trust: that account's passes end (its picture too; it is asked again).
+      passes.end(owner);
       audit({ source: 'remote', action: 'untrust', device: String(req.params.id), username: req.username, ip: resolveClientIp(req) });
       res.json({ ok: true });
     } catch (e) { next(e); }
@@ -266,6 +272,7 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
   app.delete('/api/remote/trusted', ...chain, async (req, res, next) => {
     try {
       await trustedOf().removeEvery();
+      passes.endAll();
       clearTrustCookie(req, res);
       audit({ source: 'remote', action: 'untrust-all', username: req.username, ip: resolveClientIp(req) });
       res.json({ ok: true });

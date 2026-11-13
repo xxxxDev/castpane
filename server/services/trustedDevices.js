@@ -69,7 +69,13 @@ function createTrustedDevices(db, { now = Date.now } = {}) {
     return { ...doc, lastUsedAt: t, expiresAt: until };
   }
   const forget = async (cookie) => { const c = parse(cookie);return c ? (await call('remove', { _id: c.id, kind: 'device' }, {})) > 0 : false; };
-  const remove = async (id) => (await call('remove', { _id: String(id), kind: 'device' }, {})) > 0;
+  // The account whose device it was, or null when there was none.
+  async function remove(id) {
+    const doc = await call('findOne', { _id: String(id), kind: 'device' });
+    if (!doc) return null;
+    await call('remove', { _id: doc._id }, {});
+    return doc.userId;
+  }
   const removeAll = (userId) => call('remove', { kind: 'device', userId: String(userId) }, { multi: true });
   const removeEvery = () => call('remove', { kind: 'device' }, { multi: true });
   async function list() {

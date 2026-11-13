@@ -16,7 +16,9 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   in **Admin › Trusted devices**) from its last use. The device keeps an HttpOnly, SameSite=Strict
   cookie for `/api`, its id and a 256-bit secret; the server keeps only the secret's SHA-256.
   Signing out on that device, a new password, the account disabled, deleted or reset, turning
-  it off or removing it on the admin page ends it at once. Each pass given this way is in the
+  it off or removing it on the admin page ends it at once; turning it off or removing it also ends
+  the passes that account already has, and a picture open with one. Signing a device out from
+  another one does not end its trust: remove it under **Admin › Trusted devices** as well. Each pass given this way is in the
   audit log. Whoever holds that signed-in, trusted device can open Remote: trust only a device
   you keep with you.
 
@@ -143,7 +145,7 @@ unreadable, so the server refuses to start in that state instead of making a new
   With Tailscale, TLS ends on your Mac.
 - **A signed-in device you lose.** Its session works until it is signed out. Sign it out from
   **Settings › Devices** on another device. Remote still needs the admin's passkey or password
-  again.
+  again, unless that device was trusted: remove it in **Admin › Trusted devices** too.
 - **Everyone behind one address.** Behind `tailscale serve`, every request reaches the server
   from `127.0.0.1`, so the sign-in defence sees one address. An address block then shuts out
   your own devices too, until it runs out or you sign in on the Mac at `127.0.0.1` and lift it.
