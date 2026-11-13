@@ -67,7 +67,15 @@ enum Catalog {
             w.windowLayer == 0 && !(w.title ?? "").isEmpty && w.frame.width >= 120 && w.frame.height >= 80
                 && w.owningApplication != nil && w.owningApplication?.processID != me
                 && !(w.owningApplication?.bundleIdentifier ?? "").hasPrefix("com.apple.WindowManager")
+                && !neverShown(w)
         }.sorted { a, b in a.isOnScreen && !b.isOnScreen }
+    }
+
+    /// A window its app made and never showed (Teams keeps an empty "Microsoft Teams" one),
+    /// which no click brings up: on no desktop, and still where windows are made, at the
+    /// screen's top-left corner. A minimized one has its desktop, or else its old place.
+    static func neverShown(_ w: SCWindow) -> Bool {
+        w.frame.origin == .zero && Spaces.onNone(w.windowID)
     }
 
     static func list(thumbWidth: Int = 320) async throws -> [[String: Any]] {
@@ -138,16 +146,19 @@ enum Catalog {
         // Brought forward the way a click on its Dock icon does it (Launch Services): that also
         // switches to the desktop its window is on. NSRunningApplication.activate from this
         // app, which is not in front, was ignored, and a window on another desktop stayed there.
+        // Once on its desktop, this window on top of the app's others.
+        activate(pid) { DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { raise(id, pid: pid) } }
+    }
+
+    /// An app put in front the way a click on its Dock icon does it, desktop and all.
+    static func activate(_ pid: pid_t, then: (@Sendable () -> Void)? = nil) {
         DispatchQueue.main.async {
             guard let app = NSRunningApplication(processIdentifier: pid) else { return }
             if let url = app.bundleURL {
                 let config = NSWorkspace.OpenConfiguration()
                 config.activates = true
-                // Once on its desktop, this window on top of the app's others.
-                NSWorkspace.shared.openApplication(at: url, configuration: config) { _, _ in
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { raise(id, pid: pid) }
-                }
-            } else { _ = app.activate() }
+                NSWorkspace.shared.openApplication(at: url, configuration: config) { _, _ in then?() }
+            } else { _ = app.activate(); then?() }
         }
     }
 

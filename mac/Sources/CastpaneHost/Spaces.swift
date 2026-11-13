@@ -36,4 +36,12 @@ enum Spaces {
         guard let spaces = CGSCopySpacesForWindows(CGSMainConnectionID(), 7, ids)?.takeRetainedValue() as? [Int] else { return nil }
         return spaces.first
     }
+
+    /// Whether the window server says the window is on no desktop at all (false when it
+    /// does not answer).
+    static func onNone(_ windowID: CGWindowID) -> Bool {
+        let ids = [NSNumber(value: windowID)] as CFArray
+        guard let spaces = CGSCopySpacesForWindows(CGSMainConnectionID(), 7, ids)?.takeRetainedValue() as? [Int] else { return false }
+        return spaces.isEmpty
+    }
 }
