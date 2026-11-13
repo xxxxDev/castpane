@@ -516,9 +516,9 @@ function flushMove() { if (raf) { cancelAnimationFrame(raf);raf = 0; } if (pendi
 function sendMove(p) { pending = p;if (!raf) raf = requestAnimationFrame(() => { raf = 0;if (pending) link?.send({ t: 'move', x: pending.x, y: pending.y });pending = null; }); }
 // With the phone's keyboard up, the stage fits what is left above it, and the text
 // field just tapped is zoomed in and brought to the middle; the keyboard down, the
-// picture goes back as it was.
+// picture stays zoomed where it is.
 const stageBox = ref(null);
-let lastTap = null, beforeKeyboard = null, zoomTo = null, settle = 0;
+let lastTap = null, zoomTo = null, settle = 0;
 // Zoomed once, to the field whose tap opened the keyboard, after the keyboard has
 // finished coming up; later taps while it is up do not move the picture (a
 // tap elsewhere zoomed to that place instead).
@@ -571,7 +571,9 @@ function fitViewport() {
   keyboardSideways.value = covered && window.innerWidth > window.innerHeight;
   stageBox.value = covered ? { top: (broken ? 0 : vv.offsetTop) + 'px', height: height + 'px', bottom: 'auto', ...(keyboardBarOver ? { paddingBottom: barOverViewport(height, tall) ? 'calc(env(safe-area-inset-bottom) + 42px)' : '0px' } : {}) } : null;
   clearTimeout(settle);
-  if (covered && zoomTo) settle = setTimeout(() => { if (zoomTo && keyboardOpen.value) { focusOn(zoomTo);zoomTo = null; } }, 250);
+  // Already zoomed in, the picture moves only if the cursor is out of sight, rather than
+  // jumping to a new place each time the keyboard comes up.
+  if (covered && zoomTo) settle = setTimeout(() => { if (zoomTo && keyboardOpen.value) { if (view.z > 1.2) keepInSight(zoomTo);else focusOn(zoomTo);zoomTo = null; } }, 250);
 }
 // A point of the picture (0…1) in the area's own pixels, before any zoom.
 function areaPoint(p) {
@@ -592,7 +594,6 @@ function keepInSight(p) {
 function focusOn(p) {
   const at = areaPoint(p);if (!at) return;
   const { r, px, py } = at;
-  if (!beforeKeyboard) beforeKeyboard = { ...view };
   view.z = Math.max(view.z, 1.5, readableZoom());
   view.x = r.width / 2 - view.z * px;view.y = r.height * 0.45 - view.z * py;
   clampView();
@@ -600,7 +601,9 @@ function focusOn(p) {
 watch(keyboardOpen, (open) => {
   // No keyboard came up over the page (a hardware keyboard): nothing waits to zoom.
   if (open) { zoomTo = lastTap && Date.now() - lastTap.at < 5000 ? { ...lastTap } : null;nextTick(fitViewport);setTimeout(() => { if (!stageBox.value) zoomTo = null; }, 1500); }
-  else { zoomTo = null;if (beforeKeyboard) { Object.assign(view, beforeKeyboard);beforeKeyboard = null; } nextTick(fitViewport); }
+  // The keyboard down, the zoom stays and the cursor's line where it was: going back to the
+  // whole picture lost the place just read. Two fingers or 1× go back.
+  else { zoomTo = null;nextTick(fitViewport); }
 });
 if (typeof window !== 'undefined' && window.visualViewport) {
   window.visualViewport.addEventListener('resize', fitViewport);
