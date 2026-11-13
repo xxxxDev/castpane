@@ -176,6 +176,7 @@ const english = {
 "繼續":"Continue",
 "缺少：":"Missing: ",
 "自動":"Automatic",
+"自動：目前":"Automatic, now:",
 "螢幕":"Screen",
 "螢幕與系統錄音":"Screen & System Audio Recording",
 "被拒絕":"Refused",

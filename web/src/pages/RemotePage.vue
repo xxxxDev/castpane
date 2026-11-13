@@ -91,9 +91,11 @@
         </div>
         <div v-if="settingsOpen" class="remote-settings" @pointerdown.stop>
           <div class="remote-set-title">{{ ct('畫質') }}</div>
-          <div class="remote-seg"><button v-for="q in ['low','standard','high','max']" :key="q" type="button" :class="{on: prefs.quality === q}" @click="setPref('quality', q)">{{ ct(QUALITY_LABEL[q]) }}</button></div>
+          <div class="remote-seg"><button v-for="q in ['auto','low','standard','high','max']" :key="q" type="button" :class="{on: prefs.quality === q}" @click="setPref('quality', q)">{{ ct(QUALITY_LABEL[q]) }}</button></div>
+          <div v-if="prefs.quality === 'auto'" class="remote-small auto-now quality-now">{{ ct('自動：目前') }} {{ ct(QUALITY_LABEL[auto.q]) }}</div>
           <div class="remote-set-title">{{ ct('解析度') }}</div>
-          <div class="remote-seg"><button v-for="r in ['1280','1920','2560','native']" :key="r" type="button" :class="{on: prefs.resolution === r}" @click="setPref('resolution', r)">{{ r === 'native' ? ct('原生') : r }}</button></div>
+          <div class="remote-seg"><button v-for="r in ['auto','1280','1920','2560','native']" :key="r" type="button" :class="{on: prefs.resolution === r}" @click="setPref('resolution', r)">{{ r === 'auto' ? ct('自動') : r === 'native' ? ct('原生') : r }}</button></div>
+          <div v-if="prefs.resolution === 'auto'" class="remote-small auto-now resolution-now">{{ ct('自動：目前') }} {{ auto.res === 'native' ? ct('原生') : auto.res }}</div>
           <div class="remote-set-title">{{ ct('每秒畫面') }}</div>
           <div class="remote-seg"><button v-for="f in [30, 60]" :key="f" type="button" :class="{on: prefs.fps === f}" @click="setPref('fps', f)">{{ f }}</button></div>
           <p class="remote-small">{{ ct('網路慢時調低畫質或解析度，畫面會比較順。') }}</p>
@@ -171,7 +173,7 @@ import { api } from '../js/api.js';
 import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
-import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, otherKeyboardKey, QUALITY, RESOLUTION } from '../js/remoteStream.js';
+import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, otherKeyboardKey, QUALITY, RESOLUTION, STEPS, autoStep } from '../js/remoteStream.js';
 
 const supported = remoteSupported();
 const machines = ref([]), error = ref(''), streaming = ref(false), items = ref([]), current = ref(null);
@@ -181,7 +183,7 @@ const canvas = ref(null), area = ref(null), typing = ref(null);
 const clipOpen = ref(false), panel = ref(false), pageNo = ref(0), pagesEl = ref(null), compose = ref(false), composeText = ref(''), composeField = ref(null);
 const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 const mode = ref(isTouch ? (localGet('castpane-remote-mode') || 'direct') : 'direct');
-const QUALITY_LABEL = { low: '低', standard: '標準', high: '高', max: '最高' };
+const QUALITY_LABEL = { auto: '自動', low: '低', standard: '標準', high: '高', max: '最高' };
 const KEYS = [{ code: 'Escape', label: 'esc' }, { code: 'Tab', label: 'tab' }];
 const LAST_KEYS = [{ code: 'Backspace', label: '⌫' }, { code: 'Enter', label: '⏎' }, { code: 'ArrowLeft', label: '←' }, { code: 'ArrowUp', label: '↑' }, { code: 'ArrowDown', label: '↓' }, { code: 'ArrowRight', label: '→' }];
 const MODS = [{ id: 'shift', label: '⇧' }, { id: 'ctrl', label: '⌃' }, { id: 'alt', label: '⌥' }, { id: 'meta', label: '⌘' }];
@@ -204,8 +206,32 @@ const PAGES = [
 // Native resolution by default: text on a Retina screen kept at 1920 across was soft.
 // Choices kept from before this change (v missing) had 1920 as the
 // default and move to native; one picked since stays.
-const prefs = reactive({ quality: 'standard', resolution: 'native', fps: 60, ...(JSON.parse(localGet('castpane-remote-prefs') || '{}')) });
-if (prefs.v !== 2) { if (prefs.resolution === '1920') prefs.resolution = 'native';prefs.v = 2;localSet('castpane-remote-prefs', JSON.stringify(prefs)); }
+const prefs = reactive({ quality: 'auto', resolution: 'auto', fps: 60, ...(JSON.parse(localGet('castpane-remote-prefs') || '{}')) });
+if (!(prefs.v >= 2) && prefs.resolution === '1920') prefs.resolution = 'native';
+// Native and standard were the defaults, not choices: they go to automatic. The whole screen
+// sent at native on a phone (3642 wide from a MacBook) closed Safari's page within seconds.
+if (!(prefs.v >= 3)) { if (prefs.resolution === 'native') prefs.resolution = 'auto';if (prefs.quality === 'standard') prefs.quality = 'auto';prefs.v = 3;localSet('castpane-remote-prefs', JSON.stringify(prefs)); }
+// Automatic: a start by the device (a phone 1920, a tablet 2560, a computer what its window
+// shows), then a step down after three seconds of frames waiting to be drawn and a step up
+// after a while without, never past the device's top or below 1280 and low.
+const deviceKind = () => (!isTouch ? 'computer' : Math.min(screen.width, screen.height) < 600 ? 'phone' : 'tablet');
+const autoTop = () => (deviceKind() === 'computer' ? 'native' : '2560');
+const zoomTop = () => (prefs.resolution === 'native' ? 'native' : autoTop());
+function autoStart() {
+  const kind = deviceKind();
+  if (kind === 'phone') return { res: '1920', q: 'standard' };
+  if (kind === 'tablet') return { res: '2560', q: 'standard' };
+  const wide = Math.max(window.innerWidth, 1) * (window.devicePixelRatio || 1);
+  return { res: STEPS.find((r) => r === 'native' || RESOLUTION[r] >= wide), q: 'high' };
+}
+const auto = reactive({ ...autoStart(), bad: 0, good: 0, upAfter: 30, cool: 0 });
+const resolutionNow = () => (prefs.resolution === 'auto' ? auto.res : prefs.resolution);
+const qualityNow = () => (prefs.quality === 'auto' ? auto.q : prefs.quality);
+function autoAdjust(s) {
+  const step = autoStep(auto, s, { res: prefs.resolution === 'auto', q: prefs.quality === 'auto', top: autoTop(), start: autoStart() });
+  if (step === 'down') zoomNative.value = false;
+  if (step) showCurrent();
+}
 // HEVC when this browser decodes it, until a stream shows it does not.
 let useHevc = false;
 hevcDecodes().then((yes) => { useHevc = yes; });
@@ -321,7 +347,7 @@ async function connect(m, retried = false) {
       if (state === 'closed' && streaming.value) { saveShot();streaming.value = false;link = null; }
     },
     onMessage,
-    onStats(s) { Object.assign(stats, s); },
+    onStats(s) { Object.assign(stats, s);autoAdjust(s); },
     onCodecFailed() { useHevc = false;showCurrent(); },
   });
 }
@@ -435,9 +461,10 @@ function show(w) {
   hasPicture.value = hasPicture.value && same;
   if (!same) zoomNative.value = false;
   notice.value = ct('正在切換…');
-  const resolution = zoomNative.value ? 'native' : prefs.resolution;
+  // Zoomed in, as sharp as the device takes: native on a computer, 2560 on a phone or tablet.
+  const resolution = zoomNative.value ? zoomTop() : resolutionNow(), quality = qualityNow();
   // Only values the server passes on (server/remote.js): a stale stored choice is left out.
-  link?.send({ t: 'start', kind: w.kind, id: w.id, maxWidth: Object.hasOwn(RESOLUTION, resolution) ? RESOLUTION[resolution] : undefined, fps: prefs.fps === 30 ? 30 : 60, bitrate: Object.hasOwn(QUALITY, prefs.quality) ? QUALITY[prefs.quality] : undefined, ...(useHevc ? { codec: 'hevc' } : {}) });
+  link?.send({ t: 'start', kind: w.kind, id: w.id, maxWidth: Object.hasOwn(RESOLUTION, resolution) ? RESOLUTION[resolution] : undefined, fps: prefs.fps === 30 ? 30 : 60, bitrate: Object.hasOwn(QUALITY, quality) ? QUALITY[quality] : undefined, ...(useHevc ? { codec: 'hevc' } : {}) });
   current.value = { kind: w.kind, id: w.id };
 }
 function showCurrent() {
@@ -445,6 +472,7 @@ function showCurrent() {
   if (w) show(w);
 }
 function setPref(k, v) {
+  if (v === 'auto') Object.assign(auto, autoStart(), { bad: 0, good: 0, upAfter: 30, cool: 0 });
   prefs[k] = v;localSet('castpane-remote-prefs', JSON.stringify(prefs));
   showCurrent();
 }
@@ -479,7 +507,7 @@ function resetView() { view.z = 1;view.x = 0;view.y = 0; }
 let zoomSettle = 0;
 watch(() => view.z > 1.2, (zoomed) => {
   clearTimeout(zoomSettle);
-  if (zoomed && !zoomNative.value && prefs.resolution !== 'native') zoomSettle = setTimeout(() => { if (view.z > 1.2 && streaming.value) { zoomNative.value = true;showCurrent(); } }, 400);
+  if (zoomed && !zoomNative.value && STEPS.indexOf(resolutionNow()) < STEPS.indexOf(zoomTop())) zoomSettle = setTimeout(() => { if (view.z > 1.2 && streaming.value) { zoomNative.value = true;showCurrent(); } }, 400);
 });
 onBeforeUnmount(() => clearTimeout(zoomSettle));
 // About 900 Mac pixels across the phone: a text field and its line are readable. Counted
@@ -1156,6 +1184,7 @@ function keyUp(e) {
 .remote-notice {position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px;background:rgba(0,0,0,.6);font-size:14px;line-height:1.5;}
 .remote-notice p {max-width:520px;margin:0;}
 .remote-small {font-size:12px;color:#aaa;}
+.remote-stage .auto-now {margin:4px 0 0;color:#30d158;}
 .remote-pill {border:0;border-radius:18px;padding:8px 16px;background:#0a84ff;color:#fff;font-size:14px;cursor:pointer;}
 .remote-arrow {position:absolute;pointer-events:none;transform:translate(-2px,-2px);filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));z-index:1;}
 .remote-ring {-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;position:absolute;width:68px;height:68px;margin:-34px 0 0 -34px;border-radius:50%;border:2.5px solid rgba(255,255,255,.9);background:rgba(255,255,255,.06);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 2px 10px rgba(0,0,0,.4);touch-action:none;z-index:1;}

@@ -27,6 +27,9 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
   ws.binaryType = 'arraybuffer';
   let decoder = null, config = null, needKey = true, closed = false, opened = false, shown = false;
   let frames = 0, bytes = 0, statsAt = performance.now();
+  // How long each frame takes from the decoder to the canvas, and how many wait: what the
+  // page's automatic size reads to tell a device that cannot keep up.
+  const sentAt = new Map();let lagSum = 0, lagCount = 0, queueMax = 0;
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
   const send = (msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); };
 
@@ -34,10 +37,13 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
     try { decoder?.close(); } catch {}
     decoder = new VideoDecoder({
       output(frame) {
+        const ts = frame.timestamp;
         try {
           if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) { canvas.width = frame.displayWidth; canvas.height = frame.displayHeight; }
           ctx.drawImage(frame, 0, 0);
         } finally { frame.close(); }
+        const at = sentAt.get(ts);
+        if (at !== undefined) { sentAt.delete(ts);lagSum += performance.now() - at;lagCount++; }
         frames++;shown = true;
         send({ t: 'ack' });
       },
@@ -73,10 +79,15 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
     const view = new DataView(e.data);
     const timestamp = Number(view.getBigUint64(1));
     bytes += data.length;
-    try { decoder.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp, data: data.subarray(9) })); }
+    if (sentAt.size > 30) sentAt.clear();
+    sentAt.set(timestamp, performance.now());
+    try { decoder.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp, data: data.subarray(9) }));queueMax = Math.max(queueMax, decoder.decodeQueueSize || 0); }
     catch { needKey = true; send({ t: 'ack' }); send({ t: 'key-frame' }); }
     const now = performance.now();
-    if (now - statsAt >= 1000) { onStats({ fps: Math.round(frames * 1000 / (now - statsAt)), mbps: +(bytes * 8 / 1e6 / ((now - statsAt) / 1000)).toFixed(1) }); frames = 0; bytes = 0; statsAt = now; }
+    if (now - statsAt >= 1000) {
+      onStats({ fps: Math.round(frames * 1000 / (now - statsAt)), mbps: +(bytes * 8 / 1e6 / ((now - statsAt) / 1000)).toFixed(1), lag: lagCount ? Math.round(lagSum / lagCount) : 0, queue: queueMax, width: canvas.width });
+      frames = 0; bytes = 0; statsAt = now; lagSum = 0; lagCount = 0; queueMax = 0;
+    }
   };
   return {
     send,
@@ -130,3 +141,35 @@ export function otherKeyboardKey({ code, ctrl, alt, shift, win }) {
 // For a 1920 × 1080 picture: the Mac gives a larger one more (Session.scaledBitrate).
 export const QUALITY = { low: 2_000_000, standard: 6_000_000, high: 12_000_000, max: 25_000_000 };
 export const RESOLUTION = { '1280': 1280, '1920': 1920, '2560': 2560, native: 3840 };
+export const STEPS = ['1280', '1920', '2560', 'native'], QSTEPS = ['low', 'standard', 'high'];
+
+// One second's figures (fps, lag: ms from the decoder to the canvas, queue: frames waiting)
+// for the automatic size and quality. Three seconds behind: a step down, size first, never
+// below 1280 and low. Long enough without: a step up, quality back first, never past the
+// device's top or where it started. Each step down doubles the wait before the next step
+// up, so it does not swing back and forth. Returns 'down', 'up' or null; auto is changed.
+// res, q: whether each is left to automatic.
+export function autoStep(auto, s, { res, q, top, start }) {
+  if (!res && !q) return null;
+  if (auto.cool > 0) { auto.cool--;return null; }
+  const behind = s.fps > 0 && (s.queue >= 3 || s.lag > Math.max(50, 1500 / Math.max(s.fps, 1)));
+  if (behind) { auto.bad++;auto.good = 0; } else if (s.fps > 0) { auto.bad = 0;auto.good++; }
+  const r = STEPS.indexOf(auto.res), k = QSTEPS.indexOf(auto.q);
+  if (auto.bad >= 3) {
+    auto.bad = 0;
+    if (res && r > 0) auto.res = STEPS[r - 1];
+    else if (q && k > 0) auto.q = QSTEPS[k - 1];
+    else return null;
+    auto.good = 0;auto.upAfter = Math.min(auto.upAfter * 2, 240);auto.cool = 5;
+    return 'down';
+  }
+  if (auto.good >= auto.upAfter) {
+    auto.good = 0;
+    if (q && k < QSTEPS.indexOf(start.q)) auto.q = QSTEPS[k + 1];
+    else if (res && r < STEPS.indexOf(top) && r < STEPS.indexOf(start.res)) auto.res = STEPS[r + 1];
+    else return null;
+    auto.cool = 5;
+    return 'up';
+  }
+  return null;
+}
