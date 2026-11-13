@@ -147,7 +147,17 @@ enum Catalog {
                 break
             }
         }
-        DispatchQueue.main.async { _ = NSRunningApplication(processIdentifier: pid)?.activate() }
+        // Brought forward the way a click on its Dock icon does it (Launch Services): that also
+        // switches to the desktop its window is on. NSRunningApplication.activate from this
+        // app, which is not in front, was ignored, and a window on another desktop stayed there.
+        DispatchQueue.main.async {
+            guard let app = NSRunningApplication(processIdentifier: pid) else { return }
+            if let url = app.bundleURL {
+                let config = NSWorkspace.OpenConfiguration()
+                config.activates = true
+                NSWorkspace.shared.openApplication(at: url, configuration: config)
+            } else { _ = app.activate() }
+        }
     }
 
     /// Whether a window is on the screen now (after a switch of desktops).
