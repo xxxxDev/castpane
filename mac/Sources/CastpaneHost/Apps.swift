@@ -101,6 +101,15 @@ enum Fit {
         if let size = AXValueCreate(.cgSize, &s) { AXUIElementSetAttributeValue(w, kAXSizeAttribute as CFString, size) }
     }
 
+    /// Whether a window is in full screen (its own desktop), and taking it in or out.
+    static func isFullScreen(_ w: AXUIElement) -> Bool {
+        var v: CFTypeRef?
+        return AXUIElementCopyAttributeValue(w, "AXFullScreen" as CFString, &v) == .success && (v as? Bool) == true
+    }
+    static func setFullScreen(_ w: AXUIElement, _ on: Bool) {
+        AXUIElementSetAttributeValue(w, "AXFullScreen" as CFString, on ? kCFBooleanTrue : kCFBooleanFalse)
+    }
+
     /// Presses the window's close button.
     static func close(_ w: AXUIElement) {
         var button: CFTypeRef?

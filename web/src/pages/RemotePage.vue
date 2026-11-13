@@ -1100,15 +1100,16 @@ onBeforeUnmount(() => { clearInterval(launchTimer);clearTimeout(fitTimer); });
 // The window made the shape of the area it fills here, in points as this page's pixels:
 // its text then comes out the size of this device's own. An app that cannot be that
 // narrow keeps the width it can have, and the picture fits as before.
-// A window in full screen or on another desktop is shown as it is: resizing one there kept
-// the picture at Connecting (a mail app's full-screen window).
+// The Mac brings the window to the front first, out of full screen and onto the desktop
+// shown (one left there stayed at Connecting), and puts it back when another app opens.
 function fitTo(w) {
   const r = area.value?.getBoundingClientRect();
-  if (!r || !r.width || prefs.fit === false || !isTouch || w.desk?.fullscreen || w.here === false) return Promise.resolve(null);
+  if (!r || !r.width || prefs.fit === false || !isTouch) return Promise.resolve(null);
   const size = { width: Math.max(240, Math.round(r.width)), height: Math.max(240, Math.round(r.height)) };
   const ask = (want) => new Promise((resolve) => {
     const done = (m) => { clearTimeout(t);fitWait = null;resolve(m); };
-    const t = setTimeout(() => done(null), 2000);
+    // Leaving full screen takes the Mac a few seconds.
+    const t = setTimeout(() => done(null), 6000);
     fitWait = done;
     link?.send({ t: 'fit', id: w.id, ...want });
   });

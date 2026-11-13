@@ -122,7 +122,7 @@ actor Session {
     private var displaysAtStart = ""
     private var wokenAt = Date.distantPast
     /// The window made the device's shape, and its frame before, to put back.
-    private var fitted: (id: CGWindowID, pid: pid_t, was: CGRect)?
+    private var fitted: (id: CGWindowID, pid: pid_t, was: CGRect, fullScreen: Bool)?
 
     /// `onHello` runs once, on the reader's thread, when the hello carried the token and
     /// before anything is answered; false (the server stopped meanwhile) ends the session.
@@ -479,14 +479,29 @@ actor Session {
               pid != ProcessInfo.processInfo.processIdentifier else {
             link.send(json: ["t": "fitted", "id": Int(id), "ok": false]); return
         }
-        let was = fitted?.id == id ? fitted?.was : nil
+        let again = fitted?.id == id ? fitted : nil
+        // Brought to the front first, out of full screen and onto the desktop shown: a window
+        // left on another desktop or in full screen was never shown (Connecting…). Put back as
+        // it was, full screen too, when another app is opened or the page leaves.
+        let fullNow = await MainActor.run { Fit.axWindow(id, pid: pid).map(Fit.isFullScreen) ?? false }
+        let wasFull = again?.fullScreen ?? fullNow
+        if wasFull && again == nil {
+            await MainActor.run { if let w = Fit.axWindow(id, pid: pid) { Fit.setFullScreen(w, false) } }
+            for _ in 0..<30 {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                if await MainActor.run(body: { Fit.axWindow(id, pid: pid).map(Fit.isFullScreen) ?? false }) == false { break }
+            }
+            try? await Task.sleep(nanoseconds: 400_000_000)
+        }
+        Catalog.bringForward(id, pid: pid)
+        for _ in 0..<20 where !Catalog.isHere(id) { try? await Task.sleep(nanoseconds: 100_000_000) }
         let result: (CGRect, CGRect)? = await MainActor.run {
             guard let w = Fit.axWindow(id, pid: pid), let now = Fit.frame(w) else { return nil }
             Fit.set(w, Fit.place(size, from: now, in: Fit.usable(for: now)))
-            return (was ?? now, Fit.frame(w) ?? now)
+            return (again?.was ?? now, Fit.frame(w) ?? now)
         }
         guard let (before, after) = result else { link.send(json: ["t": "fitted", "id": Int(id), "ok": false]); return }
-        fitted = (id, pid, before)
+        fitted = (id, pid, before, wasFull)
         windowFrame = nil; frameCheckedAt = 0
         link.send(json: ["t": "fitted", "id": Int(id), "ok": true, "width": Int(after.width), "height": Int(after.height)])
     }
@@ -505,7 +520,11 @@ actor Session {
     private func unfit() async {
         guard let f = fitted else { return }
         fitted = nil
-        await MainActor.run { if let w = Fit.axWindow(f.id, pid: f.pid) { Fit.set(w, f.was) } }
+        await MainActor.run {
+            guard let w = Fit.axWindow(f.id, pid: f.pid) else { return }
+            Fit.set(w, f.was)
+            if f.fullScreen { Fit.setFullScreen(w, true) }
+        }
         windowFrame = nil; frameCheckedAt = 0
     }
 
