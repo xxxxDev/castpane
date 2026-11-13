@@ -65,8 +65,9 @@ back, with touch modes made for a small screen.
 - **Several Macs, one web app.** Other Macs join this one with a one-time code and show up
   beside it on the Remote page. They need no address or account of their own
   ([docs/multi-mac.md](docs/multi-mac.md)).
-- **The clipboard both ways.** Copy the Mac's clipboard to the phone, or put the phone's on
-  the Mac. What a password manager marks hidden is never sent; each use is in Activity.
+- **The clipboard both ways.** Copy the Mac's clipboard to the phone, or paste the phone's
+  where the Mac's cursor is in one press. What a password manager marks hidden is never sent;
+  each use is in Activity.
 - **Stays current.** Each frame shown is acknowledged; the Mac skips frames while a few are
   unshown (more over a slower round trip), so a slow network gives fewer frames, not old
   ones. Quality, resolution and 30 or 60 fps are yours to choose; the bitrate grows with the

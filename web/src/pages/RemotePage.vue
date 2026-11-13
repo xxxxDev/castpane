@@ -130,8 +130,8 @@
         </div>
         <!-- The clipboard both ways. -->
         <div v-if="clipOpen" class="remote-clip" @pointerdown.stop>
-          <button type="button" class="remote-clip-btn from-mac" @click="copyFromMac"><f7-icon f7="arrow_down_doc" :size="17"/>{{ ct('拷貝 Mac 的剪貼簿') }}</button>
-          <button type="button" class="remote-clip-btn to-mac" @click="pasteToMac"><f7-icon f7="arrow_up_doc" :size="17"/>{{ ct('把剪貼簿放到 Mac') }}</button>
+          <button type="button" class="remote-clip-btn from-mac" @pointerdown.prevent @mousedown.prevent @click="copyFromMac"><f7-icon f7="arrow_down_doc" :size="17"/>{{ ct('拷貝 Mac 的剪貼簿') }}</button>
+          <button type="button" class="remote-clip-btn to-mac" @pointerdown.prevent @mousedown.prevent @click="pasteToMac"><f7-icon f7="arrow_up_doc" :size="17"/>{{ ct('貼到 Mac 游標') }}</button>
         </div>
         <!-- The keys a phone's keyboard lacks; ⇧ ⌃ ⌥ ⌘ hold for the next key. A computer opens them with the keyboard button, for what its browser or keyboard won't send. -->
         <div v-if="keyboardOpen || panel || compose || (isTouch && clipOpen)" class="remote-keys" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
@@ -157,7 +157,7 @@
           </div>
           <div class="remote-dots"><button v-for="(pg, i) in PAGES" :key="pg.id" type="button" :class="{on: i === pageNo}" :aria-label="ct(pg.name)" @click="goPage(i)"></button></div>
         </div>
-        <textarea ref="typing" class="remote-typing" :inputmode="isTouch && !keyboardOpen ? 'none' : 'text'" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="keyboard" @beforeinput="beforeInput" @compositionend="compositionEnd" @keydown="keyDown" @keyup="keyUp" @paste="pasteFromHere" @blur="typingBlur"></textarea>
+        <textarea ref="typing" class="remote-typing" :inputmode="isTouch && !keyboardOpen ? 'none' : 'text'" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="keyboard" @beforeinput="beforeInput" @input="typedAnyway" @compositionstart="composing = true" @compositionend="compositionEnd" @keydown="keyDown" @keyup="keyUp" @paste="pasteFromHere" @blur="typingBlur"></textarea>
 
       </div>
     </Teleport>
@@ -877,7 +877,16 @@ function beforeInput(e) {
   else if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') tap('Enter');
   else if (e.inputType === 'deleteContentBackward') tap('Backspace');
   else if (e.inputType === 'deleteContentForward') tap('Delete');
-  else if (e.inputType === 'insertFromPaste') sendText(e.dataTransfer?.getData('text') || '');
+  else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') pasteAtCursor(e.data || e.dataTransfer?.getData('text') || '', true);
+}
+// Text that came in some way beforeinput could not stop (the iPhone keyboard's own
+// suggestion to paste what Safari copied sent nothing: the owner's recording, 2026-11-12).
+// Several lines go by the Mac's paste, so a terminal does not run them one by one.
+let composing = false;
+function typedAnyway(e) {
+  const field = typing.value;if (!field || composing || e.isComposing || !field.value) return;
+  const s = field.value;field.value = '';
+  if (/[\r\n]/.test(s)) pasteAtCursor(s, true);else sendText(s);
 }
 // The panel takes the phone keyboard's place; closing it brings the keyboard back.
 function togglePanel() {
@@ -949,19 +958,32 @@ async function copyFromMac() {
     if (area) area.value = m.s;
   }
 }
+// What this device copied, pasted where the Mac's cursor is in one press: it goes on the
+// Mac's clipboard, then ⌘V. Putting it there and pressing ⌘V were two steps, the first
+// easily mistaken for the other button (the owner's recording, 2026-11-12).
 async function pasteToMac() {
   clipOpen.value = false;
   let s = null;
   try { s = await navigator.clipboard.readText(); } catch { /* refused or not there */ }
-  const put = (v) => {
-    if (!v) return toast(ct('這台裝置的剪貼簿裡沒有文字'));
-    if (v.length > 100000) return toast(ct('文字太長，最多 100 000 字'));
-    if (!v.isWellFormed()) v = v.toWellFormed();
-    link?.send({ t: 'clipboard-set', s: v });
-  };
   // This browser would not read it: a field to paste into.
-  if (s === null) return f7.dialog.prompt(ct('貼上要放到 Mac 剪貼簿的文字。'), ct('把剪貼簿放到 Mac'), put);
-  put(s);
+  if (s === null) return f7.dialog.prompt(ct('貼上要送到 Mac 游標位置的文字。'), ct('貼到 Mac 游標'), (v) => pasteAtCursor(v));
+  pasteAtCursor(s);
+}
+async function pasteAtCursor(v, quiet = false) {
+  if (!v) return quiet ? undefined : toast(ct('這台裝置的剪貼簿裡沒有文字'));
+  if (v.length > 100000) return toast(ct('文字太長，最多 100 000 字'));
+  if (!v.isWellFormed()) v = v.toWellFormed();
+  await putOnMac(v);
+  pasteKey(['meta']);
+}
+// The Mac says when the text is on its clipboard; ⌘V waits for that (at most 2 s).
+function putOnMac(s) {
+  return new Promise((resolve) => {
+    const done = () => { clearTimeout(timer);clipSetWait = null;resolve(); };
+    const timer = setTimeout(done, 2000);
+    clipSetWait = done;
+    link?.send({ t: 'clipboard-set', s });
+  });
 }
 // ⌘V on this computer's keyboard pasted the Mac's own clipboard, not what was just copied
 // here. The browser's paste now brings this computer's
@@ -971,7 +993,7 @@ let pasteMods = null, pasteTimer = null, clipSetWait = null;
 // But something copied on the Mac is what a paste means while this page keeps the focus: this
 // computer's clipboard still held the older text, which went over it.
 // Away from the page, this computer may have copied something newer.
-let macCopied = false;
+let macCopied = false, macPasted = 0;
 const leftPage = () => { macCopied = false; };
 if (typeof window !== 'undefined') { window.addEventListener('blur', leftPage);onBeforeUnmount(() => window.removeEventListener('blur', leftPage)); }
 // What the Mac copied comes here too, where the Mac allows it to be read. A browser that
@@ -987,20 +1009,23 @@ function pasteKey(m) {
   link?.send({ t: 'key', code: 'KeyV', down: true, mods: m });link?.send({ t: 'key', code: 'KeyV', down: false, mods: m });releaseMods();
 }
 async function pasteFromHere(e) {
-  if (!pasteMods) return;
+  // A paste with no ⌘V behind it (the iPhone keyboard's paste, a menu's): what it carries
+  // goes to where the Mac's cursor is.
+  if (!pasteMods) {
+    // The ⌘V that pasted what the Mac copied: this computer's older text stays out of it.
+    if (Date.now() - macPasted < 500) return e.preventDefault();
+    const s = e.clipboardData?.getData('text/plain') || '';
+    if (!s) return;
+    e.preventDefault();
+    return pasteAtCursor(s, true);
+  }
   e.preventDefault();
   const m = pasteMods;pasteMods = null;clearTimeout(pasteTimer);
   let s = e.clipboardData?.getData('text/plain') || '';
   if (s.length > 100000) return toast(ct('文字太長，最多 100 000 字'));
   if (s) {
     if (!s.isWellFormed()) s = s.toWellFormed();
-    // The Mac says when the text is on its clipboard; ⌘V waits for that (at most 2 s).
-    await new Promise((resolve) => {
-      const done = () => { clearTimeout(timer);clipSetWait = null;resolve(); };
-      const timer = setTimeout(done, 2000);
-      clipSetWait = done;
-      link?.send({ t: 'clipboard-set', s });
-    });
+    await putOnMac(s);
   }
   pasteKey(m);
 }
@@ -1009,7 +1034,7 @@ function composeKey(e) {
   if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
   e.preventDefault();sendCompose();
 }
-function compositionEnd(e) { sendText(e.data || '');if (typing.value) typing.value.value = ''; }
+function compositionEnd(e) { composing = false;sendText(e.data || '');if (typing.value) typing.value.value = ''; }
 const sentDown = new Set();
 // A keyboard not made for a Mac (Windows, Linux): Ctrl is where its shortcuts are, so it
 // goes as ⌘ and the Windows key as ⌃, Ctrl+R as ⌘R; F5, which reloads there, as ⌘R too.
@@ -1035,7 +1060,7 @@ function keyDown(e) {
   }
   if (meta && (e.code === 'KeyC' || e.code === 'KeyX') && !ctrl && !e.altKey) macCopied = true;
   if (meta && e.code === 'KeyV' && !ctrl && !e.altKey && !e.repeat && macCopied) {
-    e.preventDefault();
+    e.preventDefault();macPasted = Date.now();
     pasteKey(e.shiftKey ? ['shift', 'meta'] : ['meta']);
     return;
   }
