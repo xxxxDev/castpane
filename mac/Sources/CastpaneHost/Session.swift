@@ -123,6 +123,9 @@ actor Session {
     private var wokenAt = Date.distantPast
     /// The window made the device's shape, and its frame before, to put back.
     private var fitted: (id: CGWindowID, pid: pid_t, was: CGRect, fullScreen: Bool)?
+    /// The app that was in front before a window was brought forward for the viewer: put
+    /// back in front (and its desktop with it) when the viewer leaves the windows.
+    private var inFront: pid_t?
 
     /// `onHello` runs once, on the reader's thread, when the hello carried the token and
     /// before anything is answered; false (the server stopped meanwhile) ends the session.
@@ -187,7 +190,7 @@ actor Session {
             case .end:
                 watcher?.cancel()
                 clipboardWatcher?.cancel()
-                queued { await self.unfit(); await self.stop() }
+                queued { await self.unfit(); await self.stop(); await self.putBack() }
             }
         }
     }
@@ -294,7 +297,7 @@ actor Session {
             }
         case let .start(kind, id, maxWidth, fps, bitrate, hevc):
             queued { await self.start(kind: kind, id: id, maxWidth: maxWidth, fps: fps, bitrate: bitrate, hevc: hevc) }
-        case .stop: queued { await self.unfit(); await self.stop() }
+        case .stop: queued { await self.unfit(); await self.stop(); await self.putBack() }
         case .apps:
             let link = self.link
             Task { @MainActor in link.send(json: ["t": "apps", "apps": Apps.list()]) }
@@ -456,7 +459,9 @@ actor Session {
             target = found
             windowFrame = nil
             frameCheckedAt = 0
+            if found.windowID == nil { await putBack() }
             if let pid = found.pid, let wid = found.windowID {
+                await noteFront()
                 Catalog.bringForward(wid, pid: pid)
                 // On another desktop or in the Dock: wait for macOS to bring it here.
                 if !found.here { for _ in 0..<20 where !Catalog.isHere(wid) { try? await Task.sleep(nanoseconds: 100_000_000) } }
@@ -493,6 +498,7 @@ actor Session {
             }
             try? await Task.sleep(nanoseconds: 400_000_000)
         }
+        await noteFront()
         Catalog.bringForward(id, pid: pid)
         for _ in 0..<20 where !Catalog.isHere(id) { try? await Task.sleep(nanoseconds: 100_000_000) }
         let result: (CGRect, CGRect)? = await MainActor.run {
@@ -526,6 +532,20 @@ actor Session {
             if f.fullScreen { Fit.setFullScreen(w, true) }
         }
         windowFrame = nil; frameCheckedAt = 0
+    }
+
+    /// The app in front now, kept the first time a window is brought forward.
+    private func noteFront() async {
+        guard inFront == nil else { return }
+        let me = ProcessInfo.processInfo.processIdentifier
+        inFront = await MainActor.run { NSWorkspace.shared.frontmostApplication?.processIdentifier }.flatMap { $0 == me ? nil : $0 }
+    }
+
+    /// The app that was in front before puts the Mac back on its desktop.
+    private func putBack() async {
+        guard let pid = inFront else { return }
+        inFront = nil
+        Catalog.activate(pid)
     }
 
     func stop() async {
