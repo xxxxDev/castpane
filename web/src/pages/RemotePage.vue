@@ -320,7 +320,13 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', onHidden)
 // A pass for a few hours, asked for with the admin's password (and code).
 async function getPass(fresh = false) {
   const kept = sessionGet('castpane-remote-pass');
-  if (!fresh && kept && Date.parse(kept.expiresAt) > Date.now() + 60000) return kept.pass;
+  if (!fresh && kept && Date.parse(kept.expiresAt) > Date.now() + 60000) {
+    // Asked first, so the picture opens only with a pass that works.
+    let ok = false;
+    try { ok = !!(await api('/remote/pass/check', { method: 'POST', body: JSON.stringify({ pass: kept.pass }) }))?.ok; } catch { /* asked again below */ }
+    if (ok) return kept.pass;
+    sessionSet('castpane-remote-pass', null);
+  }
   // A passkey first (Face ID, Touch ID): no password or code then.
   // Cancelled, refused or none: the password, as before.
   if (passkeysWork()) {

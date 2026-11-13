@@ -188,6 +188,9 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
       res.json(issued);
     } catch (e) { try { auth.adminKept(req); } catch { /* nothing granted */ } next(e); }
   });
+  // Whether a pass the page kept is still good: a restart of the server ends them all, and
+  // the page then opened the picture only to be sent back for the password.
+  app.post('/api/remote/pass/check', ...chain, (req, res) => { res.json({ ok: passes.check(req.body?.pass, req.userId, sessionToken(req) || req.headers.authorization || '') }); });
   app.post('/api/remote/pass/end', ...chain, (req, res) => { passes.end(req.userId); res.json({ ok: true }); });
 }
 
