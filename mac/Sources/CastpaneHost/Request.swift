@@ -39,6 +39,14 @@ enum Request: Equatable, Sendable {
     case text(String)
     case clipboardGet
     case clipboardSet(String)
+    case apps
+    case icons([String])
+    case launch(String)
+    /// A window made `width` × `height` points (the device's shape); `unfit` puts it back.
+    case fit(id: Int, width: Int, height: Int)
+    case unfit
+    /// A window closed on the Mac, as its close button would (the switcher's swipe up).
+    case close(id: Int)
     /// A known request with a field out of shape; `t` is what it was, for an error answer.
     case invalid(String)
 
@@ -63,6 +71,23 @@ enum Request: Equatable, Sendable {
         case "clipboard-set":
             guard let s = msg["s"] as? String, !s.isEmpty, s.utf16.count <= Clipboard.maxLength else { return .invalid(t) }
             return .clipboardSet(s)
+        case "apps": return .apps
+        case "unfit": return .unfit
+        case "close":
+            guard let id = Field.exactInt(msg["id"], in: ids) else { return .invalid(t) }
+            return .close(id: id)
+        case "icons":
+            guard let list = msg["bundles"] as? [Any], list.count <= 40 else { return .invalid(t) }
+            let bundles = list.compactMap { $0 as? String }.filter { $0.utf8.count <= 200 }
+            return .icons(bundles)
+        case "launch":
+            guard let b = msg["bundle"] as? String, b.utf8.count <= 200, !b.isEmpty,
+                  b.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == "_") }) else { return .invalid(t) }
+            return .launch(b)
+        case "fit":
+            guard let id = Field.exactInt(msg["id"], in: ids), let w = Field.clampedInt(msg["width"], 240...8000, default: 0),
+                  let h = Field.clampedInt(msg["height"], 240...8000, default: 0), w > 0, h > 0 else { return .invalid(t) }
+            return .fit(id: id, width: w, height: h)
         case "start":
             guard let kind = msg["kind"] as? String, kind == "display" || kind == "window",
                   let id = Field.exactInt(msg["id"], in: ids),

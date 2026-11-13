@@ -121,6 +121,8 @@ actor Session {
     private var lastStart: (kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool)?
     private var displaysAtStart = ""
     private var wokenAt = Date.distantPast
+    /// The window made the device's shape, and its frame before, to put back.
+    private var fitted: (id: CGWindowID, pid: pid_t, was: CGRect)?
 
     /// `onHello` runs once, on the reader's thread, when the hello carried the token and
     /// before anything is answered; false (the server stopped meanwhile) ends the session.
@@ -185,7 +187,7 @@ actor Session {
             case .end:
                 watcher?.cancel()
                 clipboardWatcher?.cancel()
-                queued { await self.stop() }
+                queued { await self.unfit(); await self.stop() }
             }
         }
     }
@@ -292,7 +294,19 @@ actor Session {
             }
         case let .start(kind, id, maxWidth, fps, bitrate, hevc):
             queued { await self.start(kind: kind, id: id, maxWidth: maxWidth, fps: fps, bitrate: bitrate, hevc: hevc) }
-        case .stop: queued { await self.stop() }
+        case .stop: queued { await self.unfit(); await self.stop() }
+        case .apps:
+            let link = self.link
+            Task { @MainActor in link.send(json: ["t": "apps", "apps": Apps.list()]) }
+        case let .icons(bundles):
+            let link = self.link
+            Task { @MainActor in link.send(json: ["t": "icons", "icons": Apps.icons(bundles)]) }
+        case let .launch(bundle):
+            let link = self.link
+            Task { @MainActor in link.send(json: ["t": "launched", "bundle": bundle, "ok": Apps.launch(bundle)]) }
+        case let .fit(id, width, height): queued { await self.fit(CGWindowID(id), CGSize(width: width, height: height)) }
+        case .unfit: queued { await self.unfit() }
+        case let .close(id): queued { await self.close(CGWindowID(id)) }
         case .ack: video.ack()
         case .keyFrame: video.keyFrame()
         case let .move(x, y):
@@ -410,6 +424,8 @@ actor Session {
     }
 
     private func start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool) async {
+        // Another window or a display shown: the one made the device's shape goes back.
+        if let f = fitted, kind != "window" || Int(f.id) != id { await unfit() }
         await stop()
         await Self.wakeDisplays()
         lastStart = (kind, id, maxWidth, fps, bitrate, hevc)
@@ -452,6 +468,45 @@ actor Session {
         } catch {
             link.send(json: ["t": "error", "where": "start", "message": error.localizedDescription])
         }
+    }
+
+    /// Makes a window the device's shape, putting back one made so before. The page starts
+    /// the window's picture again at its new size.
+    private func fit(_ id: CGWindowID, _ size: CGSize) async {
+        if let f = fitted, f.id != id { await unfit() }
+        let link = self.link
+        guard let pid = (try? await Catalog.content())?.windows.first(where: { $0.windowID == id })?.owningApplication?.processID,
+              pid != ProcessInfo.processInfo.processIdentifier else {
+            link.send(json: ["t": "fitted", "id": Int(id), "ok": false]); return
+        }
+        let was = fitted?.id == id ? fitted?.was : nil
+        let result: (CGRect, CGRect)? = await MainActor.run {
+            guard let w = Fit.axWindow(id, pid: pid), let now = Fit.frame(w) else { return nil }
+            Fit.set(w, Fit.place(size, from: now, in: Fit.usable(for: now)))
+            return (was ?? now, Fit.frame(w) ?? now)
+        }
+        guard let (before, after) = result else { link.send(json: ["t": "fitted", "id": Int(id), "ok": false]); return }
+        fitted = (id, pid, before)
+        windowFrame = nil; frameCheckedAt = 0
+        link.send(json: ["t": "fitted", "id": Int(id), "ok": true, "width": Int(after.width), "height": Int(after.height)])
+    }
+
+    /// Closes a window on the Mac (the switcher's swipe up); the list follows.
+    private func close(_ id: CGWindowID) async {
+        if fitted?.id == id { fitted = nil }
+        guard let pid = (try? await Catalog.content())?.windows.first(where: { $0.windowID == id })?.owningApplication?.processID,
+              pid != ProcessInfo.processInfo.processIdentifier else { return }
+        await MainActor.run { if let w = Fit.axWindow(id, pid: pid) { Fit.close(w) } }
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        route(.list)
+    }
+
+    /// Puts the window made the device's shape back where and as large as it was.
+    private func unfit() async {
+        guard let f = fitted else { return }
+        fitted = nil
+        await MainActor.run { if let w = Fit.axWindow(f.id, pid: f.pid) { Fit.set(w, f.was) } }
+        windowFrame = nil; frameCheckedAt = 0
     }
 
     func stop() async {

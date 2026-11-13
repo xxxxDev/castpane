@@ -75,6 +75,13 @@ const MESSAGES = {
   text: (m) => (typeof m.s === 'string' && m.s.length >= 1 && m.s.length <= TEXT_MAX && m.s.isWellFormed() ? { s: m.s } : null),
   probe(m) { const p = at(m); return p && int(m.n, 0, 2 ** 31 - 1) ? { ...p, n: m.n } : null; },
   'clipboard-get': none,
+  // The Mac's apps for the home (docs/protocol.md); an app started by its bundle id, which
+  // the capture core starts only when it is one it lists; a window made the device's shape.
+  apps: none, unfit: none,
+  close: (m) => (int(m.id, 0, 0xffffffff) ? { id: m.id } : null),
+  icons: (m) => (Array.isArray(m.bundles) && m.bundles.length <= 40 && m.bundles.every((b) => typeof b === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(b)) ? { bundles: m.bundles } : null),
+  launch: (m) => (typeof m.bundle === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(m.bundle) ? { bundle: m.bundle } : null),
+  fit: (m) => (int(m.id, 0, 0xffffffff) && int(m.width, 240, 8000) && int(m.height, 240, 8000) ? { id: m.id, width: m.width, height: m.height } : null),
   'clipboard-set': (m) => (typeof m.s === 'string' && m.s.length >= 1 && m.s.length <= CLIPBOARD_MAX && m.s.isWellFormed() ? { s: m.s } : null),
 };
 const FROM_PAGE = new Set(Object.keys(MESSAGES));

@@ -283,6 +283,11 @@ function item(x) {
     desk: pick({ id: int(d.id), number: int(d.number), display: int(d.display), fullscreen: bool(d.fullscreen), current: bool(d.current) }),
   });
 }
+const ICON = /^data:image\/png;base64,[A-Za-z0-9+/=]*$/;
+function app(x) {
+  if (!x || typeof x !== 'object' || Array.isArray(x) || !str(x.bundle, 200)) return null;
+  return { bundle: x.bundle, name: str(x.name, 200) ?? '', running: bool(x.running) ?? false };
+}
 const SHAPES = {
   status: (m) => pick({ screen: bool(m.screen) ?? false, accessibility: bool(m.accessibility) ?? false, version: str(m.version, 64), host: str(m.host, 64) }),
   list: (m) => (Array.isArray(m.items) ? { items: m.items.slice(0, 500).map(item).filter(Boolean) } : null),
@@ -296,6 +301,11 @@ const SHAPES = {
   clipboard: (m) => pick({ s: str(m.s, 100000), truncated: bool(m.truncated), empty: bool(m.empty), concealed: bool(m.concealed), notAllowed: bool(m.notAllowed), denied: bool(m.denied), error: bool(m.error) }),
   'clipboard-set': () => ({}),
   'clipboard-changed': () => ({}),
+  apps: (m) => (Array.isArray(m.apps) ? { apps: m.apps.slice(0, 300).map(app).filter(Boolean) } : null),
+  icons: (m) => (m.icons && typeof m.icons === 'object' && !Array.isArray(m.icons)
+    ? { icons: Object.fromEntries(Object.entries(m.icons).slice(0, 40).filter(([b, v]) => str(b, 200) && typeof v === 'string' && v.length <= 64 * 1024 && ICON.test(v))) } : null),
+  launched: (m) => (str(m.bundle, 200) ? { bundle: m.bundle, ok: bool(m.ok) ?? false } : null),
+  fitted: (m) => (int(m.id) !== undefined ? pick({ id: m.id, ok: bool(m.ok) ?? false, width: int(m.width), height: int(m.height) }) : null),
   'clipboard-busy': () => ({}),
 };
 function vetFromMember(text) {

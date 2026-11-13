@@ -110,6 +110,12 @@ closing the session.
 | `probe`       | `x`, `y`, `n` (integer, 0 to 2³¹−1)                                                                                                                                                                        | Is there a text field at this point?                        |
 | `clipboard-get` |                                                                                                                                                                                                          | Send the Mac's clipboard text. At most one clipboard request a second; each is logged and shown in Activity. |
 | `clipboard-set` | `s` (1 to 100 000 UTF-16 units)                                                                                                                                                                          | Put this text on the Mac's clipboard.                       |
+| `apps`          |                                                                                                                                                                                                          | The Mac's apps, for the home.                               |
+| `icons`         | `bundles` (at most 40 bundle ids)                                                                                                                                                                        | Their icons; the page keeps them.                           |
+| `launch`        | `bundle` (a bundle id: letters, digits, `.` `_` `-`, at most 200)                                                                                                                                        | Start or bring forward one of the apps `apps` lists; any other is refused.|
+| `fit`           | `id` (a window), `width`, `height` (points, 240 to 8000)                                                                                                                                                 | Make the window this size (the device's shape), kept inside its display; it is put back on `unfit`, on `stop`, when the page leaves, or when another window or a display is started.|
+| `unfit`         |                                                                                                                                                                                                          | Put the window made a size back as it was.                  |
+| `close`         | `id` (a window)                                                                                                                                                                                          | Close the window, as its close button.                      |
 
 ### From the capture core
 
@@ -125,6 +131,10 @@ closing the session.
 | `probe`   | `editable`, `n`                                                                                                 | The answer to a `probe`.                                                    |
 | `clipboard` | `s?`, `truncated?`, `empty?`, `concealed?`                                                                    | The answer to `clipboard-get`: the text (at most 100 000 UTF-16 units), or none; text a password manager marks concealed or transient is never sent. |
 | `clipboard-set` |                                                                                                           | The text is on the Mac's clipboard.                                         |
+| `apps`          | `apps: [{bundle, name, running}]`                                                                         | Installed and running apps (at most 300).                                   |
+| `icons`         | `icons: {bundle: "data:image/png;base64,…"}`                                                              | The icons asked for, 64 × 64.                                               |
+| `launched`      | `bundle`, `ok`                                                                                            | The answer to `launch`; its window comes in the next `list`.                |
+| `fitted`        | `id`, `ok`, `width?`, `height?`                                                                           | The answer to `fit`: the size the window took (an app may keep a larger one).|
 | `error`   | `where`, `message`                                                                                              | Something failed (`where: "start"`, `message: "gone"` for a closed window). |
 
 ## The app ⇄ the server: `/api/local/*`
