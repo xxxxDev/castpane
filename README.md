@@ -80,7 +80,7 @@ back, with touch modes made for a small screen.
   keys a phone lacks (esc, tab, arrows, ⌘ ⌥ ⌃ ⇧, the Mac's desktops, Mission Control) sit in
   one capsule you slide sideways, with a round button beside it to call up or hide the
   keyboard (a tablet fits them all at once). There is a key panel in the keyboard's place
-  (editing keys, the Mac's shortcuts, a number pad, F1–F12), and a field to write a line,
+  (editing keys, the Mac's shortcuts, a number pad, F1 to F12), and a field to write a line,
   input method and all, and send it to the Mac's cursor. Held sideways, the tabs move to a
   rail on the right.
 - **At a computer too.** Pinch on a trackpad, Ctrl or ⌘ with the wheel, or the sizes in the top
