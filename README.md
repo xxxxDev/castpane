@@ -132,7 +132,7 @@ in it may still change. The Remote tab is not affected and stays the whole scree
 - **The same keys.** The capsule of keys and the keyboard's round button are there under an
   app as on the Remote tab.
 - **Apps left at their own size.** An app's menu can leave that app at its own size from then
-  on, or turn the fitting off. **Settings › System › Apps left at their own size** lists them,
+  on, or turn the fitting off. **Settings › System › Apps left at their size** lists them,
   takes more, and shows the apps found too wide to be made the device's shape. The list is
   kept on that device.
 
