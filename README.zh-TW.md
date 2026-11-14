@@ -49,20 +49,14 @@ Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用�
 ## 功能
 
 <p align="center">
-  <img src="docs/assets/anim/labs-dark.svg" width="300" alt="實驗功能：Mac 上開著的 App 一個一張卡，點開 Notes 調成手機大小，再看所有 App、點開 Mail">
-  <img src="docs/assets/anim/unlock-dark.svg" width="300" alt="Mac 鎖定時跳出小視窗輸入密碼，解鎖後看到畫面">
+  <img src="docs/assets/anim/remote-windows-dark.svg" width="300" alt="遠端分頁：整個螢幕，切到桌面 1 開 Notes 視窗，再切到桌面 2 叫出原本不在畫面上的 Calendar 視窗">
+  <img src="docs/assets/anim/remote-unlock-dark.svg" width="300" alt="遠端分頁：Mac 鎖定時跳出小視窗輸入密碼，解鎖後看到畫面">
 </p>
 <p align="center">
-  <img src="docs/assets/anim/trust-dark.svg" width="300" alt="設定裡驗證一次就信任這台裝置，管理頁把信任期限選成 90 天">
-  <img src="docs/assets/anim/keys-dark.svg" width="300" alt="手機按鍵都在一個膠囊裡：按住 ⌘、滑到第二頁、切換桌面、叫出再收起鍵盤">
+  <img src="docs/assets/anim/remote-keys-dark.svg" width="300" alt="遠端分頁：手機按鍵都在一個膠囊裡，按住 ⌘、滑到第二頁、切換桌面、叫出再收起鍵盤">
+  <img src="docs/assets/anim/remote-trust-dark.svg" width="300" alt="設定裡驗證一次就信任這台裝置，管理頁把信任期限選成 90 天">
 </p>
 
-- **把 Mac 的 App 當手機 App 用（實驗功能）。** 打開「設定 › 系統 › 實驗功能」會多一個「實驗」分頁。
-  在手機或平板上，它一打開就是 Mac 上開著的 App，一個 App 一張卡；所有 App 按一下就像 Launchpad 一樣列出來，
-  沒開的點了就會啟動。點一個，它的視窗就填滿畫面；Mac 上那個視窗會調成這台裝置的形狀，
-  字和按鈕跟裝置自己的 App 差不多大（縮不到那麼窄的 App 維持它的寬度），直接用手指點，不用移動游標。
-  底部橫條往旁邊滑切到下一個 App，往上滑叫出多工卡片（卡片往上滑就在 Mac 上關掉那個視窗），
-  從左邊緣往右滑回首頁。離開時視窗會恢復原本的大小和位置。「遠端」分頁維持原本的整個螢幕。
 - **整個螢幕或單一視窗。** 可以選一個顯示器、一個桌面（Space）、一個全螢幕 App 或單一視窗。
   清單依桌面分組，附縮圖。在別的桌面上的視窗，或 App 在背景關掉的視窗，
   會像點 Dock 圖示一樣叫出來；離開或換到別的視窗時，它會照原本的樣子收回去，
@@ -106,6 +100,31 @@ Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用�
   有新版本時會提示更新。
 - 網頁 App 有**英文和繁體中文**。
 
+## 實驗功能
+
+實驗功能放的是還在試的功能，預設關閉。打開「**設定 › 系統 › 實驗功能**」（只有管理員，每台裝置各自設定），
+「遠端」旁邊就會多一個「實驗」分頁。裡面的內容之後還可能調整。「遠端」分頁不受影響，維持原本的整個螢幕。
+
+<p align="center">
+  <img src="docs/assets/anim/labs-home-dark.svg" width="250" alt="實驗分頁：Mac 上開著的 App 一個一張卡，點開 Notes 調成手機形狀，從左邊緣滑回首頁，再從所有 App 打開原本沒開的 Music">
+  <img src="docs/assets/anim/labs-switch-dark.svg" width="250" alt="實驗分頁：底部橫條往旁邊滑切到 Mail、再到 Calendar，往上滑叫出卡片，卡片往上滑關掉那個視窗">
+  <img src="docs/assets/anim/labs-keys-dark.svg" width="250" alt="實驗分頁：App 下方一樣是按鍵膠囊，叫出鍵盤時 Mac 上的視窗會調成鍵盤上方剩下的形狀">
+</p>
+
+- **把 Mac 的 App 當手機 App 用。** 在手機或平板上，「實驗」分頁一打開就是 Mac 上開著的 App，
+  一個 App 一張卡，下面還有一個按鈕可以看這台 Mac 的整個螢幕。
+- **所有 App。** 「所有 App」像 Launchpad 一樣列出 Mac 上的每個 App，可以搜尋；
+  沒開的點了就會啟動，等它開出視窗就直接打開。
+- **調成這台裝置的形狀。** 點一個 App，它的視窗就填滿畫面；Mac 上那個視窗會調成這台裝置的形狀，
+  字和按鈕跟裝置自己的 App 差不多大，直接用手指點，不用移動游標。縮不到那麼窄的 App
+  會盡量調整，維持它能有的寬度。叫出鍵盤時，視窗會調成鍵盤上方剩下的形狀。離開時視窗會恢復原本的樣子。
+- **像手機一樣切換 App。** 底部橫條往旁邊滑切到前一個或下一個用過的 App，往上滑叫出多工卡片
+  （點一張打開，往上滑就在 Mac 上關掉那個視窗），從左邊緣往右滑回首頁。
+- **一樣的按鍵。** App 下方一樣有按鍵膠囊和圓形鍵盤按鈕，跟「遠端」分頁相同。
+- **不調整視窗的 App。** 在 App 的選單裡可以讓這個 App 以後都維持原本大小，或關掉調整。
+  「**設定 › 系統 › 不調整視窗的 App**」列出這些 App、可以再新增，也會列出縮不到這台裝置寬度的 App。
+  清單只存在那台裝置。
+
 ## 實際畫面
 
 <p align="center">
@@ -126,7 +145,7 @@ Mac 上的設定精靈和設定視窗：
 </p>
 
 這些圖都來自假資料：網頁 App 的由 `npm run shots` 產生，「Mac 螢幕」是腳本畫的；
-Mac App 的來自除錯版的截圖功能，網址是編的。「功能」段的動畫也一樣，
+Mac App 的來自除錯版的截圖功能，網址是編的。「功能」和「實驗功能」段的動畫也一樣，
 是用假回應和假 Mac 視窗跑網頁 App 錄下來的。
 沒有擷取任何真實螢幕。在 macOS 26 以上，
 App 的面板和按鈕是 Liquid Glass 玻璃效果，截圖裡畫不出來。

@@ -49,23 +49,14 @@ back, with touch modes made for a small screen.
 ## Features
 
 <p align="center">
-  <img src="docs/assets/anim/labs-dark.svg" width="300" alt="Labs: the Mac's open apps as cards; Notes opens made the phone's shape, then every app, then Mail">
-  <img src="docs/assets/anim/unlock-dark.svg" width="300" alt="A locked Mac asks for its password in a small window, then unlocks and shows its screen">
+  <img src="docs/assets/anim/remote-windows-dark.svg" width="300" alt="Remote tab: the whole screen, then Desktop 1 and its Notes window, then Desktop 2 and a Calendar window that was not on screen">
+  <img src="docs/assets/anim/remote-unlock-dark.svg" width="300" alt="Remote tab: a locked Mac asks for its password in a small window, then unlocks and shows its screen">
 </p>
 <p align="center">
-  <img src="docs/assets/anim/trust-dark.svg" width="300" alt="Settings: trust this device after asking once; Admin: trusted devices, kept for 90 days">
-  <img src="docs/assets/anim/keys-dark.svg" width="300" alt="The phone's keys in one capsule: hold ⌘, slide to the second page, switch desktops, call up and hide the keyboard">
+  <img src="docs/assets/anim/remote-keys-dark.svg" width="300" alt="Remote tab: the phone's keys in one capsule; hold ⌘, slide to the second page, switch desktops, call up and hide the keyboard">
+  <img src="docs/assets/anim/remote-trust-dark.svg" width="300" alt="Settings: trust this device after asking once; Admin: trusted devices, kept for 90 days">
 </p>
 
-- **The Mac's apps, as a phone's (Labs).** Turn on Settings › System › Labs for a Labs tab.
-  On a phone or tablet it opens on the apps open on the Mac, one card each; every app is a
-  button away, as Launchpad shows them, and one not running starts. Tap one and its window
-  fills the screen, made the device's shape on the Mac so its text and buttons are the size of
-  the device's own apps (an app that cannot be that narrow keeps its width), and you use it
-  with your finger, with no pointer to move. Slide the bar at the bottom to the next app, up
-  for all of them as cards (slide a card up to close that window), or in from the left edge
-  for the home. The window goes back as it was when you leave it. The Remote tab stays the
-  whole screen.
 - **Your screen or one window.** Pick a whole display, a desktop (Space), a full-screen app or a
   single window. The list is grouped by desktop, with thumbnails. A window on another desktop,
   or one its app keeps closed in the background, comes up as a click on its Dock icon brings
@@ -113,6 +104,38 @@ back, with touch modes made for a small screen.
   It offers each new version as it arrives.
 - **English and Traditional Chinese** in the web app.
 
+## Labs
+
+Labs holds features still being tried. It is off by default: turn on **Settings › System ›
+Labs** (admins only, on each device by itself) and a Labs tab appears beside Remote. What is
+in it may still change. The Remote tab is not affected and stays the whole screen.
+
+<p align="center">
+  <img src="docs/assets/anim/labs-home-dark.svg" width="250" alt="Labs tab: the Mac's open apps as cards; Notes opens made the phone's shape, a slide in from the left edge goes home, All apps opens Music, which was not running">
+  <img src="docs/assets/anim/labs-switch-dark.svg" width="250" alt="Labs tab: the bar at the bottom slid sideways goes to Mail, then Calendar; slid up shows the cards; a card slid up closes its window">
+  <img src="docs/assets/anim/labs-keys-dark.svg" width="250" alt="Labs tab: the same capsule of keys under an app; with the keyboard up the Mac's window is made the shape of what is left above it">
+</p>
+
+- **The Mac's apps, as a phone's.** On a phone or tablet the Labs tab opens on the apps open
+  on the Mac, one card each, with this Mac's whole screen one button below them.
+- **Every app.** All apps lists every app on the Mac as Launchpad shows them, with a search
+  field; one not running starts, and its window opens as soon as it has one.
+- **Made the device's shape.** Tap an app and its window fills the screen, made the shape of
+  this device on the Mac, so its text and buttons are the size of the device's own apps, and
+  you use it with your finger, with no pointer to move. An app that cannot be that narrow
+  keeps the width it can have and is made as close as it allows. With the keyboard up, the
+  window is made the shape of what is left above it. The window goes back as it was when you
+  leave it.
+- **Moving between apps as on a phone.** Slide the bar at the bottom sideways for the app
+  used before or after, up for the open windows as cards (tap one to open it, slide one up to
+  close that window on the Mac), or slide in from the left edge for the home.
+- **The same keys.** The capsule of keys and the keyboard's round button are there under an
+  app as on the Remote tab.
+- **Apps left at their own size.** An app's menu can leave that app at its own size from then
+  on, or turn the fitting off. **Settings › System › Apps left at their own size** lists them,
+  takes more, and shows the apps found too wide to be made the device's shape. The list is
+  kept on that device.
+
 ## What it looks like
 
 <p align="center">
@@ -134,7 +157,7 @@ On the Mac, the setup assistant and Settings:
 
 These pictures come from fixtures: the web app's from `npm run shots`, where the "Mac screen"
 is drawn by the script, and the Mac app's from a debug build's snapshots, with a made-up
-address. The animations under Features were recorded the same way, from the web app with
+address. The animations under Features and Labs were recorded the same way, from the web app with
 made-up answers and made-up Mac windows. No real screen was captured. On macOS 26 and later the app's panels and buttons are
 Liquid Glass, which the snapshots do not draw.
 
