@@ -48,6 +48,15 @@ back, with touch modes made for a small screen.
 
 ## Features
 
+<p align="center">
+  <img src="docs/assets/anim/labs-dark.svg" width="300" alt="Labs: the Mac's open apps as cards; Notes opens made the phone's shape, then every app, then Mail">
+  <img src="docs/assets/anim/unlock-dark.svg" width="300" alt="A locked Mac asks for its password in a small window, then unlocks and shows its screen">
+</p>
+<p align="center">
+  <img src="docs/assets/anim/trust-dark.svg" width="300" alt="Settings: trust this device after asking once; Admin: trusted devices, kept for 90 days">
+  <img src="docs/assets/anim/keys-dark.svg" width="300" alt="The phone's keys in one capsule: hold ⌘, slide to the second page, switch desktops, call up and hide the keyboard">
+</p>
+
 - **The Mac's apps, as a phone's (Labs).** Turn on Settings › System › Labs for a Labs tab.
   On a phone or tablet it opens on the apps open on the Mac, one card each; every app is a
   button away, as Launchpad shows them, and one not running starts. Tap one and its window

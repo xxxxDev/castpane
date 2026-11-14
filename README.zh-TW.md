@@ -48,6 +48,15 @@ Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用�
 
 ## 功能
 
+<p align="center">
+  <img src="docs/assets/anim/labs-dark.svg" width="300" alt="實驗功能：Mac 上開著的 App 一個一張卡，點開 Notes 調成手機大小，再看所有 App、點開 Mail">
+  <img src="docs/assets/anim/unlock-dark.svg" width="300" alt="Mac 鎖定時跳出小視窗輸入密碼，解鎖後看到畫面">
+</p>
+<p align="center">
+  <img src="docs/assets/anim/trust-dark.svg" width="300" alt="設定裡驗證一次就信任這台裝置，管理頁把信任期限選成 90 天">
+  <img src="docs/assets/anim/keys-dark.svg" width="300" alt="手機按鍵都在一個膠囊裡：按住 ⌘、滑到第二頁、切換桌面、叫出再收起鍵盤">
+</p>
+
 - **把 Mac 的 App 當手機 App 用（實驗功能）。** 打開「設定 › 系統 › 實驗功能」會多一個「實驗」分頁。
   在手機或平板上，它一打開就是 Mac 上開著的 App，一個 App 一張卡；所有 App 按一下就像 Launchpad 一樣列出來，
   沒開的點了就會啟動。點一個，它的視窗就填滿畫面；Mac 上那個視窗會調成這台裝置的形狀，
