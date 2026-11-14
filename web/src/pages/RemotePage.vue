@@ -163,11 +163,11 @@
 
         <!-- A phone's own way between apps: the bar at the bottom slid sideways goes to the app
              used before or after, slid up shows the open windows as cards. -->
-        <div v-if="appMode === 'app' && isTouch && !keyboardOpen && !compose && !panel" class="remote-homebar" @pointerdown="barDown" @pointermove="barMove" @pointerup="barUp" @pointercancel="barUp"><span></span></div>
-        <div v-if="switcherOpen" class="remote-switcher" @pointerdown.self="switcherOpen = false">
-          <div class="remote-switcher-cards">
-            <div v-for="w in recentWindows" :key="w.id" class="remote-switcher-card" :data-id="w.id" :style="cardSwipe[w.id] ? {transform: `translateY(${cardSwipe[w.id]}px)`, opacity: Math.max(0.2, 1 + cardSwipe[w.id] / 300)} : null"
-                 @pointerdown="cardDown($event, w)" @pointermove="cardMove($event, w)" @pointerup="cardUp($event, w)" @pointercancel="cardUp($event, w)">
+        <div v-if="appMode === 'app' && isTouch && !keyboardOpen && !compose && !panel" class="remote-homebar" @pointerdown="barDown" @pointermove="barMove" @pointerup="barUp" @pointercancel="barCancel"><span></span></div>
+        <div v-if="switcherOpen" class="remote-switcher" :class="switcherPhase" @pointerdown.self="switcherOpen = false">
+          <div ref="cardsEl" class="remote-switcher-cards">
+            <div v-for="w in switcherCards" :key="w.id" class="remote-switcher-card" :data-id="w.id" :style="cardSwipe[w.id] ? {transform: `translateY(${cardSwipe[w.id]}px)`, opacity: Math.max(0.2, 1 + cardSwipe[w.id] / 300)} : null"
+                 @pointerdown="cardDown($event, w)" @pointermove="cardMove($event, w)" @pointerup="cardUp($event, w)" @pointercancel="cardCancel(w)">
               <div class="remote-switcher-name">{{ w.app || w.title }}</div>
               <img v-if="w.thumb" :src="w.thumb" alt=""/>
               <div v-else class="remote-switcher-blank"><img v-if="icons[w.bundle]" :src="icons[w.bundle]" alt=""/></div>
@@ -1273,13 +1273,48 @@ function refitSoon() {
   }, 350);
 }
 // The bottom bar: sideways to the app used before (right) or after (left), up for the cards.
+// Slid up, the app's picture follows the finger and shrinks toward a card, as an iPhone's does.
 let bar = null, barAt = 0;
 function barDown(e) { bar = { x: e.clientX, y: e.clientY };try { e.target.setPointerCapture(e.pointerId); } catch { /* gone */ } }
-function barMove() {}
+function shrinkArea(dx, dy) {
+  const el = area.value;if (!el) return;
+  const p = Math.min(1, Math.max(0, -dy / 320));
+  el.style.transition = 'none';el.style.transformOrigin = '50% 100%';
+  el.style.transform = p ? `translate(${dx * 0.4}px, ${dy * 0.35}px) scale(${1 - 0.42 * p})` : '';
+  el.style.borderRadius = p ? `${Math.round(28 * p)}px` : '';
+}
+function unshrinkArea(animate) {
+  const el = area.value;if (!el) return;
+  el.style.transition = animate ? 'transform .25s cubic-bezier(.2,.8,.2,1), border-radius .25s' : 'none';
+  el.style.transform = '';el.style.borderRadius = '';
+}
+function barMove(e) { if (bar) shrinkArea(e.clientX - bar.x, Math.min(0, e.clientY - bar.y)); }
+// A gesture the browser took over: nothing happens (its point can be 0, 0 on an iPhone).
+function barCancel() { bar = null;unshrinkArea(true); }
+// The cards: the order as they opened, kept while they show (a list arriving meanwhile
+// reordered them under the finger); as on an iPhone the app just left is last, in the
+// middle, with those used before it to its left, grown in from the picture's size.
+const switcherCards = ref([]), switcherPhase = ref(''), cardsEl = ref(null);
+let phaseTimer = 0;
+onBeforeUnmount(() => clearTimeout(phaseTimer));
+async function openSwitcher() {
+  const now = current.value && recentWindows.value.find((w) => w.id === current.value.id);
+  switcherCards.value = [...recentWindows.value.filter((w) => w !== now).reverse(), ...(now ? [now] : [])];
+  switcherPhase.value = 'enter';switcherOpen.value = true;
+  await nextTick();
+  unshrinkArea(false);
+  const here = current.value && cardsEl.value?.querySelector(`[data-id="${current.value.id}"]`);
+  if (here) cardsEl.value.scrollLeft = here.offsetLeft - (cardsEl.value.clientWidth - here.offsetWidth) / 2;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    switcherPhase.value = 'settle';
+    clearTimeout(phaseTimer);phaseTimer = setTimeout(() => { switcherPhase.value = ''; }, 320);
+  }));
+}
 function barUp(e) {
   if (!bar) return;
   const dx = e.clientX - bar.x, dy = e.clientY - bar.y;bar = null;
-  if (dy < -40 && -dy > Math.abs(dx)) { switcherOpen.value = true;return; }
+  if (dy < -40 && -dy > Math.abs(dx)) { openSwitcher();return; }
+  unshrinkArea(true);
   if (Math.abs(dx) < 40) return;
   const list = recentWindows.value;if (list.length < 2) return;
   const here = list.findIndex((w) => current.value && w.id === current.value.id);
@@ -1293,12 +1328,20 @@ let barSettle = 0;
 onBeforeUnmount(() => clearTimeout(barSettle));
 // A card slid up closes its window on the Mac; a tap opens it.
 let card = null;
-function cardDown(e, w) { card = { id: w.id, y: e.clientY, moved: 0 };try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* gone */ } }
-function cardMove(e, w) { if (!card || card.id !== w.id) return;const dy = e.clientY - card.y;card.moved = Math.max(card.moved, Math.abs(dy));cardSwipe[w.id] = Math.min(0, dy); }
+// Sideways is the browser's scroll through the cards: only a slide mostly upward moves a card.
+function cardDown(e, w) { card = { id: w.id, x: e.clientX, y: e.clientY, moved: 0 }; }
+function cardMove(e, w) {
+  if (!card || card.id !== w.id) return;
+  const dx = e.clientX - card.x, dy = e.clientY - card.y;
+  card.moved = Math.max(card.moved, Math.abs(dx), Math.abs(dy));
+  if (-dy > Math.abs(dx)) cardSwipe[w.id] = Math.min(0, dy);
+}
+// The browser took the touch for its scroll: neither a tap nor a close (its point can be 0, 0).
+function cardCancel(w) { card = null;delete cardSwipe[w.id]; }
 function cardUp(e, w) {
   if (!card || card.id !== w.id) return;
-  const dy = e.clientY - card.y, moved = card.moved;card = null;
-  if (dy < -120) { link?.send({ t: 'close', id: w.id });recent.value = recent.value.filter((x) => x !== w.id);items.value = items.value.filter((x) => !(x.kind === 'window' && x.id === w.id));delete cardSwipe[w.id];return; }
+  const dx = e.clientX - card.x, dy = e.clientY - card.y, moved = card.moved;card = null;
+  if (dy < -120 && -dy > Math.abs(dx)) { link?.send({ t: 'close', id: w.id });recent.value = recent.value.filter((x) => x !== w.id);items.value = items.value.filter((x) => !(x.kind === 'window' && x.id === w.id));switcherCards.value = switcherCards.value.filter((x) => x.id !== w.id);delete cardSwipe[w.id];return; }
   delete cardSwipe[w.id];
   if (moved < 10) openWindow(w);
 }
@@ -1641,6 +1684,12 @@ function keyUp(e) {
 .remote-switcher {position:absolute;inset:0;z-index:5;background:rgba(0,0,0,.82);display:flex;flex-direction:column;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}
 .remote-switcher-cards {display:flex;gap:14px;overflow-x:auto;scrollbar-width:none;padding:0 24px;scroll-snap-type:x mandatory;}
 .remote-switcher-card {flex:0 0 62%;max-width:300px;scroll-snap-align:center;touch-action:pan-x;cursor:pointer;transition:opacity .15s;}
+.remote-switcher {transition:background-color .28s;}
+.remote-switcher.enter {background-color:rgba(0,0,0,0);}
+.remote-switcher.enter .remote-switcher-card {transform:scale(1.5);opacity:0;}
+.remote-switcher.enter .remote-switcher-hint {opacity:0;}
+.remote-switcher.settle .remote-switcher-card {transition:transform .3s cubic-bezier(.2,.8,.2,1), opacity .22s;}
+.remote-switcher-hint {transition:opacity .3s;}
 .remote-switcher-name {color:#fff;font-size:14px;margin:0 0 6px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-switcher-card img {display:block;width:100%;aspect-ratio:3/5;object-fit:cover;object-position:top;border-radius:16px;background:#2c2c2e;}
 .remote-switcher-blank {width:100%;aspect-ratio:3/5;border-radius:16px;background:#2c2c2e;display:flex;align-items:center;justify-content:center;}
