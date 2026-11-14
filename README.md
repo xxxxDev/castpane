@@ -59,8 +59,9 @@ back, with touch modes made for a small screen.
   whole screen.
 - **Your screen or one window.** Pick a whole display, a desktop (Space), a full-screen app or a
   single window. The list is grouped by desktop, with thumbnails.
-- **Asleep or locked.** Connecting wakes the Mac's display, and it stays on while you watch;
-  a locked Mac shows its login screen, and you type the password from the phone.
+- **Asleep or locked.** Connecting wakes the Mac's display, and it stays on while you watch.
+  A locked Mac asks for its password in a small window and unlocks; it locks again when you
+  leave, or when the phone drops off the network.
 - **Made for a phone.** Three touch modes: tap where you want (direct), a trackpad, or a
   pointer you drag by a ring below it, so your finger never hides what it points at. Pinch to
   zoom, or pick a size in the menu; when you tap a text field the keyboard comes up and the field is zoomed into view. A
@@ -87,7 +88,8 @@ back, with touch modes made for a small screen.
   sign-ins lock an address out for longer each time; an admin sees what was tried and from
   where.
 - **Asked again before control.** Opening Remote needs the admin's passkey, or their password
-  and code, again. The pass lasts 8 hours, for that sign-in only.
+  and code, again. The pass lasts 8 hours, for that sign-in only. A device you keep with you
+  can be trusted to skip that for 30 to 180 days from its last use.
 - **One viewer at a time.** A second page takes over from the first. The Mac's menu shows who
   is watching and can stop it at once. Every admin gets a notification when a session
   opens, with who and from where.
