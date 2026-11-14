@@ -67,14 +67,19 @@ back, with touch modes made for a small screen.
   for the home. The window goes back as it was when you leave it. The Remote tab stays the
   whole screen.
 - **Your screen or one window.** Pick a whole display, a desktop (Space), a full-screen app or a
-  single window. The list is grouped by desktop, with thumbnails.
+  single window. The list is grouped by desktop, with thumbnails. A window on another desktop,
+  or one its app keeps closed in the background, comes up as a click on its Dock icon brings
+  it; when you leave or turn to another, it goes back out of sight as it was and the app that
+  was in front comes back.
 - **Asleep or locked.** Connecting wakes the Mac's display, and it stays on while you watch.
   A locked Mac asks for its password in a small window and unlocks; it locks again when you
   leave, or when the phone drops off the network.
 - **Made for a phone.** Three touch modes: tap where you want (direct), a trackpad, or a
   pointer you drag by a ring below it, so your finger never hides what it points at. Pinch to
-  zoom, or pick a size in the menu; when you tap a text field the keyboard comes up and the field is zoomed into view. A
-  row of keys a phone lacks (esc, tab, arrows, ⌘ ⌥ ⌃ ⇧, the Mac's desktops, Mission Control), a key panel in the keyboard's place
+  zoom, or pick a size in the menu; when you tap a text field the keyboard comes up and the field is zoomed into view. The
+  keys a phone lacks (esc, tab, arrows, ⌘ ⌥ ⌃ ⇧, the Mac's desktops, Mission Control) sit in
+  one capsule you slide sideways, with a round button beside it to call up or hide the
+  keyboard (a tablet fits them all at once). There is a key panel in the keyboard's place
   (editing keys, the Mac's shortcuts, a number pad, F1–F12), and a field to write a line,
   input method and all, and send it to the Mac's cursor. Held sideways, the tabs move to a
   rail on the right.
@@ -129,7 +134,8 @@ On the Mac, the setup assistant and Settings:
 
 These pictures come from fixtures: the web app's from `npm run shots`, where the "Mac screen"
 is drawn by the script, and the Mac app's from a debug build's snapshots, with a made-up
-address. No real screen was captured. On macOS 26 and later the app's panels and buttons are
+address. The animations under Features were recorded the same way, from the web app with
+made-up answers and made-up Mac windows. No real screen was captured. On macOS 26 and later the app's panels and buttons are
 Liquid Glass, which the snapshots do not draw.
 
 ## Requirements

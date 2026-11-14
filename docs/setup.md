@@ -89,7 +89,8 @@ For the Mac you connect to:
 2. **Permissions.** Castpane needs two, both in **System Settings › Privacy & Security**:
    - **Screen & System Audio Recording**, to capture the screen. macOS applies it only after
      the app restarts, so Castpane offers to restart itself.
-   - **Accessibility**, to post your clicks and keys.
+   - **Accessibility**, to post your clicks and keys, bring a window forward and, with Labs,
+     make a window the device's shape.
 
    The assistant shows each one's state live, with a button that opens the right pane.
 

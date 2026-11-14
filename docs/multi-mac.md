@@ -46,7 +46,8 @@ ways, each prefixed with `n` (4 bytes), so nothing from an earlier session is mi
   not open another for five minutes; **Pause** stops sharing until it resumes. Either way the
   hub shows the member as not sharing.
 - The member checks what the hub sends too: the same allow-list as for a page, the clipboard
-  at most once a second, and each clipboard use in its own log.
+  at most once a second, an unlock try at most once every 3 seconds, and each clipboard use
+  and unlock try in its own log.
 - Sessions are in both Macs' logs and Activity: on the hub with the member's name, on the
   member with the hub's address.
 
