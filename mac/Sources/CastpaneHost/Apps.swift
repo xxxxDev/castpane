@@ -58,8 +58,8 @@ enum Apps {
 
     /// Starts (or brings forward) the app with this bundle id, if it is one `list` gives.
     @MainActor static func launch(_ bundle: String) -> Bool {
-        guard found().contains(where: { $0.id == bundle }),
-              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) else { return false }
+        // The copy that was listed, not whichever one macOS would pick for the bundle id.
+        guard let url = found().first(where: { $0.id == bundle })?.url else { return false }
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true
         NSWorkspace.shared.openApplication(at: url, configuration: config)
