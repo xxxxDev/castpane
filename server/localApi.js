@@ -57,7 +57,7 @@ function readActivity({ limit = 50, file = AUDIT_LOG } = {}) {
     let e; try { e = JSON.parse(lines[i]); } catch { continue; }
     if (e.source === 'remote' && (e.action === 'open' || e.action === 'end')) {
       out.push({ at: e.ts, kind: e.action === 'open' ? 'remote-open' : 'remote-end', username: e.username || '', ...(e.ip ? { ip: e.ip } : {}), ...(typeof e.machine === 'string' ? { machine: e.machine } : {}), ...(e.action === 'end' ? { reason: e.reason || '', seconds: e.seconds || 0 } : {}) });
-    } else if (e.source === 'remote' && (e.action === 'clipboard-read' || e.action === 'clipboard-write')) {
+    } else if (e.source === 'remote' && (e.action === 'clipboard-read' || e.action === 'clipboard-write' || e.action === 'unlock')) {
       // A run of the same use by the same person is one row, with how many times.
       const prev = out[out.length - 1], machine = typeof e.machine === 'string' ? e.machine : '';
       if (prev?.kind === e.action && prev.username === (e.username || '') && (prev.machine || '') === machine) prev.count = (prev.count || 1) + 1;

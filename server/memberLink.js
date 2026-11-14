@@ -119,6 +119,12 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
         s.lastClipboard = Date.now();
         if (mayAudit()) audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: s.by, via: config?.hub || '', ...(clean.s ? { chars: clean.s.length } : {}) });
       }
+      // A password try at most every 3 seconds on this Mac too, each in its log (without it).
+      if (clean.t === 'unlock') {
+        if (Date.now() - (s.lastUnlock || 0) < 3000) continue;
+        s.lastUnlock = Date.now();
+        audit({ source: 'remote', action: 'unlock', username: s.by, via: config?.hub || '' });
+      }
       // The capture core not reading: the session ends rather than piling up.
       if (s.sock.writableLength > BACKLOG) return endSession();
       s.sock.write(frame(1, Buffer.from(JSON.stringify(clean))));

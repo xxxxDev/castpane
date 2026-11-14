@@ -21,6 +21,12 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   another one does not end its trust: remove it under **Admin › Trusted devices** as well. Each pass given this way is in the
   audit log. Whoever holds that signed-in, trusted device can open Remote: trust only a device
   you keep with you.
+- **Unlocking from Remote:** a Mac at its lock screen asks the viewer for its login password,
+  which the capture core types into the lock screen, as the viewer could on the whole screen.
+  The password goes from the page to the Mac once; it is not kept, logged or shown, and only the
+  try is in the audit log and the Mac's Activity. One try every 3 seconds at most, and macOS's
+  own delays after wrong ones still apply. A Mac seen locked and then unlocked while a viewer
+  is there is locked again when that viewer leaves, the connection lost included.
 
 ## What Castpane guarantees
 

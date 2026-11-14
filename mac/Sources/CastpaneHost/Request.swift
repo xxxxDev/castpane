@@ -47,6 +47,8 @@ enum Request: Equatable, Sendable {
     case unfit
     /// A window closed on the Mac, as its close button would (the switcher's swipe up).
     case close(id: Int)
+    /// The Mac's password typed into its lock screen; never kept or logged.
+    case unlock(String)
     /// A known request with a field out of shape; `t` is what it was, for an error answer.
     case invalid(String)
 
@@ -116,6 +118,9 @@ enum Request: Equatable, Sendable {
             guard let code = msg["code"] as? String, code.utf8.count <= 64, let down = msg["down"] as? Bool else { return .invalid(t) }
             let mods = (msg["mods"] as? [Any] ?? []).compactMap { $0 as? String }
             return .key(code: code, down: down, mods: mods)
+        case "unlock":
+            guard let s = msg["s"] as? String, (1...256).contains(s.count) else { return .invalid(t) }
+            return .unlock(s)
         case "text":
             guard let s = msg["s"] as? String, s.count <= 4000 else { return .invalid(t) }
             return .text(s)

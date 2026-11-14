@@ -116,6 +116,7 @@ closing the session.
 | `fit`           | `id` (a window), `width`, `height` (points, 240 to 8000)                                                                                                                                                 | Make the window this size (the device's shape), kept inside its display; it is put back on `unfit`, on `stop`, when the page leaves, or when another window or a display is started.|
 | `unfit`         |                                                                                                                                                                                                          | Put the window made a size back as it was.                  |
 | `close`         | `id` (a window)                                                                                                                                                                                          | Close the window, as its close button.                      |
+| `unlock`        | `s` (the Mac's login password, 1 to 256 UTF-16 units)                                               | Typed into the lock screen when the Mac is locked, then Return; answered with `unlocked`. Never logged. At most one every 3 seconds. |
 
 ### From the capture core
 
@@ -135,7 +136,8 @@ closing the session.
 | `icons`         | `icons: {bundle: "data:image/png;base64,…"}`                                                              | The icons asked for, 64 × 64.                                               |
 | `launched`      | `bundle`, `ok`                                                                                            | The answer to `launch`; its window comes in the next `list`.                |
 | `fitted`        | `id`, `ok`, `width?`, `height?`                                                                           | The answer to `fit`: the size the window took (an app may keep a larger one).|
-| `locked`        | `locked`                                                                                                  | `true` while the Mac is locked and the window shown lies under another app's window: at the lock screen macOS brings no window forward, so a click lands on the one on top. Sent when it changes (not at first while `false`). |
+| `locked`        | `locked`                                                                                                  | Sent when the Mac locks or unlocks (not at first while unlocked), so the page can ask for its password. |
+| `unlocked`      | `ok`, `busy?`                                                                                             | The answer to `unlock`: whether the Mac unlocked (`busy`: a try too soon after the last). |
 | `error`   | `where`, `message`                                                                                              | Something failed (`where: "start"`, `message: "gone"` for a closed window). |
 
 ## The app ⇄ the server: `/api/local/*`

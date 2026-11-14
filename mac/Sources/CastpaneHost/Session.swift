@@ -195,7 +195,7 @@ actor Session {
             case .end:
                 watcher?.cancel()
                 clipboardWatcher?.cancel()
-                queued { await self.unfit(); await self.stop(); await self.restore() }
+                queued { await self.unfit(); await self.stop(); await self.restore(); await self.relock() }
             }
         }
     }
@@ -206,8 +206,8 @@ actor Session {
     private func watchWindows() {
         watcher = Task {
             while !Task.isCancelled && !link.isClosed {
-                checkLocked()
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
+                checkLocked()
                 checkWindows()
             }
         }
@@ -229,12 +229,37 @@ actor Session {
 
     private func clipboardWritten(_ count: Int) { clipboardSeen = count }
 
-    /// Tells the page when the Mac is locked with the window shown under another one: at
-    /// the lock screen macOS brings no window forward, and a click lands on the one on top.
-    private var lockedSent = false
+    /// Tells the page when the Mac locks or unlocks, so it can ask for the password. A Mac
+    /// seen locked and unlocked while this viewer is there is locked again when it leaves.
+    private var lockedSent = false, sawLocked = false
     private func checkLocked() {
-        let now = Wake.locked && target.flatMap { t in t.windowID.map { Catalog.covered($0, pid: t.pid) } } == true
+        let now = Wake.locked
+        if now { sawLocked = true }
         if now != lockedSent { lockedSent = now; link.send(json: ["t": "locked", "locked": now]) }
+    }
+
+    /// The password typed into the lock screen (woken first), and whether the Mac unlocked.
+    private var unlocking = false
+    private func unlock(_ password: String) async {
+        guard !unlocking else { return }
+        guard Wake.locked else { link.send(json: ["t": "unlocked", "ok": true]); return }
+        unlocking = true; defer { unlocking = false }
+        sawLocked = true
+        Wake.display()
+        try? await Task.sleep(nanoseconds: 900_000_000)
+        input.typeKeys(password)
+        input.key(code: "Enter", down: true, mods: []); input.key(code: "Enter", down: false, mods: [])
+        var ok = false
+        for _ in 0..<40 { try? await Task.sleep(nanoseconds: 150_000_000); if !Wake.locked { ok = true; break } }
+        if ok { lockedSent = false }
+        link.send(json: ["t": "unlocked", "ok": ok])
+        if ok { link.send(json: ["t": "locked", "locked": false]) }
+    }
+
+    /// Locked again as it was found, when it was unlocked while this viewer was there.
+    private func relock() {
+        if sawLocked && !Wake.locked { Lock.now() }
+        sawLocked = false
     }
 
     private func checkWindows() {
@@ -351,6 +376,8 @@ actor Session {
             input.key(code: code, down: down, mods: mods); if !down { reportCaret() }
         case let .text(s):
             input.type(s); reportCaret()
+        case let .unlock(password):
+            queued { await self.unlock(password) }
         case .clipboardGet:
             let link = self.link
             Task { @MainActor in

@@ -118,15 +118,29 @@
         </div>
         </div>
 
+        <!-- The Mac at its lock screen: its password asked here and typed into it. The Mac
+             is locked again when the viewer leaves. -->
+        <div v-if="macLocked && !unlockOpen" class="remote-locked" @pointerdown.stop>
+          <f7-icon f7="lock_fill" :size="15"/><span>{{ ct('這台 Mac 已鎖定') }}</span>
+          <button type="button" class="remote-locked-open" @click="unlockOpen = true">{{ ct('輸入密碼解鎖') }}</button>
+        </div>
+        <div v-if="macLocked && unlockOpen" class="remote-unlock" @pointerdown.stop>
+          <form class="remote-unlock-box" @submit.prevent="sendUnlock">
+            <f7-icon f7="lock_fill" :size="26"/>
+            <div class="remote-unlock-title">{{ ct('這台 Mac 已鎖定') }}</div>
+            <p>{{ ct('輸入 Mac 的登入密碼解鎖。密碼只送進 Mac 的鎖定畫面，不會存下來；離開遠端時 Mac 會再鎖上。') }}</p>
+            <input ref="unlockField" v-model="unlockPw" class="remote-unlock-field" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" :disabled="unlockBusy" :placeholder="ct('Mac 的密碼')">
+            <p v-if="unlockError" class="remote-unlock-error">{{ unlockError }}</p>
+            <div class="remote-unlock-buttons">
+              <button type="button" class="remote-unlock-later" @click="unlockOpen = false">{{ ct('稍後') }}</button>
+              <button type="submit" class="remote-unlock-go" :disabled="unlockBusy || !unlockPw">{{ unlockBusy ? ct('解鎖中…') : ct('解鎖') }}</button>
+            </div>
+          </form>
+        </div>
         <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
-          <!-- A locked Mac still sends a window's picture, but clicks go to its lock screen. -->
-          <div v-if="macLocked && current?.kind === 'window'" class="remote-locked" @pointerdown.stop @pointerup.stop>
-            <f7-icon f7="lock_fill" :size="16"/><span>{{ ct('這台 Mac 已鎖定，鎖定時無法把這個 App 叫到最前面，點擊會落到蓋在上面的視窗。') }}</span>
-            <button type="button" class="remote-pill" @click="toUnlock">{{ ct('到整個螢幕解鎖') }}</button>
-          </div>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
               <f7-icon f7="lock_shield" :size="36"/>
@@ -218,7 +232,17 @@ import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, otherK
 
 const supported = remoteSupported();
 const machines = ref([]), error = ref(''), streaming = ref(false), items = ref([]), current = ref(null);
-const macLocked = ref(false);
+const macLocked = ref(false), unlockOpen = ref(false), unlockPw = ref(''), unlockBusy = ref(false), unlockError = ref(''), unlockField = ref(null);
+let unlockTimer = 0;
+watch(unlockOpen, (on) => { if (on) nextTick(() => unlockField.value?.focus()); else unlockPw.value = ''; });
+// Sent once and forgotten here: the field is emptied as it goes.
+function sendUnlock() {
+  if (!unlockPw.value || unlockBusy.value) return;
+  link?.send({ t: 'unlock', s: unlockPw.value });
+  unlockPw.value = '';unlockBusy.value = true;unlockError.value = '';
+  clearTimeout(unlockTimer);
+  unlockTimer = setTimeout(() => { if (unlockBusy.value) { unlockBusy.value = false;unlockError.value = ct('Mac 沒有回應，請再試一次'); } }, 12000);
+}
 const hasPicture = ref(false), notice = ref(''), permission = ref(''), stats = reactive({ fps: 0, mbps: 0 });
 const keyHint = ref(false), keyboardOpen = ref(false), settingsOpen = ref(false), menuOpen = ref(false), held = reactive(new Set());
 const canvas = ref(null), area = ref(null), typing = ref(null);
@@ -389,7 +413,7 @@ async function connect(m, retried = false) {
   let pass;
   try { pass = await getPass(retried); } catch (e) { return f7.dialog.alert(adminProblem(e) || e.message); }
   if (!pass) return;
-  streaming.value = true;macLocked.value = false;hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;
+  streaming.value = true;macLocked.value = false;unlockOpen.value = false;unlockBusy.value = false;unlockError.value = '';hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;
   startApps(m);
   await nextTick();
   link = openRemote({
@@ -420,7 +444,13 @@ function onMessage(msg) {
     // Without the permissions there is nothing to show: the notice that asks for them.
     else if (appMode.value === 'home') appMode.value = 'desktop';
   } else if (msg.t === 'locked') {
+    if (msg.locked && !macLocked.value) { unlockOpen.value = true;unlockError.value = ''; }
     macLocked.value = !!msg.locked;
+    if (!msg.locked) { unlockOpen.value = false;unlockBusy.value = false; }
+  } else if (msg.t === 'unlocked') {
+    clearTimeout(unlockTimer);unlockBusy.value = false;
+    if (msg.ok) unlockOpen.value = false;
+    else { unlockError.value = msg.busy ? ct('試太快了，請等幾秒再試') : ct('沒有解鎖：密碼可能不對，請再試一次');nextTick(() => unlockField.value?.focus()); }
   } else if (msg.t === 'list') {
     items.value = msg.items || [];
     if (appMode.value !== 'desktop') { appsListed();return; }
@@ -1172,12 +1202,6 @@ function goHome() {
   appMode.value = 'home';
   list();link?.send({ t: 'apps' });
 }
-// The whole screen, where the lock screen's password can be typed.
-function toUnlock() {
-  if (props.labs) { goDesktop();return; }
-  const d = items.value.find((x) => x.kind === 'display' && !x.all) || items.value[0];
-  if (d) show(d);
-}
 function goDesktop() {
   appMode.value = 'desktop';switcherOpen.value = false;
   mode.value = localGet('castpane-remote-mode') || 'direct';
@@ -1479,8 +1503,19 @@ function keyUp(e) {
 .remote-canvas.smooth {transition:transform .28s cubic-bezier(.2, .8, .2, 1);}
 .remote-btn.zoom {font-size:12px;font-weight:600;}
 .remote-canvas.hidden {visibility:hidden;}
-.remote-locked {position:absolute;left:12px;right:12px;top:34px;z-index:3;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-radius:12px;background:rgba(255,159,10,.92);color:#000;font-size:14px;line-height:1.4;}
-.remote-locked span {flex:1;min-width:160px;}
+.remote-locked {position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 76px);z-index:25;display:flex;align-items:center;gap:8px;padding:6px 6px 6px 14px;border-radius:20px;background:rgba(255,159,10,.95);color:#000;font-size:14px;white-space:nowrap;}
+.remote-stage .remote-locked-open {width:auto;height:30px;margin:0;padding:0 12px;border:0;border-radius:15px;background:rgba(0,0,0,.8);color:#fff;font-size:13px;cursor:pointer;}
+.remote-unlock {position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55);}
+.remote-unlock-box {width:100%;max-width:340px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:10px;padding:22px 18px 16px;border-radius:16px;background:rgba(40,40,44,.98);color:#fff;text-align:center;}
+.remote-unlock-title {font-size:17px;font-weight:600;}
+.remote-unlock-box p {margin:0;font-size:13px;line-height:1.5;color:#bbb;}
+.remote-unlock-box p.remote-unlock-error {color:#ff6b60;}
+.remote-stage .remote-unlock-field {width:100%;height:40px;box-sizing:border-box;padding:0 14px;border-radius:10px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:16px;}
+.remote-unlock-buttons {display:flex;gap:10px;width:100%;margin-top:4px;}
+.remote-stage .remote-unlock-later, .remote-stage .remote-unlock-go {flex:1;width:auto;height:40px;margin:0;padding:0;border:0;border-radius:10px;font-size:15px;cursor:pointer;}
+.remote-stage .remote-unlock-later {background:rgba(255,255,255,.12);color:#fff;}
+.remote-stage .remote-unlock-go {background:#0a84ff;color:#fff;}
+.remote-stage .remote-unlock-go:disabled {opacity:.5;}
 .remote-notice {position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px;background:rgba(0,0,0,.6);font-size:14px;line-height:1.5;}
 .remote-notice p {max-width:520px;margin:0;}
 .remote-small {font-size:12px;color:#aaa;}

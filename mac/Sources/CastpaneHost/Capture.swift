@@ -180,24 +180,6 @@ enum Catalog {
         }
     }
 
-    /// Whether another app's window on the screen lies over part of this one.
-    static func covered(_ id: CGWindowID, pid: pid_t?) -> Bool {
-        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return false }
-        func rect(_ w: [String: Any]) -> CGRect? {
-            guard let b = w[kCGWindowBounds as String] as? [String: CGFloat], let x = b["X"], let y = b["Y"], let width = b["Width"], let height = b["Height"] else { return nil }
-            return CGRect(x: x, y: y, width: width, height: height)
-        }
-        guard let mine = list.first(where: { ($0[kCGWindowNumber as String] as? Int) == Int(id) }).flatMap(rect) else { return false }
-        // Front to back: the ordinary windows listed before this one are above it.
-        for w in list {
-            if (w[kCGWindowNumber as String] as? Int) == Int(id) { break }
-            guard (w[kCGWindowLayer as String] as? Int) == 0, (w[kCGWindowOwnerPID as String] as? pid_t) != pid,
-                  let r = rect(w), r.intersection(mine).width > 40, r.intersection(mine).height > 40 else { continue }
-            return true
-        }
-        return false
-    }
-
     /// Whether a window is on the screen now (after a switch of desktops).
     static func isHere(_ id: CGWindowID) -> Bool {
         guard let info = CGWindowListCopyWindowInfo([.optionIncludingWindow], id) as? [[String: Any]] else { return false }

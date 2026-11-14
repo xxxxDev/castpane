@@ -34,3 +34,14 @@ enum Wake {
         }
     }
 }
+
+// Locks the Mac at once, as the menu's Lock Screen does (the login framework's own call;
+// no public API locks it).
+enum Lock {
+    static func now() {
+        guard let h = dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_LAZY),
+              let f = dlsym(h, "SACLockScreenImmediate") else { return }
+        typealias Call = @convention(c) () -> Int32
+        _ = unsafeBitCast(f, to: Call.self)()
+    }
+}

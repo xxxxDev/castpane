@@ -580,6 +580,7 @@ private struct ActivityRow: View {
         case "remote-end": return ("eye.slash.fill", .gray, "\(who) stopped viewing\(item.machine.isEmpty ? "" : " " + item.machine)")
         case "clipboard-read": return ("doc.on.clipboard.fill", .orange, "\(who) copied \(whose) clipboard\(times)")
         case "clipboard-write": return ("doc.on.clipboard", Palette.blue, "\(who) put text on \(whose) clipboard\(times)")
+        case "unlock": return ("lock.open.fill", .orange, "\(who) typed a password into \(whose) lock screen\(times)")
         default: return ("circle.fill", .gray, "\(who): \(item.kind)")
         }
     }

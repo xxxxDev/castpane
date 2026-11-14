@@ -82,6 +82,8 @@ const MESSAGES = {
   icons: (m) => (Array.isArray(m.bundles) && m.bundles.length <= 40 && m.bundles.every((b) => typeof b === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(b)) ? { bundles: m.bundles } : null),
   launch: (m) => (typeof m.bundle === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(m.bundle) ? { bundle: m.bundle } : null),
   fit: (m) => (int(m.id, 0, 0xffffffff) && int(m.width, 240, 8000) && int(m.height, 240, 8000) ? { id: m.id, width: m.width, height: m.height } : null),
+  // The Mac's password for its lock screen: passed on once, never logged or kept.
+  unlock: (m) => (typeof m.s === 'string' && m.s.length >= 1 && m.s.length <= 256 && m.s.isWellFormed() ? { s: m.s } : null),
   'clipboard-set': (m) => (typeof m.s === 'string' && m.s.length >= 1 && m.s.length <= CLIPBOARD_MAX && m.s.isWellFormed() ? { s: m.s } : null),
 };
 const FROM_PAGE = new Set(Object.keys(MESSAGES));
@@ -391,7 +393,7 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
       if (buf.length) { pieces = [buf]; held = buf.length; buf = Buffer.alloc(0); }
     });
     host.on('close', () => close('host closed')); host.on('error', () => close('host error'));
-    let windowStart = Date.now(), count = 0, lastClipboard = 0, lastLarge = 0;
+    let windowStart = Date.now(), count = 0, lastClipboard = 0, lastLarge = 0, lastUnlock = 0;
     ws.on('message', (raw, binary) => {
       if (closed) return;
       if (binary) return close('binary from page');
@@ -415,6 +417,12 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
       if (clipboard) {
         if (Date.now() - lastClipboard < 1000) return sendJson({ t: 'clipboard-busy' });
         lastClipboard = Date.now();
+      }
+      // A password try at most every 3 seconds, each in the log (without it).
+      if (clean.t === 'unlock') {
+        if (Date.now() - lastUnlock < 3000) return sendJson({ t: 'unlocked', ok: false, busy: true });
+        lastUnlock = Date.now();
+        audit({ source: 'remote', action: 'unlock', username: principal.username, ...(member ? { member: machine, machine: me.machine } : {}) });
       }
       // The capture core not reading: a page cannot pile up input behind it.
       if (host.writableLength > 1024 * 1024) return close('host backed up');
