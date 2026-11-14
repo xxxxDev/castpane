@@ -206,6 +206,7 @@ actor Session {
     private func watchWindows() {
         watcher = Task {
             while !Task.isCancelled && !link.isClosed {
+                checkLocked()
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
                 checkWindows()
             }
@@ -227,6 +228,14 @@ actor Session {
     }
 
     private func clipboardWritten(_ count: Int) { clipboardSeen = count }
+
+    /// Tells the page when the Mac is locked with the window shown under another one: at
+    /// the lock screen macOS brings no window forward, and a click lands on the one on top.
+    private var lockedSent: Bool?
+    private func checkLocked() {
+        let now = Wake.locked && target.flatMap { t in t.windowID.map { Catalog.covered($0, pid: t.pid) } } == true
+        if now != lockedSent { lockedSent = now; link.send(json: ["t": "locked", "locked": now]) }
+    }
 
     private func checkWindows() {
         guard !link.isClosed, CGPreflightScreenCaptureAccess() else { return }

@@ -16,6 +16,8 @@ const english = {
 "下一個桌面":"Next desktop",
 "下桌面":"Next desktop",
 "不在畫面上":"Not on screen",
+"這台 Mac 已鎖定，鎖定時無法把這個 App 叫到最前面，點擊會落到蓋在上面的視窗。":"This Mac is locked, so this app can't be brought to the front; taps land on the window above it.",
+"到整個螢幕解鎖":"Unlock on the whole screen",
 "不是我，拒絕":"Not me, refuse",
 "不用":"Not now",
 "中":"Medium",

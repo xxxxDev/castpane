@@ -122,6 +122,11 @@
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
+          <!-- A locked Mac still sends a window's picture, but clicks go to its lock screen. -->
+          <div v-if="macLocked && current?.kind === 'window'" class="remote-locked" @pointerdown.stop @pointerup.stop>
+            <f7-icon f7="lock_fill" :size="16"/><span>{{ ct('這台 Mac 已鎖定，鎖定時無法把這個 App 叫到最前面，點擊會落到蓋在上面的視窗。') }}</span>
+            <button type="button" class="remote-pill" @click="toUnlock">{{ ct('到整個螢幕解鎖') }}</button>
+          </div>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
               <f7-icon f7="lock_shield" :size="36"/>
@@ -213,6 +218,7 @@ import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, otherK
 
 const supported = remoteSupported();
 const machines = ref([]), error = ref(''), streaming = ref(false), items = ref([]), current = ref(null);
+const macLocked = ref(false);
 const hasPicture = ref(false), notice = ref(''), permission = ref(''), stats = reactive({ fps: 0, mbps: 0 });
 const keyHint = ref(false), keyboardOpen = ref(false), settingsOpen = ref(false), menuOpen = ref(false), held = reactive(new Set());
 const canvas = ref(null), area = ref(null), typing = ref(null);
@@ -383,7 +389,7 @@ async function connect(m, retried = false) {
   let pass;
   try { pass = await getPass(retried); } catch (e) { return f7.dialog.alert(adminProblem(e) || e.message); }
   if (!pass) return;
-  streaming.value = true;hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;
+  streaming.value = true;macLocked.value = false;hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;
   startApps(m);
   await nextTick();
   link = openRemote({
@@ -413,6 +419,8 @@ function onMessage(msg) {
     if (msg.screen) { list();if (appMode.value === 'home') link?.send({ t: 'apps' }); }
     // Without the permissions there is nothing to show: the notice that asks for them.
     else if (appMode.value === 'home') appMode.value = 'desktop';
+  } else if (msg.t === 'locked') {
+    macLocked.value = !!msg.locked;
   } else if (msg.t === 'list') {
     items.value = msg.items || [];
     if (appMode.value !== 'desktop') { appsListed();return; }
@@ -1164,6 +1172,12 @@ function goHome() {
   appMode.value = 'home';
   list();link?.send({ t: 'apps' });
 }
+// The whole screen, where the lock screen's password can be typed.
+function toUnlock() {
+  if (props.labs) { goDesktop();return; }
+  const d = items.value.find((x) => x.kind === 'display' && !x.all) || items.value[0];
+  if (d) show(d);
+}
 function goDesktop() {
   appMode.value = 'desktop';switcherOpen.value = false;
   mode.value = localGet('castpane-remote-mode') || 'direct';
@@ -1465,6 +1479,8 @@ function keyUp(e) {
 .remote-canvas.smooth {transition:transform .28s cubic-bezier(.2, .8, .2, 1);}
 .remote-btn.zoom {font-size:12px;font-weight:600;}
 .remote-canvas.hidden {visibility:hidden;}
+.remote-locked {position:absolute;left:12px;right:12px;top:34px;z-index:3;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-radius:12px;background:rgba(255,159,10,.92);color:#000;font-size:14px;line-height:1.4;}
+.remote-locked span {flex:1;min-width:160px;}
 .remote-notice {position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px;background:rgba(0,0,0,.6);font-size:14px;line-height:1.5;}
 .remote-notice p {max-width:520px;margin:0;}
 .remote-small {font-size:12px;color:#aaa;}

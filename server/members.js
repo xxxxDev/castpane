@@ -289,6 +289,7 @@ function app(x) {
   return { bundle: x.bundle, name: str(x.name, 200) ?? '', running: bool(x.running) ?? false };
 }
 const SHAPES = {
+  locked: (m) => ({ locked: bool(m.locked) ?? false }),
   status: (m) => pick({ screen: bool(m.screen) ?? false, accessibility: bool(m.accessibility) ?? false, version: str(m.version, 64), host: str(m.host, 64) }),
   list: (m) => (Array.isArray(m.items) ? { items: m.items.slice(0, 500).map(item).filter(Boolean) } : null),
   started: (m) => (m.kind === 'display' || m.kind === 'window') && int(m.id) !== undefined ? pick({ kind: m.kind, id: m.id, width: int(m.width) ?? 0, height: int(m.height) ?? 0, fps: int(m.fps) }) : null,

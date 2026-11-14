@@ -17,6 +17,12 @@ enum Wake {
         if CGGetOnlineDisplayList(16, &ids, &count) == .success, ids.prefix(Int(count)).contains(where: { CGDisplayIsAsleep($0) != 0 }) {
             return true
         }
+        return locked
+    }
+
+    /// Whether the Mac sits at its lock screen: a window's picture still comes, but a click
+    /// goes to the lock screen, not the window.
+    static var locked: Bool {
         let session = CGSessionCopyCurrentDictionary() as? [String: Any]
         return session?["CGSSessionScreenIsLocked"] as? Bool ?? false
     }
