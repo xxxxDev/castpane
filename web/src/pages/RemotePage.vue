@@ -169,7 +169,7 @@
             <div v-for="w in switcherCards" :key="w.id" class="remote-switcher-card" :data-id="w.id" :style="cardSwipe[w.id] ? {transform: `translateY(${cardSwipe[w.id]}px)`, opacity: Math.max(0.2, 1 + cardSwipe[w.id] / 300)} : null"
                  @pointerdown="cardDown($event, w)" @pointermove="cardMove($event, w)" @pointerup="cardUp($event, w)" @pointercancel="cardCancel(w)">
               <div class="remote-switcher-name">{{ w.app || w.title }}</div>
-              <img v-if="snaps[w.id] || w.thumb" :src="snaps[w.id] || w.thumb" alt=""/>
+              <img v-if="snaps[w.id] || w.thumb" :src="snaps[w.id] || w.thumb" alt="" decoding="async"/>
               <div v-else class="remote-switcher-blank"><img v-if="icons[w.bundle]" :src="icons[w.bundle]" alt=""/></div>
             </div>
           </div>
@@ -601,7 +601,7 @@ function setPref(k, v) {
 }
 function askPermissions() { link?.send({ t: 'permissions' }); }
 function saveShot() {
-  try { const c = canvas.value;if (!c || !hasPicture.value) return;const s = document.createElement('canvas');s.width = 320;s.height = Math.round(320 * c.height / c.width);s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);shots[machine] = s.toDataURL('image/jpeg', 0.6);localSet(shotKey(machine), shots[machine]); } catch {}
+  try { const c = canvas.value;if (!c || !hasPicture.value) return;const s = document.createElement('canvas');s.width = 320;s.height = Math.round(320 * c.height / c.width);s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);shots[machine] = s.toDataURL('image/jpeg', 0.6);s.width = s.height = 0;localSet(shotKey(machine), shots[machine]); } catch {}
 }
 function disconnect() {
   if (!streaming.value && !link) return;
@@ -1221,16 +1221,19 @@ function watchPicture(w, tried) {
   }, 5000);
 }
 // The picture of each app as it was left, at the card's sharpness: the Mac's thumbnails are
-// 320 wide, blurred on a phone's card. Kept for this session only, the last 12.
+// 320 wide, blurred on a phone's card. Small on purpose, as Safari closes a page whose
+// pictures and canvases take too much: 600 wide (a card is about 240 points), JPEG, the last
+// 8, for this session only, and the canvas used to make one emptied at once (Safari frees a
+// canvas's memory late, and a page past its limit is closed).
 const snaps = reactive({});
 function snapCurrent() {
   try {
     const c = canvas.value, w = currentWindow.value;
     if (!c || !w || !hasPicture.value || appMode.value !== 'app' || !c.width) return;
-    const s = document.createElement('canvas');s.width = Math.min(c.width, 720);s.height = Math.round(s.width * c.height / c.width);
+    const s = document.createElement('canvas');s.width = Math.min(c.width, 600);s.height = Math.round(s.width * c.height / c.width);
     s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);
-    delete snaps[w.id];snaps[w.id] = s.toDataURL('image/jpeg', 0.82);
-    for (const k of Object.keys(snaps).slice(0, -12)) delete snaps[k];
+    delete snaps[w.id];snaps[w.id] = s.toDataURL('image/jpeg', 0.8);s.width = s.height = 0;
+    for (const k of Object.keys(snaps).slice(0, -8)) delete snaps[k];
   } catch { /* no picture to keep */ }
 }
 async function openWindow(w, keepOrder = false, tried = new Set()) {
