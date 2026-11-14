@@ -169,7 +169,7 @@
             <div v-for="w in switcherCards" :key="w.id" class="remote-switcher-card" :data-id="w.id" :style="cardSwipe[w.id] ? {transform: `translateY(${cardSwipe[w.id]}px)`, opacity: Math.max(0.2, 1 + cardSwipe[w.id] / 300)} : null"
                  @pointerdown="cardDown($event, w)" @pointermove="cardMove($event, w)" @pointerup="cardUp($event, w)" @pointercancel="cardCancel(w)">
               <div class="remote-switcher-name">{{ w.app || w.title }}</div>
-              <img v-if="w.thumb" :src="w.thumb" alt=""/>
+              <img v-if="snaps[w.id] || w.thumb" :src="snaps[w.id] || w.thumb" alt=""/>
               <div v-else class="remote-switcher-blank"><img v-if="icons[w.bundle]" :src="icons[w.bundle]" alt=""/></div>
             </div>
           </div>
@@ -1130,6 +1130,7 @@ function startApps(m) {
   appMode.value = props.labs && resumeMode !== 'desktop' ? 'home' : 'desktop';resumeMode = null;
   apps.value = [];launching.value = '';switcherOpen.value = false;iconsAsked = new Set();iconsAll = false;
   for (const k of Object.keys(icons)) delete icons[k];
+  for (const k of Object.keys(snaps)) delete snaps[k];
   try { Object.assign(icons, JSON.parse(localGet(iconsKey()) || '{}')); } catch { /* none kept */ }
   try { recent.value = JSON.parse(localGet(recentKey()) || '[]').filter(Number.isInteger); } catch { recent.value = []; }
 }
@@ -1219,7 +1220,21 @@ function watchPicture(w, tried) {
     openWindow(next, false, new Set([...tried, w.id]));
   }, 5000);
 }
+// The picture of each app as it was left, at the card's sharpness: the Mac's thumbnails are
+// 320 wide, blurred on a phone's card. Kept for this session only, the last 12.
+const snaps = reactive({});
+function snapCurrent() {
+  try {
+    const c = canvas.value, w = currentWindow.value;
+    if (!c || !w || !hasPicture.value || appMode.value !== 'app' || !c.width) return;
+    const s = document.createElement('canvas');s.width = Math.min(c.width, 720);s.height = Math.round(s.width * c.height / c.width);
+    s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);
+    delete snaps[w.id];snaps[w.id] = s.toDataURL('image/jpeg', 0.82);
+    for (const k of Object.keys(snaps).slice(0, -12)) delete snaps[k];
+  } catch { /* no picture to keep */ }
+}
 async function openWindow(w, keepOrder = false, tried = new Set()) {
+  snapCurrent();
   switcherOpen.value = false;menuOpen.value = false;settingsOpen.value = false;
   if (!keepOrder) used(w.id);
   if (appMode.value !== 'app') { appMode.value = 'app';mode.value = 'direct'; }
@@ -1230,6 +1245,7 @@ async function openWindow(w, keepOrder = false, tried = new Set()) {
   watchPicture(w, tried);
 }
 function goHome() {
+  snapCurrent();
   menuOpen.value = false;settingsOpen.value = false;switcherOpen.value = false;compose.value = false;panel.value = false;clipOpen.value = false;
   if (keyboardOpen.value) { keyboardOpen.value = false;typing.value?.blur(); }
   link?.send({ t: 'stop' });
@@ -1298,6 +1314,7 @@ const switcherCards = ref([]), switcherPhase = ref(''), cardsEl = ref(null);
 let phaseTimer = 0;
 onBeforeUnmount(() => clearTimeout(phaseTimer));
 async function openSwitcher() {
+  snapCurrent();
   const now = current.value && recentWindows.value.find((w) => w.id === current.value.id);
   switcherCards.value = [...recentWindows.value.filter((w) => w !== now).reverse(), ...(now ? [now] : [])];
   switcherPhase.value = 'enter';switcherOpen.value = true;
