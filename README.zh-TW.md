@@ -107,7 +107,7 @@ Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用�
 
 <p align="center">
   <img src="docs/assets/anim/labs-home-dark.svg" width="250" alt="實驗分頁：Mac 上開著的 App 一個一張卡，點開 Notes 調成手機形狀，從左邊緣滑回首頁，再從所有 App 打開原本沒開的 Music">
-  <img src="docs/assets/anim/labs-switch-dark.svg" width="250" alt="實驗分頁：底部橫條往旁邊滑切到 Mail、再到 Calendar，往上滑叫出卡片，卡片往上滑關掉那個視窗">
+  <img src="docs/assets/anim/labs-switch-dark.svg" width="250" alt="實驗分頁：底部橫條往旁邊滑切到 Mail、再到 Calendar；往上滑時 Calendar 縮成卡片；Mail 的卡片往上滑關掉；點 Notes 的卡片打開">
   <img src="docs/assets/anim/labs-keys-dark.svg" width="250" alt="實驗分頁：App 下方一樣是按鍵膠囊，叫出鍵盤時 Mac 上的視窗會調成鍵盤上方剩下的形狀">
 </p>
 

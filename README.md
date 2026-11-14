@@ -112,7 +112,7 @@ in it may still change. The Remote tab is not affected and stays the whole scree
 
 <p align="center">
   <img src="docs/assets/anim/labs-home-dark.svg" width="250" alt="Labs tab: the Mac's open apps as cards; Notes opens made the phone's shape, a slide in from the left edge goes home, All apps opens Music, which was not running">
-  <img src="docs/assets/anim/labs-switch-dark.svg" width="250" alt="Labs tab: the bar at the bottom slid sideways goes to Mail, then Calendar; slid up shows the cards; a card slid up closes its window">
+  <img src="docs/assets/anim/labs-switch-dark.svg" width="250" alt="Labs tab: the bar at the bottom slid sideways goes to Mail, then Calendar; slid up, Calendar shrinks into its card among the others; Mail's card slid up closes it; Notes opens from its card">
   <img src="docs/assets/anim/labs-keys-dark.svg" width="250" alt="Labs tab: the same capsule of keys under an app; with the keyboard up the Mac's window is made the shape of what is left above it">
 </p>
 
