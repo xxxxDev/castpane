@@ -279,7 +279,9 @@ actor Session {
     /// Locked again as it was found, when it was unlocked from Remote. Also run when
     /// Castpane stops, which a viewer's queued end might not wait for.
     static func relock() {
-        guard relockPending.withLock({ p -> Bool in defer { p = false }; return p }), !Wake.locked else { return }
+        // Still locked while a password is being checked: kept for the relock after it.
+        let locked = Wake.locked, checking = unlockGate.withLock { $0.busy }
+        guard relockPending.withLock({ p -> Bool in let was = p; if !(locked && checking) { p = false }; return was }), !locked else { return }
         if !Lock.now() { log.error("the Mac could not be locked again after Remote unlocked it") }
     }
     private static let log = Logger(subsystem: "io.github.castpane", category: "session")
