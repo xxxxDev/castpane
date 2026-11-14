@@ -16,6 +16,7 @@ const english = {
 "下一個桌面":"Next desktop",
 "下桌面":"Next desktop",
 "不在畫面上":"Not on screen",
+"叫出鍵盤":"Show keyboard",
 "這台 Mac 已鎖定":"This Mac is locked",
 "輸入密碼解鎖":"Unlock with password",
 "輸入 Mac 的登入密碼解鎖。密碼只送進 Mac 的鎖定畫面，不會存下來；離開遠端時 Mac 會再鎖上。":"Type the Mac's login password to unlock it. It goes only into the Mac's lock screen and is not kept; the Mac locks again when you leave.",

@@ -81,7 +81,7 @@
           <button type="button" class="remote-apphead-back" @click="goHome"><f7-icon f7="chevron_left" :size="17"/>{{ ct('首頁') }}</button>
           <div class="remote-apphead-title">{{ appTitle }}</div>
           <button v-if="view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
-          <button type="button" class="remote-btn keyboard" :class="{on: keyboardOpen}" :title="ct('鍵盤')" @pointerdown.prevent @mousedown.prevent @click="toggleKeyboard"><f7-icon f7="keyboard" :size="18"/></button>
+          <button v-if="!isTouch" type="button" class="remote-btn keyboard" :class="{on: keyboardOpen}" :title="ct('鍵盤')" @pointerdown.prevent @mousedown.prevent @click="toggleKeyboard"><f7-icon f7="keyboard" :size="18"/></button>
           <button type="button" class="remote-btn more" :class="{on: menuOpen}" :title="ct('更多')" @pointerdown.prevent @mousedown.prevent @click="menuOpen = !menuOpen;settingsOpen = false"><f7-icon f7="ellipsis" :size="18"/></button>
         </div>
         <div v-if="menuOpen" ref="menuEl" class="remote-menu" :style="menuMax ? {maxHeight: menuMax + 'px'} : null" @pointerdown.stop>
@@ -187,12 +187,33 @@
           <button type="button" class="remote-clip-btn to-mac" @pointerdown.prevent @mousedown.prevent @click="pasteToMac"><f7-icon f7="arrow_up_doc" :size="17"/>{{ ct('貼到 Mac 游標') }}</button>
         </div>
         <!-- The keys a phone's keyboard lacks; ⇧ ⌃ ⌥ ⌘ hold for the next key. A computer opens them with the keyboard button, for what its browser or keyboard won't send. -->
-        <div v-if="keyboardOpen || panel || compose || (isTouch && clipOpen)" class="remote-keys" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
-          <template v-if="isTouch">
-            <button type="button" class="remote-key tool compose-btn" :class="{on: compose}" :title="ct('輸入文字')" @pointerdown.prevent @mousedown.prevent @click="toggleCompose"><f7-icon f7="pencil" :size="17"/></button>
-            <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :title="panel ? ct('鍵盤') : ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon :f7="panel ? 'keyboard' : 'square_grid_2x2'" :size="17"/></button>
-            <button type="button" class="remote-key tool clip-btn" :class="{on: clipOpen}" :title="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="17"/></button>
-          </template>
+        <!-- On a phone: the keys a phone's keyboard lacks in one capsule, a page at a time
+             sideways, with the keyboard's own round button beside it; ⇧ ⌃ ⌥ ⌘ hold for the
+             next key. Always there, so the keyboard can be called up from it. -->
+        <div v-if="isTouch && appMode !== 'home'" class="remote-keys remote-keys-touch" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
+          <div class="remote-keys-box">
+            <div ref="keyTrack" class="remote-keys-track" @scroll.passive="keyPaged">
+              <div class="remote-keys-page">
+                <button type="button" class="remote-key tool compose-btn" :class="{on: compose}" :title="ct('輸入文字')" :aria-label="ct('輸入文字')" @pointerdown.prevent @mousedown.prevent @click="toggleCompose"><f7-icon f7="pencil" :size="16"/></button>
+                <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :title="panel ? ct('鍵盤') : ct('按鍵面板')" :aria-label="panel ? ct('鍵盤') : ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon :f7="panel ? 'keyboard' : 'square_grid_2x2'" :size="16"/></button>
+                <button type="button" class="remote-key tool clip-btn" :class="{on: clipOpen}" :title="ct('剪貼簿')" :aria-label="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="16"/></button>
+                <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
+                <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
+              </div>
+              <div class="remote-keys-page">
+                <button v-for="k in LAST_KEYS" :key="k.code" type="button" class="remote-key" :title="k.name" :aria-label="k.name" @pointerdown.prevent @click="tap(k.code)"><f7-icon :f7="k.icon" :size="16"/></button>
+                <button type="button" class="remote-key tool mission" :title="ct('指揮中心')" :aria-label="ct('指揮中心')" @pointerdown.prevent @click="space('ArrowUp')"><f7-icon f7="rectangle_3_offgrid" :size="16"/></button>
+                <button type="button" class="remote-key tool space-left" :title="ct('上一個桌面')" :aria-label="ct('上一個桌面')" @pointerdown.prevent @click="space('ArrowLeft')"><f7-icon f7="arrow_left_square" :size="16"/></button>
+                <button type="button" class="remote-key tool space-right" :title="ct('下一個桌面')" :aria-label="ct('下一個桌面')" @pointerdown.prevent @click="space('ArrowRight')"><f7-icon f7="arrow_right_square" :size="16"/></button>
+              </div>
+            </div>
+          </div>
+          <div class="remote-keys-dots" aria-hidden="true"><span v-for="i in 2" :key="i" :class="{on: i - 1 === keyPage}"></span></div>
+          <!-- Follows whether the keyboard is really up (the page's height), not the field's
+               focus: on an iPhone a focused field does not mean a keyboard came up. -->
+          <button type="button" class="remote-round kb-btn" :title="kbShown ? ct('收起鍵盤') : ct('叫出鍵盤')" :aria-label="kbShown ? ct('收起鍵盤') : ct('叫出鍵盤')" @pointerdown.prevent @mousedown.prevent @click="kbButton"><f7-icon :f7="kbShown ? 'keyboard_chevron_compact_down' : 'keyboard'" :size="18"/></button>
+        </div>
+        <div v-if="!isTouch && keyboardOpen" class="remote-keys" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
           <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
           <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
           <!-- The Mac's desktops and Mission Control are a press away with the keyboard up. -->
@@ -253,7 +274,18 @@ const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: 
 const mode = ref(isTouch ? (localGet('castpane-remote-mode') || 'direct') : 'direct');
 const QUALITY_LABEL = { auto: '自動', low: '低', standard: '標準', high: '高', max: '最高' };
 const KEYS = [{ code: 'Escape', label: 'esc' }, { code: 'Tab', label: 'tab' }];
-const LAST_KEYS = [{ code: 'Backspace', label: '⌫' }, { code: 'Enter', label: '⏎' }, { code: 'ArrowLeft', label: '←' }, { code: 'ArrowUp', label: '↑' }, { code: 'ArrowDown', label: '↓' }, { code: 'ArrowRight', label: '→' }];
+const LAST_KEYS = [{ code: 'Backspace', label: '⌫', icon: 'delete_left', name: 'delete' }, { code: 'Enter', label: '⏎', icon: 'return', name: 'return' }, { code: 'ArrowLeft', label: '←', icon: 'arrow_left', name: '←' }, { code: 'ArrowUp', label: '↑', icon: 'arrow_up', name: '↑' }, { code: 'ArrowDown', label: '↓', icon: 'arrow_down', name: '↓' }, { code: 'ArrowRight', label: '→', icon: 'arrow_right', name: '→' }];
+// The phone's capsule: which page of keys shows.
+const keyTrack = ref(null), keyPage = ref(0);
+function keyPaged() { const el = keyTrack.value;if (el?.clientWidth) keyPage.value = Math.round(el.scrollLeft / el.clientWidth); }
+// Whether a keyboard really covers the page now (fitViewport), for the round button.
+const kbShown = ref(false);
+function kbButton() {
+  if (kbShown.value) { keyboardOpen.value = false;typing.value?.blur();return; }
+  // Asked for but not up (a focus that came without a tap): this tap brings it.
+  if (keyboardOpen.value) { typing.value?.focus({ preventScroll: true });return; }
+  toggleKeyboard();
+}
 const MODS = [{ id: 'shift', label: '⇧' }, { id: 'ctrl', label: '⌃' }, { id: 'alt', label: '⌥' }, { id: 'meta', label: '⌘' }];
 // The key panel's pages. A Mac has no Insert, so Tab sits there; the shortcuts are the
 // Mac's own (Mission Control ⌃↑, Show Desktop F11); the number pad types its characters.
@@ -693,6 +725,7 @@ function fitViewport() {
   const broken = viewportBroken(vv), tall = window.innerHeight >= window.innerWidth;
   const height = !broken ? vv.height : keyboardOpen.value ? window.innerHeight - Math.round((tall ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height)) * 0.44) : window.innerHeight;
   const covered = window.innerHeight - height > 80;
+  kbShown.value = broken ? keyboardOpen.value : covered;
   if (wasCovered && !covered && !broken) keyboardGone();
   wasCovered = covered;
   keyboardSideways.value = covered && window.innerWidth > window.innerHeight;
@@ -1535,6 +1568,28 @@ function keyUp(e) {
    keys had grown to one full-width row each). */
 .remote-keys {display:flex;flex-wrap:nowrap;align-items:center;gap:5px;padding:5px 8px;overflow-x:auto;scrollbar-width:none;background:rgba(28,28,30,.96);border-top:1px solid rgba(255,255,255,.08);}
 .remote-keys::-webkit-scrollbar {display:none;}
+/* The phone's row: one capsule of keys, paged sideways, and the keyboard's round button. */
+.remote-keys.remote-keys-touch {position:relative;gap:8px;padding:8px 12px 12px;overflow:visible;background:#000;border-top:0;}
+.remote-keys-box {flex:1;min-width:0;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;}
+.remote-keys-track {display:flex;height:44px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;}
+.remote-keys-track::-webkit-scrollbar {display:none;}
+.remote-keys-page {flex:0 0 100%;display:flex;align-items:center;padding:0 4px;box-sizing:border-box;scroll-snap-align:start;}
+.remote-stage .remote-keys-touch .remote-key {flex:1 1 0;min-width:0;height:34px;padding:0;border-radius:999px;background:transparent;color:rgba(255,255,255,.88);font:14px/1 -apple-system,system-ui,sans-serif;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+.remote-stage .remote-keys-touch .remote-key.mod {font-size:16px;font-weight:600;}
+.remote-stage .remote-keys-touch .remote-key:active {background:rgba(255,255,255,.18);}
+.remote-stage .remote-keys-touch .remote-key.on {background:#0a84ff;color:#fff;}
+.remote-keys-dots {position:absolute;left:12px;right:64px;bottom:3px;display:flex;justify-content:center;gap:5px;pointer-events:none;}
+.remote-keys-dots span {width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.18);}
+.remote-keys-dots span.on {background:rgba(255,255,255,.55);}
+/* Room for every key (a tablet, a phone held sideways): one page, no dots. */
+@media (min-width: 700px) {
+  .remote-keys-page {flex:1 1 0;}
+  .remote-keys-track {overflow-x:hidden;}
+  .remote-keys-dots {display:none;}
+  .remote-keys.remote-keys-touch {padding-bottom:8px;}
+}
+.remote-stage .remote-round {flex:0 0 auto;width:44px;height:44px;margin:0;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:rgba(255,255,255,.1);color:rgba(255,255,255,.88);touch-action:manipulation;cursor:pointer;}
+.remote-stage .remote-round:active {background:rgba(255,255,255,.2);}
 .remote-stage .remote-key {display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:auto;min-width:36px;height:30px;padding:0 8px;margin:0;border-radius:7px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:13px;line-height:1;cursor:pointer;}
 .remote-key.mod.on, .remote-key.tool.on {background:#0a84ff;}
 .remote-clip {display:flex;gap:6px;padding:6px 8px;background:rgba(28,28,30,.96);border-top:1px solid rgba(255,255,255,.08);}
