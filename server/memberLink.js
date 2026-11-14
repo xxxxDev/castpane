@@ -93,10 +93,10 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
   }
 
   // Told to the page as the hub tells it, through the session's stream.
-  function busy(s) {
+  function busy(s, said = '{"t":"clipboard-busy"}') {
     if (ws?.readyState !== 1) return;
     const head = Buffer.alloc(4); head.writeUInt32BE(s.n);
-    ws.send(Buffer.concat([head, frame(1, Buffer.from('{"t":"clipboard-busy"}'))]), { binary: true });
+    ws.send(Buffer.concat([head, frame(1, Buffer.from(said))]), { binary: true });
   }
 
   // What the hub sends for the capture core, checked here as the hub checks a page's: the
@@ -121,7 +121,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
       }
       // A password try at most every 3 seconds on this Mac too, each in its log (without it).
       if (clean.t === 'unlock') {
-        if (Date.now() - (s.lastUnlock || 0) < 3000) continue;
+        if (Date.now() - (s.lastUnlock || 0) < 3000) { busy(s, '{"t":"unlocked","ok":false,"busy":true}'); continue; }
         s.lastUnlock = Date.now();
         audit({ source: 'remote', action: 'unlock', username: s.by, via: config?.hub || '' });
       }

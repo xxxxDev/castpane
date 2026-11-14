@@ -97,7 +97,9 @@ final class Input {
     /// Text typed key by key as a US keyboard would type it, for the lock screen's password
     /// field, which may not take text that comes without its keys. Anything not on such a
     /// keyboard goes as text.
-    func typeKeys(_ text: String) {
+    /// Stops, false, as soon as `go` says no; nothing more is typed.
+    @discardableResult
+    func typeKeys(_ text: String, while go: () -> Bool = { true }) -> Bool {
         let plain = "`1234567890-=qwertyuiop[]\\asdfghjkl;'zxcvbnm,./ ", shifted = "~!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>? "
         let codes = ["Backquote", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal",
                      "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight", "Backslash",
@@ -105,10 +107,12 @@ final class Input {
                      "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period", "Slash", "Space"]
         let lower = Array(plain), upper = Array(shifted)
         for ch in text {
+            guard go() else { return false }
             if let i = lower.firstIndex(of: ch) { key(code: codes[i], down: true, mods: []); key(code: codes[i], down: false, mods: []) }
             else if let i = upper.firstIndex(of: ch) { key(code: codes[i], down: true, mods: ["shift"]); key(code: codes[i], down: false, mods: ["shift"]) }
             else { type(String(ch)) }
         }
+        return true
     }
 
     /// Whether the thing at this point takes typing: a text field, text area, search or

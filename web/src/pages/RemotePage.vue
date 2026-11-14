@@ -125,17 +125,19 @@
           <button type="button" class="remote-locked-open" @click="unlockOpen = true">{{ ct('輸入密碼解鎖') }}</button>
         </div>
         <div v-if="macLocked && unlockOpen" class="remote-unlock" @pointerdown.stop>
-          <form class="remote-unlock-box" @submit.prevent="sendUnlock">
+          <!-- Not a form, and not a password a browser keeps: it would offer to save the
+               Mac's password for this site. -->
+          <div class="remote-unlock-box">
             <f7-icon f7="lock_fill" :size="26"/>
             <div class="remote-unlock-title">{{ ct('這台 Mac 已鎖定') }}</div>
             <p>{{ ct('輸入 Mac 的登入密碼解鎖。密碼只送進 Mac 的鎖定畫面，不會存下來；離開遠端時 Mac 會再鎖上。') }}</p>
-            <input ref="unlockField" v-model="unlockPw" class="remote-unlock-field" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" :disabled="unlockBusy" :placeholder="ct('Mac 的密碼')">
+            <input ref="unlockField" v-model="unlockPw" class="remote-unlock-field" type="password" autocomplete="one-time-code" data-1p-ignore data-lpignore="true" @keydown.enter.prevent="sendUnlock" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" :disabled="unlockBusy" :placeholder="ct('Mac 的密碼')">
             <p v-if="unlockError" class="remote-unlock-error">{{ unlockError }}</p>
             <div class="remote-unlock-buttons">
               <button type="button" class="remote-unlock-later" @click="unlockOpen = false">{{ ct('稍後') }}</button>
-              <button type="submit" class="remote-unlock-go" :disabled="unlockBusy || !unlockPw">{{ unlockBusy ? ct('解鎖中…') : ct('解鎖') }}</button>
+              <button type="button" class="remote-unlock-go" :disabled="unlockBusy || !unlockPw" @click="sendUnlock">{{ unlockBusy ? ct('解鎖中…') : ct('解鎖') }}</button>
             </div>
-          </form>
+          </div>
         </div>
         <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">

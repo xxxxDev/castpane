@@ -24,9 +24,13 @@ what protects that, where the secrets are, and what Castpane cannot stop.
 - **Unlocking from Remote:** a Mac at its lock screen asks the viewer for its login password,
   which the capture core types into the lock screen, as the viewer could on the whole screen.
   The password goes from the page to the Mac once; it is not kept, logged or shown, and only the
-  try is in the audit log and the Mac's Activity. One try every 3 seconds at most, and macOS's
-  own delays after wrong ones still apply. A Mac seen locked and then unlocked while a viewer
-  is there is locked again when that viewer leaves, the connection lost included.
+  try is in the audit log and the Mac's Activity. One try at a time and one every 3 seconds at
+  most on each Mac, and macOS's own delays after wrong ones still apply. Each key is typed only
+  while the Mac is still locked, so a Mac unlocked meanwhile at its keyboard never gets the
+  password in the app in front. A Mac unlocked from Remote, or whose lock screen a viewer used,
+  is locked again when that viewer leaves (a page that stops answering is dropped within about
+  30 seconds) and when Castpane quits; one a person unlocked at the Mac itself is left alone.
+  If Castpane crashes, the Mac stays as it was.
 
 ## What Castpane guarantees
 

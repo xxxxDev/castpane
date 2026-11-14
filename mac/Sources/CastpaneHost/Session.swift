@@ -195,7 +195,7 @@ actor Session {
             case .end:
                 watcher?.cancel()
                 clipboardWatcher?.cancel()
-                queued { await self.unfit(); await self.stop(); await self.restore(); await self.relock() }
+                queued { await self.unfit(); await self.stop(); await self.restore(); Self.relock() }
             }
         }
     }
@@ -229,25 +229,40 @@ actor Session {
 
     private func clipboardWritten(_ count: Int) { clipboardSeen = count }
 
-    /// Tells the page when the Mac locks or unlocks, so it can ask for the password. A Mac
-    /// seen locked and unlocked while this viewer is there is locked again when it leaves.
-    private var lockedSent = false, sawLocked = false
+    /// Tells the page when the Mac locks or unlocks, so it can ask for the password.
+    private var lockedSent = false
     private func checkLocked() {
         let now = Wake.locked
-        if now { sawLocked = true }
         if now != lockedSent { lockedSent = now; link.send(json: ["t": "locked", "locked": now]) }
     }
 
+    /// One password try at a time for the whole app, every viewer's together, and one every
+    /// 3 seconds at most.
+    private static let unlockGate = OSAllocatedUnfairLock(initialState: (busy: false, last: Date.distantPast))
+    /// A Mac unlocked from Remote, or used at its lock screen from Remote, is locked again
+    /// when that viewer leaves (or when Castpane stops). One a person unlocked at the Mac
+    /// itself is left alone.
+    private static let relockPending = OSAllocatedUnfairLock(initialState: false)
+
     /// The password typed into the lock screen (woken first), and whether the Mac unlocked.
-    private var unlocking = false
+    /// Each key goes only while the Mac is still locked: a Mac unlocked meanwhile (by its
+    /// owner at the keyboard, or by another viewer's try) must not get the password, and
+    /// its Return, in the app in front.
     private func unlock(_ password: String) async {
-        guard !unlocking else { return }
         guard Wake.locked else { link.send(json: ["t": "unlocked", "ok": true]); return }
-        unlocking = true; defer { unlocking = false }
-        sawLocked = true
+        let go = Self.unlockGate.withLock { g -> Bool in
+            guard !g.busy, Date().timeIntervalSince(g.last) >= 3 else { return false }
+            g = (true, Date()); return true
+        }
+        guard go else { link.send(json: ["t": "unlocked", "ok": false, "busy": true]); return }
+        defer { Self.unlockGate.withLock { $0.busy = false } }
         Wake.display()
         try? await Task.sleep(nanoseconds: 900_000_000)
-        input.typeKeys(password)
+        let link = self.link
+        let stillLocked = { !link.isClosed && Wake.locked }
+        guard stillLocked() else { link.send(json: ["t": "unlocked", "ok": !Wake.locked]); return }
+        Self.relockPending.withLock { $0 = true }
+        guard input.typeKeys(password, while: stillLocked), stillLocked() else { link.send(json: ["t": "unlocked", "ok": !Wake.locked]); return }
         input.key(code: "Enter", down: true, mods: []); input.key(code: "Enter", down: false, mods: [])
         var ok = false
         for _ in 0..<40 { try? await Task.sleep(nanoseconds: 150_000_000); if !Wake.locked { ok = true; break } }
@@ -256,11 +271,18 @@ actor Session {
         if ok { link.send(json: ["t": "locked", "locked": false]) }
     }
 
-    /// Locked again as it was found, when it was unlocked while this viewer was there.
-    private func relock() {
-        if sawLocked && !Wake.locked { Lock.now() }
-        sawLocked = false
+    /// Input from the viewer while the Mac is locked: its lock screen used from Remote.
+    private func noteLockedInput() {
+        if Wake.locked { Self.relockPending.withLock { $0 = true } }
     }
+
+    /// Locked again as it was found, when it was unlocked from Remote. Also run when
+    /// Castpane stops, which a viewer's queued end might not wait for.
+    static func relock() {
+        guard relockPending.withLock({ p -> Bool in defer { p = false }; return p }), !Wake.locked else { return }
+        if !Lock.now() { log.error("the Mac could not be locked again after Remote unlocked it") }
+    }
+    private static let log = Logger(subsystem: "io.github.castpane", category: "session")
 
     private func checkWindows() {
         guard !link.isClosed, CGPreflightScreenCaptureAccess() else { return }
@@ -354,6 +376,7 @@ actor Session {
         case let .move(x, y):
             if let p = place(x, y) { input.move(to: p) }
         case let .button(b, down, x, y):
+            if down { noteLockedInput() }
             if let p = place(x, y) {
                 input.button(b, down: down, at: p)
                 // After a click, whether a text field now has the focus: the page offers its keyboard.
@@ -373,9 +396,10 @@ actor Session {
         case let .scroll(dx, dy, x, y):
             if let p = place(x, y) { input.scroll(dx: dx, dy: dy, at: p) }
         case let .key(code, down, mods):
+            if down { noteLockedInput() }
             input.key(code: code, down: down, mods: mods); if !down { reportCaret() }
         case let .text(s):
-            input.type(s); reportCaret()
+            noteLockedInput(); input.type(s); reportCaret()
         case let .unlock(password):
             queued { await self.unlock(password) }
         case .clipboardGet:

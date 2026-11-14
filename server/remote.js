@@ -289,7 +289,7 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
 // onOpen({username, ip}): a viewer was let in (server/start.js tells the admins).
 // signOut(userId, token): that sign-in ends, as when it is signed out from the
 // account's device list (the app's "Stop sharing now").
-function installRemote(server, { passes = sharedPasses, connect = connectHost, members = null, tokenOf = readHostToken, onOpen = () => {}, tickMs = 5000, secret = () => process.env.JWT_SECRET, principalOf = resolveLivePrincipal, allowedSocket = (req) => require('./siteConfig').isAllowedSocket(req), signOut = (userId, token) => require('./controllers/authController').endSession(userId, token) } = {}) {
+function installRemote(server, { passes = sharedPasses, connect = connectHost, members = null, tokenOf = readHostToken, onOpen = () => {}, tickMs = 5000, pingMs = 15000, secret = () => process.env.JWT_SECRET, principalOf = resolveLivePrincipal, allowedSocket = (req) => require('./siteConfig').isAllowedSocket(req), signOut = (userId, token) => require('./controllers/authController').endSession(userId, token) } = {}) {
   // A page's message is small, but for clipboard-set: 100 000 UTF-16 units, at most six
   // bytes each as JSON (\u0000), well within the capture core's 1 MiB frame.
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
@@ -346,6 +346,12 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
     audit({ source: 'remote', action: 'open', username: principal.username, ip, ...(member ? { member: machine, machine: me.machine } : {}) });
     try { onOpen({ username: principal.username, userId: principal.id, ip, at: started }); } catch (e) { console.error('remote: the open was not announced:', e.message); }
     ws.on('close', () => close('page left')); ws.on('error', () => close('page error'));
+    // A page gone without a word (a phone off the network, behind a tunnel that keeps the
+    // socket open) ends the session within a ping or two: the Mac is locked again then.
+    let alive = true;
+    const beat = setInterval(() => { if (closed) return clearInterval(beat); if (!alive) { clearInterval(beat); close('page gone'); try { ws.terminate(); } catch { /* gone */ } return; } alive = false; try { ws.ping(); } catch { /* closing */ } }, pingMs);
+    beat.unref?.();
+    ws.on('pong', () => { alive = true; });
     try {
       if (member) {
         // The member says hello to its own capture core with its own token.

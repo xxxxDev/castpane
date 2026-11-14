@@ -61,6 +61,7 @@ public final class HostServer: @unchecked Sendable {
         let l = lock.withLock { () -> Listener? in defer { listener = nil }; return listener }
         l?.stop()
         closeAll()
+        Session.relock()
     }
 
     /// Ends the current viewer's connection, if any; the listener stays.
