@@ -231,7 +231,7 @@ actor Session {
 
     /// Tells the page when the Mac is locked with the window shown under another one: at
     /// the lock screen macOS brings no window forward, and a click lands on the one on top.
-    private var lockedSent: Bool?
+    private var lockedSent = false
     private func checkLocked() {
         let now = Wake.locked && target.flatMap { t in t.windowID.map { Catalog.covered($0, pid: t.pid) } } == true
         if now != lockedSent { lockedSent = now; link.send(json: ["t": "locked", "locked": now]) }

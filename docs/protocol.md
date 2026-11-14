@@ -135,7 +135,7 @@ closing the session.
 | `icons`         | `icons: {bundle: "data:image/png;base64,…"}`                                                              | The icons asked for, 64 × 64.                                               |
 | `launched`      | `bundle`, `ok`                                                                                            | The answer to `launch`; its window comes in the next `list`.                |
 | `fitted`        | `id`, `ok`, `width?`, `height?`                                                                           | The answer to `fit`: the size the window took (an app may keep a larger one).|
-| `locked`        | `locked`                                                                                                  | `true` while the Mac is locked and the window shown lies under another app's window: at the lock screen macOS brings no window forward, so a click lands on the one on top. Sent on each change. |
+| `locked`        | `locked`                                                                                                  | `true` while the Mac is locked and the window shown lies under another app's window: at the lock screen macOS brings no window forward, so a click lands on the one on top. Sent when it changes (not at first while `false`). |
 | `error`   | `where`, `message`                                                                                              | Something failed (`where: "start"`, `message: "gone"` for a closed window). |
 
 ## The app ⇄ the server: `/api/local/*`
