@@ -57,18 +57,29 @@ function createTrustedDevices(db, { now = Date.now } = {}) {
     if (!c) return null;
     const doc = await call('findOne', { _id: c.id, kind: 'device' });
     if (!doc || doc.userId !== String(userId) || !sameHash(Buffer.from(doc.secretHash, 'hex'), hash(c.secret))) return null;
-    if (doc.expiresAt <= now()) { await call('remove', { _id: doc._id }, {}); return null; }
-    return doc;
+    // Days shortened on the admin page count at once, not only from the next use.
+    const until = Math.min(doc.expiresAt, doc.lastUsedAt + (await days()) * DAY_MS);
+    if (until <= now()) { await call('remove', { _id: doc._id }, {}); return null; }
+    return { ...doc, expiresAt: until };
   }
   // Used to open the picture: in date again for the whole period from now.
   async function use(userId, cookie) {
     const doc = await find(userId, cookie);
     if (!doc) return null;
     const t = now(), until = t + (await days()) * DAY_MS;
-    await call('update', { _id: doc._id }, { $set: { lastUsedAt: t, expiresAt: until } }, {});
+    // Only if it is still there with the same secret: a removal meanwhile must not be undone by a pass.
+    const changed = await call('update', { _id: doc._id, kind: 'device', secretHash: doc.secretHash }, { $set: { lastUsedAt: t, expiresAt: until } }, {});
+    if (!changed) return null;
     return { ...doc, lastUsedAt: t, expiresAt: until };
   }
-  const forget = async (cookie) => { const c = parse(cookie);return c ? (await call('remove', { _id: c.id, kind: 'device' }, {})) > 0 : false; };
+  // Only the cookie's own holder can end it: the id alone is not enough.
+  async function forget(cookie) {
+    const c = parse(cookie);
+    if (!c) return false;
+    const doc = await call('findOne', { _id: c.id, kind: 'device' });
+    if (!doc || !sameHash(Buffer.from(doc.secretHash, 'hex'), hash(c.secret))) return false;
+    return (await call('remove', { _id: doc._id, kind: 'device', secretHash: doc.secretHash }, {})) > 0;
+  }
   // The account whose device it was, or null when there was none.
   async function remove(id) {
     const doc = await call('findOne', { _id: String(id), kind: 'device' });
@@ -79,9 +90,9 @@ function createTrustedDevices(db, { now = Date.now } = {}) {
   const removeAll = (userId) => call('remove', { kind: 'device', userId: String(userId) }, { multi: true });
   const removeEvery = () => call('remove', { kind: 'device' }, { multi: true });
   async function list() {
-    const t = now();
-    return (await call('find', { kind: 'device' })).filter((d) => d.expiresAt > t)
-      .map((d) => ({ id: d._id, userId: d.userId, label: d.label, createdAt: new Date(d.createdAt).toISOString(), lastUsedAt: new Date(d.lastUsedAt).toISOString(), expiresAt: new Date(d.expiresAt).toISOString() }))
+    const t = now(), span = (await days()) * DAY_MS, until = (d) => Math.min(d.expiresAt, d.lastUsedAt + span);
+    return (await call('find', { kind: 'device' })).filter((d) => until(d) > t)
+      .map((d) => ({ id: d._id, userId: d.userId, label: d.label, createdAt: new Date(d.createdAt).toISOString(), lastUsedAt: new Date(d.lastUsedAt).toISOString(), expiresAt: new Date(until(d)).toISOString() }))
       .sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt));
   }
   return { days, setDays, trust, find, use, forget, remove, removeAll, removeEvery, list };

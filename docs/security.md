@@ -13,7 +13,7 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   and that sign-in only, kept in the server's memory (a restart ends every pass).
   An admin may trust a device (**Settings › Account › Trust this device**, which asks again
   once): from it, a pass is given with no password or passkey for 30, 60, 90 or 180 days (set
-  in **Admin › Trusted devices**) from its last use. The device keeps an HttpOnly, SameSite=Strict
+  in **Admin › Trusted devices**, and a shorter setting counts at once) from its last use. The device keeps an HttpOnly, SameSite=Strict
   cookie for `/api`, its id and a 256-bit secret; the server keeps only the secret's SHA-256.
   Signing out on that device, a new password, the account disabled, deleted or reset, turning
   it off or removing it on the admin page ends it at once; turning it off or removing it also ends
@@ -29,7 +29,8 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   while the Mac is still locked, so a Mac unlocked meanwhile at its keyboard never gets the
   password in the app in front. A Mac unlocked from Remote, or whose lock screen a viewer used,
   is locked again when that viewer leaves (a page that stops answering is dropped within about
-  30 seconds) and when Castpane quits; one a person unlocked at the Mac itself is left alone.
+  30 seconds; a Mac joined to another waits up to about a minute when that other Mac itself
+  goes silent) and when Castpane quits; one a person unlocked at the Mac itself is left alone.
   If Castpane crashes, the Mac stays as it was.
 
 ## What Castpane guarantees
