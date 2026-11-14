@@ -43,7 +43,10 @@ const CLIPBOARD_MAX = 100000;
 const at = (m) => (unit(m.x) && unit(m.y) ? { x: m.x, y: m.y } : null);
 const none = () => ({});
 const MESSAGES = {
-  status: none, permissions: none, list: none, stop: none, ack: none, 'key-frame': none,
+  status: none, permissions: none, stop: none,
+  // Optional: thumbnails this wide (the cards of the apps), 320 when not given.
+  list: (m) => (m.thumb === undefined ? {} : int(m.thumb, 160, 800) ? { thumb: m.thumb } : null),
+  ack: none, 'key-frame': none,
   start(m) {
     if ((m.kind !== 'display' && m.kind !== 'window') || !int(m.id, 0, 0xffffffff)) return null;
     const out = { kind: m.kind, id: m.id };

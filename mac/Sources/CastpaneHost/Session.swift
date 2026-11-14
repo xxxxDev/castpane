@@ -350,12 +350,13 @@ actor Session {
                 _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
                 link.send(json: Self.status())
             }
-        case .list:
+        case .list, .listSized:
             lastListed = Date()
             let link = self.link
+            let width: Int = if case .listSized(let w) = request { w } else { 320 }
             Task.detached {
                 await Self.wakeDisplays()
-                do { link.send(json: ["t": "list", "items": try await Catalog.list()]) }
+                do { link.send(json: ["t": "list", "items": try await Catalog.list(thumbWidth: width)]) }
                 catch { link.send(json: ["t": "error", "where": "list", "message": error.localizedDescription]) }
             }
         case let .start(kind, id, maxWidth, fps, bitrate, hevc):
@@ -556,7 +557,7 @@ actor Session {
         // left on another desktop or in full screen was never shown (Connecting…). Put back as
         // it was, full screen too, when another app is opened or the page leaves.
         let fullNow = await MainActor.run { Fit.axWindow(id, pid: pid).map(Fit.isFullScreen) ?? false }
-        let wasFull = again?.fullScreen ?? fullNow
+        var wasFull = again?.fullScreen ?? fullNow
         if wasFull && again == nil {
             await MainActor.run { if let w = Fit.axWindow(id, pid: pid) { Fit.setFullScreen(w, false) } }
             for _ in 0..<30 {
@@ -566,8 +567,19 @@ actor Session {
             try? await Task.sleep(nanoseconds: 400_000_000)
         }
         await note(id, pid: pid)
-        Catalog.bringForward(id, pid: pid)
-        for _ in 0..<20 where !Catalog.isHere(id) { try? await Task.sleep(nanoseconds: 100_000_000) }
+        await bringHere(id, pid: pid)
+        // Full screen on another desktop could not be seen from here (Accessibility lists only
+        // the windows on the desktop shown): out of it now that it is here, and brought here again.
+        if await MainActor.run(body: { Fit.axWindow(id, pid: pid).map(Fit.isFullScreen) ?? false }) {
+            if again == nil { wasFull = true }
+            await MainActor.run { if let w = Fit.axWindow(id, pid: pid) { Fit.setFullScreen(w, false) } }
+            for _ in 0..<30 {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                if await MainActor.run(body: { Fit.axWindow(id, pid: pid).map(Fit.isFullScreen) ?? false }) == false { break }
+            }
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            await bringHere(id, pid: pid)
+        }
         let result: (CGRect, CGRect)? = await MainActor.run {
             guard let w = Fit.axWindow(id, pid: pid), let now = Fit.frame(w) else { return nil }
             Fit.set(w, Fit.place(size, from: now, in: Fit.usable(for: now)))
@@ -577,6 +589,18 @@ actor Session {
         fitted = (id, pid, before, wasFull)
         windowFrame = nil; frameCheckedAt = 0
         link.send(json: ["t": "fitted", "id": Int(id), "ok": true, "width": Int(after.width), "height": Int(after.height)])
+    }
+
+    /// Brought to the front and waited for until Accessibility can reach it: switching to
+    /// another desktop takes the Mac a few seconds, and a window still on its way was not
+    /// found, so it was left at its own size the first time (fine the next, already here).
+    private func bringHere(_ id: CGWindowID, pid: pid_t) async {
+        Catalog.bringForward(id, pid: pid)
+        for _ in 0..<45 {
+            if Catalog.isHere(id), await MainActor.run(body: { Fit.axWindow(id, pid: pid) != nil }) { return }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        Self.log.error("window \(id) not reachable 4.5 s after bringing it forward")
     }
 
     /// Closes a window on the Mac (the switcher's swipe up); the list follows.

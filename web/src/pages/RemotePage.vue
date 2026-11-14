@@ -169,7 +169,7 @@
             <div v-for="w in switcherCards" :key="w.id" class="remote-switcher-card" :class="{now: current && w.id === current.id}" :data-id="w.id" :style="cardSwipe[w.id] ? {transform: `translateY(${cardSwipe[w.id]}px)`, opacity: Math.max(0.2, 1 + cardSwipe[w.id] / 300)} : null"
                  @pointerdown="cardDown($event, w)" @pointermove="cardMove($event, w)" @pointerup="cardUp($event, w)" @pointercancel="cardCancel(w)">
               <div class="remote-switcher-name">{{ w.app || w.title }}</div>
-              <img v-if="snaps[w.id] || w.thumb" :src="snaps[w.id] || w.thumb" alt="" decoding="async"/>
+              <img v-if="snaps[w.id] || bigThumbs[w.id] || w.thumb" :src="snaps[w.id] || bigThumbs[w.id] || w.thumb" :class="{wide: !snaps[w.id] && w.width > w.height}" alt="" decoding="async"/>
               <div v-else class="remote-switcher-blank"><img v-if="icons[w.bundle]" :src="icons[w.bundle]" alt=""/></div>
             </div>
           </div>
@@ -487,6 +487,7 @@ function onMessage(msg) {
     else { unlockError.value = msg.busy ? ct('試太快了，請等幾秒再試') : ct('沒有解鎖：密碼可能不對，請再試一次');nextTick(() => unlockField.value?.focus()); }
   } else if (msg.t === 'list') {
     items.value = msg.items || [];
+    if (bigWanted) { bigWanted = false;for (const w of items.value) if (w.kind === 'window' && w.thumb && recentWindows.value.some((r) => r.id === w.id)) bigThumbs[w.id] = w.thumb; }
     if (appMode.value !== 'desktop') { appsListed();return; }
     if (!current.value && items.value.length) {
       const back = resumeItem && items.value.find((w) => w.kind === resumeItem.kind && w.id === resumeItem.id);
@@ -1131,6 +1132,7 @@ function startApps(m) {
   apps.value = [];launching.value = '';switcherOpen.value = false;iconsAsked = new Set();iconsAll = false;
   for (const k of Object.keys(icons)) delete icons[k];
   for (const k of Object.keys(snaps)) delete snaps[k];
+  for (const k of Object.keys(bigThumbs)) delete bigThumbs[k];
   try { Object.assign(icons, JSON.parse(localGet(iconsKey()) || '{}')); } catch { /* none kept */ }
   try { recent.value = JSON.parse(localGet(recentKey()) || '[]').filter(Number.isInteger); } catch { recent.value = []; }
 }
@@ -1189,8 +1191,8 @@ function fitTo(w) {
   const size = { width: Math.max(240, Math.round(r.width)), height: Math.max(240, Math.round(r.height)) };
   const ask = (want) => new Promise((resolve) => {
     const done = (m) => { clearTimeout(t);fitWait = null;resolve(m); };
-    // Leaving full screen takes the Mac a few seconds.
-    const t = setTimeout(() => done(null), 6000);
+    // Switching desktops and leaving full screen take the Mac a few seconds each.
+    const t = setTimeout(() => done(null), 12000);
     fitWait = done;
     link?.send({ t: 'fit', id: w.id, ...want });
   });
@@ -1316,8 +1318,13 @@ function barCancel() { bar = null;unshrinkArea(true); }
 const switcherCards = ref([]), switcherPhase = ref(''), cardsEl = ref(null);
 let phaseTimer = 0;
 onBeforeUnmount(() => clearTimeout(phaseTimer));
+// The cards of apps not opened since this page connected: the Mac's thumbnails asked for
+// once more at a card's width (720), not the bar's 320.
+const bigThumbs = reactive({});
+let bigWanted = false;
 async function openSwitcher() {
   snapCurrent();
+  bigWanted = true;link?.send({ t: 'list', thumb: 720 });
   const now = current.value && recentWindows.value.find((w) => w.id === current.value.id);
   switcherCards.value = [...recentWindows.value.filter((w) => w !== now).reverse(), ...(now ? [now] : [])];
   switcherPhase.value = 'enter';switcherOpen.value = true;
@@ -1714,6 +1721,8 @@ function keyUp(e) {
 .remote-switcher-hint {transition:opacity .3s;}
 .remote-switcher-name {color:#fff;font-size:14px;margin:0 0 6px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-switcher-card img {display:block;width:100%;aspect-ratio:3/5;object-fit:cover;object-position:top;border-radius:16px;background:#2c2c2e;}
+/* A window wider than tall (not made the device's shape) whole, not a sliver of it. */
+.remote-switcher-card img.wide {object-fit:contain;object-position:center;}
 .remote-switcher-blank {width:100%;aspect-ratio:3/5;border-radius:16px;background:#2c2c2e;display:flex;align-items:center;justify-content:center;}
 .remote-switcher-blank img {width:64px;height:64px;}
 .remote-switcher-hint {margin-top:16px;text-align:center;color:#aaa;font-size:13px;}

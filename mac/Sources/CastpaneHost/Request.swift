@@ -30,6 +30,8 @@ enum Field {
 
 enum Request: Equatable, Sendable {
     case status, permissions, list, stop, ack, keyFrame
+    /// The list with thumbnails this wide (the switcher's cards; 320 otherwise).
+    case listSized(Int)
     case start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool = false)
     case move(x: Double, y: Double)
     case button(Int, down: Bool, x: Double, y: Double)
@@ -65,7 +67,10 @@ enum Request: Equatable, Sendable {
         switch t {
         case "status": return .status
         case "permissions": return .permissions
-        case "list": return .list
+        case "list":
+            guard msg["thumb"] != nil else { return .list }
+            guard let w = Field.exactInt(msg["thumb"], in: 160...800) else { return .invalid(t) }
+            return .listSized(w)
         case "stop": return .stop
         case "ack": return .ack
         case "key-frame": return .keyFrame
