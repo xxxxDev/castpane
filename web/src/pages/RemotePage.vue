@@ -166,7 +166,7 @@
         <div v-if="appMode === 'app' && isTouch && !keyboardOpen && !compose && !panel" class="remote-homebar" @pointerdown="barDown" @pointermove="barMove" @pointerup="barUp" @pointercancel="barCancel"><span></span></div>
         <div v-if="switcherOpen" class="remote-switcher" :class="switcherPhase" @pointerdown.self="switcherOpen = false">
           <div ref="cardsEl" class="remote-switcher-cards">
-            <div v-for="w in switcherCards" :key="w.id" class="remote-switcher-card" :data-id="w.id" :style="cardSwipe[w.id] ? {transform: `translateY(${cardSwipe[w.id]}px)`, opacity: Math.max(0.2, 1 + cardSwipe[w.id] / 300)} : null"
+            <div v-for="w in switcherCards" :key="w.id" class="remote-switcher-card" :class="{now: current && w.id === current.id}" :data-id="w.id" :style="cardSwipe[w.id] ? {transform: `translateY(${cardSwipe[w.id]}px)`, opacity: Math.max(0.2, 1 + cardSwipe[w.id] / 300)} : null"
                  @pointerdown="cardDown($event, w)" @pointermove="cardMove($event, w)" @pointerup="cardUp($event, w)" @pointercancel="cardCancel(w)">
               <div class="remote-switcher-name">{{ w.app || w.title }}</div>
               <img v-if="snaps[w.id] || w.thumb" :src="snaps[w.id] || w.thumb" alt="" decoding="async"/>
@@ -1701,12 +1701,14 @@ function keyUp(e) {
 .remote-apphead-title {flex:1;min-width:0;text-align:center;font-size:15px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-homebar {flex:0 0 auto;height:22px;display:flex;align-items:center;justify-content:center;touch-action:none;}
 .remote-homebar span {width:120px;height:5px;border-radius:3px;background:rgba(255,255,255,.7);}
-.remote-switcher {position:absolute;inset:0;z-index:5;background:rgba(0,0,0,.82);display:flex;flex-direction:column;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}
-.remote-switcher-cards {display:flex;gap:14px;overflow-x:auto;scrollbar-width:none;padding:0 24px;scroll-snap-type:x mandatory;}
-.remote-switcher-card {flex:0 0 62%;max-width:300px;scroll-snap-align:center;touch-action:pan-x;cursor:pointer;transition:opacity .15s;}
-.remote-switcher {transition:background-color .28s;}
-.remote-switcher.enter {background-color:rgba(0,0,0,0);}
+.remote-switcher {position:absolute;inset:0;z-index:5;background:#0b0b0d;display:flex;flex-direction:column;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}
+/* Room on both sides so the last card, the app just left, can sit in the middle. */
+.remote-switcher-cards {display:flex;gap:14px;overflow-x:auto;scrollbar-width:none;padding:0 calc(50% - min(31vw, 150px));scroll-snap-type:x mandatory;}
+.remote-switcher-cards::after {content:'';flex:0 0 1px;}
+.remote-switcher-card {flex:0 0 min(62vw, 300px);scroll-snap-align:center;touch-action:pan-x;cursor:pointer;transition:opacity .15s;}
 .remote-switcher.enter .remote-switcher-card {transform:scale(1.5);opacity:0;}
+/* The app just left is already its picture, shrunk under the finger: it only settles. */
+.remote-switcher.enter .remote-switcher-card.now {transform:scale(1.3);opacity:1;}
 .remote-switcher.enter .remote-switcher-hint {opacity:0;}
 .remote-switcher.settle .remote-switcher-card {transition:transform .3s cubic-bezier(.2,.8,.2,1), opacity .22s;}
 .remote-switcher-hint {transition:opacity .3s;}
