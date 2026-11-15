@@ -543,7 +543,11 @@ function onMessage(msg) {
     notice.value = msg.message === 'not-running' ? ct('Castpane 沒有在執行') : msg.where === 'host' ? ct('Castpane 沒有回應，請稍後再試') : msg.message === 'gone' ? ct('這個視窗已經關閉') : msg.message;
     if (msg.where === 'start') list();
   } else if (msg.t === 'stopped') {
-    notice.value = ct('畫面已停止：') + (msg.reason || '');
+    // An app that opens with a window of its own first (Discord's updater) closes it for its
+    // main one: Labs follows the app to that window.
+    const w = currentWindow.value;
+    if (props.labs && appMode.value === 'app' && w?.bundle) { notice.value = ct('正在打開…');waitForWindow(w.bundle, w.id); }
+    else notice.value = ct('畫面已停止：') + (msg.reason || '');
   } else if (msg.t === 'closed' && msg.reason === 'replaced') {
     error.value = ct('已在別的頁面打開遠端，這裡已中斷。');
   } else if (msg.t === 'closed' && msg.reason === 'ended on the Mac') {
@@ -1161,7 +1165,7 @@ function appsMessage(msg) {
 // The list came: a window of the app being opened, or the one to come back to.
 function appsListed() {
   if (launching.value) {
-    const w = items.value.find((x) => x.kind === 'window' && x.bundle === launching.value);
+    const w = items.value.find((x) => x.kind === 'window' && x.bundle === launching.value && x.id !== launchSkip);
     if (w) { launching.value = '';clearInterval(launchTimer);openWindow(w); }
   } else if (resumeItem && appMode.value === 'home') {
     const w = items.value.find((x) => x.kind === resumeItem.kind && x.id === resumeItem.id);
@@ -1173,11 +1177,17 @@ function openApp(a) {
   const w = recentWindows.value.find((x) => x.bundle === a.bundle);
   if (w) return openWindow(w);
   // Not open, or open with no window: started (or asked for a window), then shown once it has one.
-  launching.value = a.bundle;
   link?.send({ t: 'launch', bundle: a.bundle });
+  waitForWindow(a.bundle);
+}
+// A window of the app, other than one just gone, looked for each second for 15 seconds.
+let launchSkip = null;
+function waitForWindow(bundle, skip = null) {
+  launching.value = bundle;launchSkip = skip;
   clearInterval(launchTimer);
   let tries = 0;
   launchTimer = setInterval(() => { if (!launching.value || ++tries > 15) { clearInterval(launchTimer);if (launching.value) { launching.value = '';toast(ct('這個 App 沒有開出視窗')); } return; } list(); }, 1000);
+  if (skip) list();
 }
 onBeforeUnmount(() => { clearInterval(launchTimer);clearTimeout(fitTimer); });
 // The window made the shape of the area it fills here, in points as this page's pixels:
@@ -1254,6 +1264,7 @@ function goHome() {
   menuOpen.value = false;settingsOpen.value = false;switcherOpen.value = false;compose.value = false;panel.value = false;clipOpen.value = false;
   if (keyboardOpen.value) { keyboardOpen.value = false;typing.value?.blur(); }
   link?.send({ t: 'stop' });
+  if (launchSkip) { launching.value = '';launchSkip = null;clearInterval(launchTimer); }
   current.value = null;hasPicture.value = false;fitSize = null;
   appMode.value = 'home';
   list();link?.send({ t: 'apps' });
@@ -1289,7 +1300,7 @@ function refitSoon() {
   clearTimeout(fitTimer);
   fitTimer = setTimeout(async () => {
     const r = area.value?.getBoundingClientRect(), w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);
-    if (!r || !w || appMode.value !== 'app' || (Math.abs(r.width - fitSize.width) < 40 && Math.abs(r.height - fitSize.height) < 40)) return;
+    if (!r || !w || !fitSize || appMode.value !== 'app' || (Math.abs(r.width - fitSize.width) < 40 && Math.abs(r.height - fitSize.height) < 40)) return;
     if (await fitTo(w)) show(w);
   }, 350);
 }
