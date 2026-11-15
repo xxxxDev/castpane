@@ -1191,6 +1191,8 @@ function waitForWindow(bundle, skip = null, giveUp = () => toast(ct('這個 App 
   launchTimer = setInterval(() => { if (!launching.value || ++tries > 15) { clearInterval(launchTimer);if (launching.value) { launching.value = '';launchSkip = null;giveUp(); } return; } list(); }, 1000);
   if (skip) list();
 }
+// Waiting for the window after one gone is dropped once the person goes elsewhere.
+function stopFollowing() { if (launchSkip) { launching.value = '';launchSkip = null;clearInterval(launchTimer); } }
 onBeforeUnmount(() => { clearInterval(launchTimer);clearTimeout(fitTimer); });
 // The window made the shape of the area it fills here, in points as this page's pixels:
 // its text then comes out the size of this device's own. An app that cannot be that
@@ -1252,6 +1254,7 @@ function snapCurrent() {
   } catch { /* no picture to keep */ }
 }
 async function openWindow(w, keepOrder = false, tried = new Set()) {
+  stopFollowing();
   snapCurrent();
   switcherOpen.value = false;menuOpen.value = false;settingsOpen.value = false;
   if (!keepOrder) used(w.id);
@@ -1267,7 +1270,7 @@ function goHome() {
   menuOpen.value = false;settingsOpen.value = false;switcherOpen.value = false;compose.value = false;panel.value = false;clipOpen.value = false;
   if (keyboardOpen.value) { keyboardOpen.value = false;typing.value?.blur(); }
   link?.send({ t: 'stop' });
-  if (launchSkip) { launching.value = '';launchSkip = null;clearInterval(launchTimer); }
+  stopFollowing();
   current.value = null;hasPicture.value = false;fitSize = null;
   appMode.value = 'home';
   list();link?.send({ t: 'apps' });
