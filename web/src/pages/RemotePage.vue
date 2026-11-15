@@ -546,8 +546,9 @@ function onMessage(msg) {
     // An app that opens with a window of its own first (Discord's updater) closes it for its
     // main one: Labs follows the app to that window.
     const w = currentWindow.value;
-    if (props.labs && appMode.value === 'app' && w?.bundle) { notice.value = ct('正在打開…');waitForWindow(w.bundle, w.id); }
-    else notice.value = ct('畫面已停止：') + (msg.reason || '');
+    const stopped = () => { notice.value = ct('畫面已停止：') + (msg.reason || ''); };
+    if (props.labs && appMode.value === 'app' && w?.bundle) { notice.value = ct('正在打開…');waitForWindow(w.bundle, w.id, stopped); }
+    else stopped();
   } else if (msg.t === 'closed' && msg.reason === 'replaced') {
     error.value = ct('已在別的頁面打開遠端，這裡已中斷。');
   } else if (msg.t === 'closed' && msg.reason === 'ended on the Mac') {
@@ -1182,11 +1183,12 @@ function openApp(a) {
 }
 // A window of the app, other than one just gone, looked for each second for 15 seconds.
 let launchSkip = null;
-function waitForWindow(bundle, skip = null) {
+// None by then: giveUp, or a toast.
+function waitForWindow(bundle, skip = null, giveUp = () => toast(ct('這個 App 沒有開出視窗'))) {
   launching.value = bundle;launchSkip = skip;
   clearInterval(launchTimer);
   let tries = 0;
-  launchTimer = setInterval(() => { if (!launching.value || ++tries > 15) { clearInterval(launchTimer);if (launching.value) { launching.value = '';toast(ct('這個 App 沒有開出視窗')); } return; } list(); }, 1000);
+  launchTimer = setInterval(() => { if (!launching.value || ++tries > 15) { clearInterval(launchTimer);if (launching.value) { launching.value = '';launchSkip = null;giveUp(); } return; } list(); }, 1000);
   if (skip) list();
 }
 onBeforeUnmount(() => { clearInterval(launchTimer);clearTimeout(fitTimer); });
@@ -1201,8 +1203,9 @@ function fitTo(w) {
   const size = { width: Math.max(240, Math.round(r.width)), height: Math.max(240, Math.round(r.height)) };
   const ask = (want) => new Promise((resolve) => {
     const done = (m) => { clearTimeout(t);fitWait = null;resolve(m); };
-    // Switching desktops and leaving full screen take the Mac a few seconds each.
-    const t = setTimeout(() => done(null), 12000);
+    // Switching desktops and leaving full screen take the Mac a few seconds each (up to
+    // about 12.5 in all, Session.fit).
+    const t = setTimeout(() => done(null), 15000);
     fitWait = done;
     link?.send({ t: 'fit', id: w.id, ...want });
   });
