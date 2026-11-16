@@ -129,7 +129,7 @@ const english = {
 "安全":"Security",
 "編輯":"Edit",
 "左側最多 1 顆、右側最多 2 顆，那一顆放回原位了。":"One at most on the left, two on the right: that key went back.",
-"遠端畫面下方的按鈕列：左側最多一顆獨立圓鈕，右側最多兩顆，中間是左右滑動的四頁。點一顆按鈕可以移到別的位置；按「編輯」後可以拖曳把手，跨頁、跨左右調整。只影響這台裝置。":"The keys under the remote screen: one round button at most on the left, two on the right, four pages between that slide sideways. Tap a key to move it elsewhere; tap Edit to drag the handles, across pages and sides too. Only on this device.",
+"遠端畫面下方的按鈕列：左側最多一顆獨立圓鈕，右側最多兩顆，中間是左右滑動的四頁。點一顆按鈕可以移到別的位置；按「編輯」後可以拖曳把手，跨頁、跨左右調整。存在帳號上，每台裝置都一樣。":"The keys under the remote screen: one round button at most on the left, two on the right, four pages between that slide sideways. Tap a key to move it elsewhere; tap Edit to drag the handles, across pages and sides too. Kept on the account, the same on every device.",
 "移到…":"Move to…",
 "（沒有）":"(none)",
 "恢復預設":"Restore the default",

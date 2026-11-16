@@ -2,12 +2,12 @@
   <!-- Settings › Remote › Key row: the phone's key row as set here (js/remotePrefs.js): one
        round button at most at its left, two at its right, four pages of keys between. Any key
        can be in any of them; within one they are dragged into order, and a tap moves one to
-       another. Kept on this device. -->
+       another. Kept on the account (js/remotePrefs.js). -->
   <f7-page name="key-row" class="page-large-static">
     <f7-navbar :title="ct('按鈕列')" back-link :back-link-text="t('tabSettings')">
       <f7-nav-right><f7-link class="key-row-edit" @click="editing = !editing">{{ editing ? ct('完成') : ct('編輯') }}</f7-link></f7-nav-right>
     </f7-navbar>
-    <p class="key-row-note">{{ ct('遠端畫面下方的按鈕列：左側最多一顆獨立圓鈕，右側最多兩顆，中間是左右滑動的四頁。點一顆按鈕可以移到別的位置；按「編輯」後可以拖曳把手，跨頁、跨左右調整。只影響這台裝置。') }}</p>
+    <p class="key-row-note">{{ ct('遠端畫面下方的按鈕列：左側最多一顆獨立圓鈕，右側最多兩顆，中間是左右滑動的四頁。點一顆按鈕可以移到別的位置；按「編輯」後可以拖曳把手，跨頁、跨左右調整。存在帳號上，每台裝置都一樣。') }}</p>
     <!-- Not editing: the places as lists, a tap moves a key. Editing: the whole row as one list,
          the places as titles in it, so a key is dragged within its place or across to another. -->
     <template v-if="!editing">

@@ -70,8 +70,8 @@ back, with touch modes made for a small screen.
   which one, with Quit app and Force quit at the foot. A window an app keeps hidden gets no
   card.
 - **Every app.** All apps opens a panel over the home, as the Mac's Apps window: a search
-  field, the apps running in a row, then every app; one not running starts, says so while it does, and its window opens as soon as it has
-  one.
+  field, the apps running in a row, then every app; one not running starts, says so while it
+  does, and its window opens as soon as it has one.
 - **Made the device's shape.** Tap an app and its window fills the screen, made the shape of
   this device on the Mac, so its text and buttons are the size of the device's own apps, and
   you use it with your finger, with no pointer to move. An app that cannot be that narrow keeps
