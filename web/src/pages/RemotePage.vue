@@ -36,26 +36,14 @@
         <div v-if="appMode === 'desktop'" class="remote-apphead remote-desktop-head">
           <button type="button" class="remote-apphead-back remote-desktop-back" @click="goHome"><f7-icon f7="chevron_left" :size="17"/>{{ ct('首頁') }}</button>
           <div class="remote-apphead-title">{{ ct('整個螢幕') }}</div>
-          <span class="remote-desktop-head-end" aria-hidden="true"></span>
-        </div>
-        <div v-if="appMode === 'desktop' && groups.length > 1 && !headFolded" class="remote-desks" role="tablist">
-          <button v-for="g in groups" :key="g.key" type="button" class="remote-desk" :class="{active: g.key === groupKey, current: g.current}" @click="groupKey = g.key">{{ g.label }}<span class="remote-desk-count">{{ g.items.length }}</span></button>
-        </div>
-        <div v-if="appMode === 'desktop'" class="remote-bar">
-          <div v-if="!headFolded" class="remote-thumbs" role="tablist">
-            <button v-for="w in shownItems" :key="w.kind + w.id" type="button" class="remote-thumb" :class="{active: current && current.kind === w.kind && current.id === w.id}" :title="w.app ? w.app + ' · ' + w.title : w.title" @click="show(w)">
-              <img v-if="w.thumb" :src="w.thumb" alt=""/><f7-icon v-else :f7="w.kind === 'display' ? 'desktopcomputer' : 'macwindow'" :size="20"/>
-              <span>{{ w.kind === 'display' ? (w.all ? ct('所有螢幕') : ct('桌面') + (w.title.match(/\d+$/) ? ' ' + w.title.match(/\d+$/)[0] : '')) : (w.app || w.title) }}</span>
-              <small v-if="w.kind === 'window' && w.here === false" class="remote-away">{{ ct('不在畫面上') }}</small>
-            </button>
-          </div>
+          <!-- At the right of the bar, as an app's: the picture's numbers, then its buttons. -->
+          <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <div class="remote-actions">
             <!-- The screens, desktops and windows fold away for a bigger picture. -->
             <button type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headFolded ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
             <button v-if="isTouch && view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
             <!-- A computer: the picture's size, and what the bottom bar used to hold. -->
             <template v-if="!isTouch">
-              <span class="remote-stats remote-head-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
               <div class="remote-zoom">
                 <button type="button" class="remote-btn zoom-out" :title="ct('縮小')" :disabled="view.z <= 1" @click="zoomStep(1 / 1.25)"><f7-icon f7="minus" :size="16"/></button>
                 <button type="button" class="remote-btn size" :class="{on: sizeOpen}" :title="ct('畫面大小')" @click="sizeOpen = !sizeOpen;settingsOpen = false">{{ view.z <= 1 ? ct('適合') : Math.round(view.z * 100) + '%' }}</button>
@@ -79,10 +67,23 @@
             </template>
           </div>
         </div>
+        <div v-if="appMode === 'desktop' && groups.length > 1 && !headFolded" class="remote-desks" role="tablist">
+          <button v-for="g in groups" :key="g.key" type="button" class="remote-desk" :class="{active: g.key === groupKey, current: g.current}" @click="groupKey = g.key">{{ g.label }}<span class="remote-desk-count">{{ g.items.length }}</span></button>
+        </div>
+        <div v-if="appMode === 'desktop' && !headFolded" class="remote-bar">
+          <div v-if="!headFolded" class="remote-thumbs" role="tablist">
+            <button v-for="w in shownItems" :key="w.kind + w.id" type="button" class="remote-thumb" :class="{active: current && current.kind === w.kind && current.id === w.id}" :title="w.app ? w.app + ' · ' + w.title : w.title" @click="show(w)">
+              <img v-if="w.thumb" :src="w.thumb" alt=""/><f7-icon v-else :f7="w.kind === 'display' ? 'desktopcomputer' : 'macwindow'" :size="20"/>
+              <span>{{ w.kind === 'display' ? (w.all ? ct('所有螢幕') : ct('桌面') + (w.title.match(/\d+$/) ? ' ' + w.title.match(/\d+$/)[0] : '')) : (w.app || w.title) }}</span>
+              <small v-if="w.kind === 'window' && w.here === false" class="remote-away">{{ ct('不在畫面上') }}</small>
+            </button>
+          </div>
+        </div>
         <!-- An app's own bar: back to the home, its name, the keyboard and the rest. -->
         <div v-if="appMode === 'app'" class="remote-apphead">
           <button type="button" class="remote-apphead-back" @click="goHome"><f7-icon f7="chevron_left" :size="17"/>{{ ct('首頁') }}</button>
           <div class="remote-apphead-title">{{ appTitle }}</div>
+          <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <button v-if="view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
           <button v-if="!isTouch" type="button" class="remote-btn keyboard" :class="{on: keyboardOpen}" :title="ct('鍵盤')" @pointerdown.prevent @mousedown.prevent @click="toggleKeyboard"><f7-icon f7="keyboard" :size="18"/></button>
           <button type="button" class="remote-btn more" :class="{on: menuOpen}" :title="ct('更多')" @pointerdown.prevent @mousedown.prevent @click="menuOpen = !menuOpen;settingsOpen = false"><f7-icon f7="ellipsis" :size="18"/></button>
@@ -167,7 +168,6 @@
         <button v-if="macWindows && appMode !== 'home' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @close="dockOpen = false"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
-          <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
@@ -1887,9 +1887,6 @@ function keyUp(e) {
 .remote-typing {position:absolute;left:-1000px;top:0;width:10px;height:10px;opacity:0;}
 .remote-settings {position:absolute;right:8px;top:calc(100% + 6px);width:min(320px,calc(100vw - 16px));background:rgba(44,44,46,.98);border-radius:16px;padding:12px 14px;box-shadow:0 8px 30px rgba(0,0,0,.5);}
 .remote-head {position:relative;z-index:2;}
-.remote-head.collapsed {position:absolute;top:env(safe-area-inset-top);right:env(safe-area-inset-right);}
-.remote-head.collapsed .remote-bar {background:transparent;border:0;padding:8px;}
-.remote-head.collapsed .remote-btn {background:rgba(44,44,46,.85);box-shadow:0 2px 8px rgba(0,0,0,.4);}
 .remote-menu {position:absolute;right:8px;top:calc(100% + 6px);min-width:200px;box-sizing:border-box;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;background:rgba(44,44,46,.98);border-radius:14px;padding:6px;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;}
 .remote-stage .remote-menu-item {display:flex;align-items:center;gap:10px;width:100%;margin:0;border:0;background:transparent;color:#fff;font-size:15px;text-align:left;padding:10px 12px;border-radius:9px;cursor:pointer;}
 .remote-stage .remote-menu-item:active {background:rgba(255,255,255,.1);}
@@ -1920,7 +1917,8 @@ function keyUp(e) {
 .remote-home-launching.over {bottom:calc(env(safe-area-inset-bottom) + 100px);}
 .remote-desktop-head {padding-bottom:0;}
 /* As wide as the back button, so the title stays centred. */
-.remote-desktop-head-end {flex:0 0 auto;width:64px;}
+.remote-nav-stats {flex:0 0 auto;align-self:center;margin:0 2px;font-size:11px;color:#8e8e93;white-space:nowrap;}
+.remote-desktop-head {padding-bottom:4px;}
 .remote-card-menu-layer {position:absolute;inset:0;z-index:6;}
 .remote-card-menu {position:absolute;width:220px;background:rgba(44,44,46,.98);border-radius:14px;padding:4px;box-shadow:0 10px 40px rgba(0,0,0,.6);}
 .remote-stage .remote-card-menu button {display:block;width:100%;height:auto;margin:0;padding:12px;border:0;border-radius:10px;background:none;color:#fff;font-size:16px;text-align:left;cursor:pointer;}
