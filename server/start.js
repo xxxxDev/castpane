@@ -10,6 +10,8 @@
 // It sets the data folder up (databases, secrets, the audit log), makes local.token if
 // the app has not, and serves the web app, the API, the live socket and the remote
 // relay. It never starts the capture core: that is the app's (server/remote.js).
+// First, so a log line that cannot be written (a full disk) never stops the service.
+require('./services/outputStreams').keepOutputErrorsQuiet();
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
