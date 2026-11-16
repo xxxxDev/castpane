@@ -91,6 +91,10 @@ function liveRect() {
   return { win: o.win, rect: { left: Math.round(b.left), top: Math.round(b.top), width: Math.round(b.width), height: Math.round(b.height - (o.max ? 0 : 14)) } };
 }
 watch([focused, placed], () => nextTick(() => emit('live', liveRect())), { deep: true });
+// The desk itself moved or resized (the browser window, the sidebar folded or opened): told again.
+let sized = null;
+watch(deskEl, (el) => { sized?.disconnect();sized = null;if (el && typeof ResizeObserver !== 'undefined') { sized = new ResizeObserver(() => emit('live', liveRect()));sized.observe(el); } });
+onBeforeUnmount(() => sized?.disconnect());
 // Dragging and resizing, kept within the desk.
 let drag = null;
 function bounds() { const b = deskEl.value?.getBoundingClientRect();return b ? { w: b.width, h: b.height } : { w: 1200, h: 800 }; }
