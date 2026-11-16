@@ -32,14 +32,13 @@
     <div class="remote-home-open" :class="{one: cols === 1}">
       <div v-for="o in openApps" :key="o.key" role="button" tabindex="0" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.enter.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.space.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
         <span class="remote-home-shot">
-          <!-- A Mac window's buttons, as macOS draws them: red at the top left closes the window
-               on top, yellow at the top right puts it in the Dock; the number of windows at the
-               bottom right. -->
+          <!-- A Mac window's buttons, as macOS draws them, at the top left: red closes the window on
+               top, yellow puts it in the Dock, green holds the number of windows. -->
           <button v-if="o.window" type="button" class="light close" :title="ct('關閉視窗')" :aria-label="ct('關閉視窗')" @click.stop="$emit('closeWindow', o.window)"><f7-icon f7="xmark" :size="13"/></button>
           <button v-if="o.window && canMinimize && !o.window.minimized" type="button" class="light minimize" :title="ct('縮到 Dock')" :aria-label="ct('縮到 Dock')" @click.stop="$emit('minimize', o.window)"><f7-icon f7="minus" :size="13"/></button>
           <img v-if="o.window?.thumb" :src="o.window.thumb" alt=""/>
           <img v-else-if="icons[o.bundle]" class="remote-home-shot-icon" :src="icons[o.bundle]" alt=""/>
-          <span v-if="o.count > 1" class="remote-home-count">{{ o.count }}</span>
+          <span v-if="o.window" class="remote-home-count" :aria-label="o.count > 1 ? ct('{n} 個視窗').replace('{n}', () => o.count) : null">{{ o.count > 1 ? o.count : '' }}</span>
         </span>
         <span class="remote-home-label">{{ o.name }}</span>
       </div>
@@ -48,21 +47,34 @@
     </div>
     </div>
 
-    <!-- Every app, as Launchpad: searched, a page at a time sideways; a tap starts it. -->
+    <!-- Every app, as the Mac's Apps window: a panel over the home, searched at the top, the
+         apps running first, then every app in a grid that scrolls; a tap starts it. -->
     <div v-if="allOpen" class="remote-launchpad" @click.self="allOpen = false">
-      <div class="remote-launchpad-top">
-        <input v-model="query" class="remote-launchpad-search" type="search" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" :placeholder="ct('搜尋 App')">
-        <button type="button" class="remote-launchpad-close" :title="ct('關閉')" @click="allOpen = false"><f7-icon f7="xmark" :size="16"/></button>
-      </div>
-      <div ref="pagesEl" class="remote-launchpad-pages" @scroll.passive="paged" @click.self="allOpen = false">
-        <div v-for="(pg, i) in pages" :key="i" class="remote-launchpad-page" :style="{gridTemplateColumns: `repeat(${fitted.cols}, 1fr)`}" @click.self="allOpen = false">
-          <button v-for="a in pg" :key="a.bundle" type="button" class="remote-home-app" :class="{running: a.running, launching: launching === a.bundle}" :data-bundle="a.bundle" @click="pick(a)">
-            <span class="remote-home-icon"><img v-if="icons[a.bundle]" :src="icons[a.bundle]" alt=""/></span>
-            <span class="remote-home-applabel">{{ a.name }}</span>
-          </button>
+      <div class="remote-launchpad-panel" role="dialog" :aria-label="ct('所有 App')">
+        <div class="remote-launchpad-top">
+          <f7-icon f7="search" :size="17" class="remote-launchpad-glass"/>
+          <input v-model="query" class="remote-launchpad-search" type="search" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" :placeholder="ct('搜尋 App')">
+          <button type="button" class="remote-launchpad-close" :title="ct('關閉')" @click="allOpen = false"><f7-icon f7="xmark" :size="15"/></button>
+        </div>
+        <div ref="pagesEl" class="remote-launchpad-body">
+          <template v-if="!query.trim() && running.length">
+            <div class="remote-launchpad-grid remote-launchpad-running" :style="{gridTemplateColumns: `repeat(${fitted.cols}, 1fr)`}">
+              <button v-for="a in running" :key="a.bundle" type="button" class="remote-home-app running" :class="{launching: launching === a.bundle}" :data-bundle="a.bundle" @click="pick(a)">
+                <span class="remote-home-icon"><img v-if="icons[a.bundle]" :src="icons[a.bundle]" alt=""/></span>
+                <span class="remote-home-applabel">{{ a.name }}</span>
+              </button>
+            </div>
+            <div class="remote-launchpad-sep"></div>
+          </template>
+          <div class="remote-launchpad-grid remote-launchpad-all" :style="{gridTemplateColumns: `repeat(${fitted.cols}, 1fr)`}">
+            <button v-for="a in shown" :key="a.bundle" type="button" class="remote-home-app" :class="{running: a.running, launching: launching === a.bundle}" :data-bundle="a.bundle" @click="pick(a)">
+              <span class="remote-home-icon"><img v-if="icons[a.bundle]" :src="icons[a.bundle]" alt=""/></span>
+              <span class="remote-home-applabel">{{ a.name }}</span>
+            </button>
+          </div>
+          <div v-if="!shown.length" class="remote-launchpad-none">{{ ct('沒有符合的 App') }}</div>
         </div>
       </div>
-      <div v-if="pages.length > 1" class="remote-launchpad-dots"><span v-for="(pg, i) in pages" :key="i" :class="{on: i === page}"></span></div>
     </div>
   </div>
 </template>
@@ -93,31 +105,24 @@ const openApps = computed(() => {
   }
   return [...seen.values()];
 });
-const allOpen = ref(false), query = ref(''), page = ref(0), pagesEl = ref(null);
-watch(allOpen, (on) => { if (on) emit('all'); query.value = '';page.value = 0; });
-// As many as the screen holds on a page: the rows and columns that fit the room left
-// (a fixed 20 left half of a phone's page empty, and seven pages).
-const fitted = ref({ cols: 4, rows: 5 });
+const allOpen = ref(false), query = ref(''), pagesEl = ref(null);
+watch(allOpen, (on) => { if (on) emit('all'); query.value = ''; });
+// As many columns as the panel's width holds, four at the least.
+const fitted = ref({ cols: 4 });
 let sized = null;
 watch(pagesEl, (el) => {
   sized?.disconnect();sized = null;
   if (!el || typeof ResizeObserver === 'undefined') return;
-  sized = new ResizeObserver(() => {
-    const w = el.clientWidth, h = el.clientHeight;
-    if (w && h) fitted.value = { cols: Math.max(4, Math.floor((w - 24) / 84)), rows: Math.max(2, Math.floor((h - 16) / 96)) };
-  });
+  sized = new ResizeObserver(() => { const w = el.clientWidth;if (w) fitted.value = { cols: Math.max(4, Math.floor((w - 24) / 84)) }; });
   sized.observe(el);
 });
 onBeforeUnmount(() => sized?.disconnect());
-const PER_PAGE = computed(() => fitted.value.cols * fitted.value.rows);
-const pages = computed(() => {
+const shown = computed(() => {
   const q = query.value.trim().toLowerCase();
-  const list = q ? props.apps.filter((a) => a.name.toLowerCase().includes(q)) : props.apps;
-  const out = [];
-  for (let i = 0; i < list.length; i += PER_PAGE.value) out.push(list.slice(i, i + PER_PAGE.value));
-  return out.length ? out : [[]];
+  return q ? props.apps.filter((a) => a.name.toLowerCase().includes(q)) : props.apps;
 });
-function paged() { const el = pagesEl.value;if (el?.clientWidth) page.value = Math.round(el.scrollLeft / el.clientWidth); }
+// The apps running, first, as the Mac's window puts its most used: one row's worth.
+const running = computed(() => props.apps.filter((a) => a.running).slice(0, fitted.value.cols));
 function pick(a) { allOpen.value = false;emit('app', a); }
 </script>
 <style>
@@ -141,14 +146,15 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-stage .remote-home-cols button.on {background:rgba(255,255,255,.22);color:#fff;}
 .remote-home-open.one {grid-template-columns:1fr;}
 .remote-home-open.one .remote-home-shot {aspect-ratio:16/10;}
-/* The Mac's window buttons, as macOS draws them: a red and a yellow dot, no sign on them, in a
-   finger-sized area that shows nothing itself. */
-.remote-stage .remote-home-shot .light {position:absolute;top:2px;z-index:1;width:36px;height:36px;margin:0;padding:0;border:0;border-radius:18px;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.remote-stage .remote-home-shot .light::before {content:'';width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.25),0 1px 3px rgba(0,0,0,.45);}
+/* The Mac's window buttons, as macOS draws them, together at the top left: a red dot (close),
+   a yellow one (into the Dock), a green one holding the number of windows. Each in an area a
+   finger can hit, which shows nothing itself. */
+.remote-stage .remote-home-shot .light {position:absolute;top:2px;z-index:1;width:26px;height:36px;margin:0;padding:0;border:0;border-radius:13px;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.remote-stage .remote-home-shot .light::before, .remote-home-count {content:'';width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.25),0 1px 3px rgba(0,0,0,.45);}
 .remote-stage .remote-home-shot .light .icon {display:none;}
-.remote-stage .remote-home-shot .light.close {left:2px;}
+.remote-stage .remote-home-shot .light.close {left:3px;}
 .remote-stage .remote-home-shot .light.close::before {background:radial-gradient(circle at 50% 35%, #ff7b74, #ec5a52 70%);}
-.remote-stage .remote-home-shot .light.minimize {right:2px;}
+.remote-stage .remote-home-shot .light.minimize {left:27px;}
 .remote-stage .remote-home-shot .light.minimize::before {background:radial-gradient(circle at 50% 35%, #ffd34d, #f5b81c 70%);}
 .remote-home-empty {font-size:14px;color:#888;}
 .remote-home-open {display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:14px 12px;}
@@ -158,24 +164,25 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-home-shot {position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;border-radius:18px;background:#2c2c2e;overflow:hidden;}
 .remote-home-shot img {width:100%;height:100%;object-fit:cover;object-position:top;}
 .remote-home-shot img.remote-home-shot-icon {width:56px;height:56px;object-fit:contain;}
-.remote-home-count {position:absolute;bottom:6px;right:6px;min-width:22px;height:22px;padding:0 7px;border-radius:100px;background:rgba(30,30,32,.55);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:rgba(255,255,255,.4) 0 0 1px 0 inset;color:#fff;font-size:12px;line-height:22px;box-sizing:border-box;}
+.remote-home-count {position:absolute;top:12px;left:56px;z-index:1;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 35%, #5fd86a, #29b53b 70%);color:rgba(0,0,0,.7);font-size:10px;font-weight:700;line-height:1;}
 .remote-home-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-home-card.launching .remote-home-shot, .remote-home-app.launching .remote-home-icon {opacity:.5;animation:remote-home-pulse 1s ease-in-out infinite alternate;}
 @keyframes remote-home-pulse {to {opacity:1;}}
 .remote-stage .remote-home-desktop {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;margin:4px 0 0;padding:0;border:0;border-radius:100px;color:#fff;font-size:15px;cursor:pointer;}
-.remote-launchpad {position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;background:rgba(18,18,20,.97);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);padding:calc(env(safe-area-inset-top) + 12px) 0 calc(env(safe-area-inset-bottom) + 12px);}
-.remote-launchpad-top {display:flex;gap:10px;align-items:center;padding:0 16px 12px;}
-.remote-launchpad-search {flex:1;min-width:0;height:36px;box-sizing:border-box;padding:0 14px;border-radius:18px;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:16px;}
-.remote-stage .remote-launchpad-close {flex:0 0 auto;width:36px;height:36px;margin:0;padding:0;border:0;border-radius:18px;background:rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.remote-launchpad-pages {flex:1;min-height:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;}
-.remote-launchpad-pages::-webkit-scrollbar {display:none;}
-.remote-launchpad-page {flex:0 0 100%;scroll-snap-align:start;display:grid;grid-template-columns:repeat(4, 1fr);grid-auto-rows:78px;gap:18px 6px;padding:8px 12px;box-sizing:border-box;align-content:start;}
+.remote-launchpad {position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.35);display:flex;padding:calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 10px);box-sizing:border-box;}
+.remote-launchpad-panel {flex:1;min-height:0;display:flex;flex-direction:column;border-radius:28px;overflow:hidden;background:rgba(40,40,44,.72);-webkit-backdrop-filter:saturate(180%) blur(30px);backdrop-filter:saturate(180%) blur(30px);box-shadow:rgba(255,255,255,.35) 0 0 1px 0 inset,rgba(255,255,255,.25) 1px 1px 2px -1px inset,0 20px 60px rgba(0,0,0,.6);}
+.remote-launchpad-top {flex:0 0 auto;display:flex;gap:10px;align-items:center;margin:0 16px;padding:14px 0 12px;border-bottom:1px solid rgba(255,255,255,.12);}
+.remote-launchpad-glass {color:#aaa;}
+.remote-launchpad-search {flex:1;min-width:0;height:34px;box-sizing:border-box;padding:0;border:0;background:none;color:#fff;font-size:20px;font-weight:600;outline:none;}
+.remote-launchpad-search::placeholder {color:rgba(255,255,255,.45);}
+.remote-stage .remote-launchpad-close {flex:0 0 auto;width:30px;height:30px;margin:0;padding:0;border:0;border-radius:15px;background:rgba(255,255,255,.12);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.remote-launchpad-body {flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 12px 20px;box-sizing:border-box;}
+.remote-launchpad-grid {display:grid;grid-template-columns:repeat(4, 1fr);gap:16px 6px;align-content:start;}
+.remote-launchpad-sep {height:1px;margin:16px 4px;background:rgba(255,255,255,.12);}
+.remote-launchpad-none {padding:24px 0;text-align:center;color:#999;font-size:14px;}
 .remote-stage .remote-home-app {display:flex;flex-direction:column;align-items:center;gap:5px;width:auto;height:auto;margin:0;padding:0;border:0;background:none;color:#ddd;font-size:12px;cursor:pointer;}
 .remote-home-icon {width:56px;height:56px;border-radius:13px;display:flex;align-items:center;justify-content:center;overflow:hidden;}
 .remote-home-icon img {width:56px;height:56px;}
 .remote-home-applabel {max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-home-app.running .remote-home-applabel::before {content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:#30d158;margin-right:4px;vertical-align:middle;}
-.remote-launchpad-dots {display:flex;justify-content:center;gap:8px;padding-top:8px;}
-.remote-launchpad-dots span {width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.3);}
-.remote-launchpad-dots span.on {background:#fff;}
 </style>
