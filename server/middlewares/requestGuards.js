@@ -63,7 +63,7 @@ function isHttpsRequest(req) {
 function csrfCookieOpts(req) {
   return {
     // the SPA has to read this one back out to echo it in the header, so unlike
-    // session_id it cannot be httpOnly — it is a CSRF token, not a credential
+    // session_id it cannot be httpOnly: it is a CSRF token, not a credential
     httpOnly: false,
     secure: isHttpsRequest(req),
     sameSite: 'Lax',
@@ -203,7 +203,7 @@ function rateLimit({ windowMs, max }) {
 // allow-listed field sets, far below it.
 const JSON_BODY_LIMIT = '100kb';
 
-// express's default error handler answers a body-parser error with HTML — and
+// express's default error handler answers a body-parser error with HTML, and
 // leaks a stack trace outside production. Keep the API's JSON error shape.
 function jsonBodyErrorHandler(err, req, res, next) {
   if (err?.type === 'entity.too.large') {
