@@ -215,7 +215,7 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
         return res.json(issued);
       }
       if (req.body?.passkey) {
-        try { await auth.adminPasskeyAgain(req, res, req.body.passkey, 'remote'); } catch (e) { return res.status(e.status || 400).json({ message: 'Passkey not accepted', code: 'PASSKEY_REFUSED' }); }
+        try { await auth.adminPasskeyAgain(req, res, req.body.passkey, 'remote'); } catch (e) { if (!e.status) console.error('remote passkey:', e.message); return res.status(e.status || 500).json({ message: 'Passkey not accepted', code: 'PASSKEY_REFUSED' }); }
       } else {
         if (!(await auth.adminAgain(req, res, 'remote-open', 'remote', { purpose: 'remote' }))) return;
         auth.adminGranted(req, 'remote');
