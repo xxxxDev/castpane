@@ -63,6 +63,9 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   on one account name in an hour protect that name from every address except those it signed
   in from before. Ten wrong codes in a day stop taking authenticator codes for the account
   (recovery codes still work). Every sign-in step has its own rate limit.
+- Changes are limited per address too. That table keeps at most 5,000 addresses at a time,
+  the oldest let go first, so new visitors are never locked out; past 16 IPv6 /64s under one
+  /48, the rest of that /48 shares one bucket.
 - Admins see what was tried, from where, and which addresses are blocked, and can block or
   unblock an address (but not their own).
 - Passkeys are bound to the public HTTPS address. A key cannot be used from another origin, and
