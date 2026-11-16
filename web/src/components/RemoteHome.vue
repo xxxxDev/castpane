@@ -1,7 +1,8 @@
 <template>
   <!-- The Labs page's home: the apps open on the Mac, one card each (its windows stacked),
        as a phone's own app switcher. Every app is a button away, as Launchpad shows them;
-       the whole screen (the remote desktop) is at the bottom. -->
+       the whole screen (the remote desktop) is at the top, in reach without scrolling past
+       every app. -->
   <div class="remote-home">
     <!-- A bar at the top, as the whole screen's: back to the list of Macs, this Mac, every app. -->
     <div class="remote-home-head">
@@ -10,6 +11,7 @@
       <button type="button" class="remote-home-all" @click="allOpen = true"><f7-icon f7="square_grid_2x2" :size="15"/>{{ ct('所有 App') }}</button>
     </div>
     <div v-if="notice" class="remote-home-notice">{{ notice }}</div>
+    <button type="button" class="remote-home-desktop" @click="$emit('desktop')"><f7-icon f7="desktopcomputer" :size="18"/>{{ ct('整個螢幕（遠端桌面）') }}</button>
     <div class="remote-home-title">{{ ct('開著的 App') }}</div>
     <div v-if="!openApps.length" class="remote-home-empty">{{ ct('正在讀取…') }}</div>
     <div class="remote-home-open">
@@ -22,7 +24,6 @@
         <span class="remote-home-label">{{ o.name }}</span>
       </button>
     </div>
-    <button type="button" class="remote-home-desktop" @click="$emit('desktop')"><f7-icon f7="desktopcomputer" :size="18"/>{{ ct('整個螢幕（遠端桌面）') }}</button>
 
     <!-- Every app, as Launchpad: searched, a page at a time sideways; a tap starts it. -->
     <div v-if="allOpen" class="remote-launchpad" @click.self="allOpen = false">
@@ -111,7 +112,7 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-home-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-home-card.launching .remote-home-shot, .remote-home-app.launching .remote-home-icon {opacity:.5;animation:remote-home-pulse 1s ease-in-out infinite alternate;}
 @keyframes remote-home-pulse {to {opacity:1;}}
-.remote-stage .remote-home-desktop {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;margin:22px 0 0;padding:0;border:0;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;font-size:15px;cursor:pointer;}
+.remote-stage .remote-home-desktop {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;margin:4px 0 0;padding:0;border:0;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;font-size:15px;cursor:pointer;}
 .remote-launchpad {position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;background:rgba(18,18,20,.97);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);padding:calc(env(safe-area-inset-top) + 12px) 0 calc(env(safe-area-inset-bottom) + 12px);}
 .remote-launchpad-top {display:flex;gap:10px;align-items:center;padding:0 16px 12px;}
 .remote-launchpad-search {flex:1;min-width:0;height:36px;box-sizing:border-box;padding:0 14px;border-radius:18px;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:16px;}
