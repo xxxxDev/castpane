@@ -15,12 +15,14 @@ what protects that, where the secrets are, and what Castpane cannot stop.
 - **Accounts left from an earlier version,** which allowed several, still sign in as they did:
   one that was an admin can open Remote, one that was a member cannot. Settings lists them under
   a warning, the Mac app's Account tab counts them, and Settings deletes them (deleting one that
-  was an admin asks for your password, or passkey, again). Delete them.
-  The account may trust a device (**Settings › Account › Trust this device**, which asks again
+  was an admin asks for your password, or passkey, again). Delete them soon: a leftover admin
+  account sees yours as the other one, and can delete it just the same. A deleted account stays as
+  a record that signs nothing in and keeps its name taken.
+  The account may trust a device (**Settings › This device › Trust this device**, which asks again
   once): from it, a pass is given with no password or passkey for 30, 60, 90 or 180 days (set
   in **Settings › Trusted devices**, and a shorter setting counts at once) from its last use. The device keeps an HttpOnly, SameSite=Strict
   cookie for `/api`, its id and a 256-bit secret; the server keeps only the secret's SHA-256.
-  Signing out on that device, a new password, the account disabled, deleted or reset, turning
+  Signing out on that device, a new password, the account deleted, turning
   it off or removing it under **Settings › Trusted devices** ends it at once; turning it off or removing it also ends
   the passes that account already has, and a picture open with one. Signing a device out from
   another one does not end its trust: remove it under **Settings › Trusted devices** as well. Each pass given this way is in the
@@ -112,7 +114,7 @@ what protects that, where the secrets are, and what Castpane cannot stop.
 - When the page falls behind, video is dropped up to the next key frame, so input does not
   queue behind a backlog. Input stops if the capture core stops reading.
 - Every pass, every session opened and ended (with its length), and every app force-quit (who,
-  and which app) is in the audit log. The account gets a push notification when a session
+  and which app) is in the audit log. Every active admin account (yours, and any left from an earlier version) gets a push notification when a session
   opens, naming who and from where.
 - The server never starts the capture core or any other program. It connects to `host.sock` in
   Castpane's folder and proves itself with `host.token`; if the socket is not there, it says

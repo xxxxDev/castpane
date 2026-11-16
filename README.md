@@ -44,7 +44,7 @@ back, with touch modes made for a small screen.
 |                                    | What                                                                                                                                                                                                                                                          | Where                                   |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
 | **Castpane.app** (the server side) | A menu-bar app. It captures the screen with ScreenCaptureKit, encodes it with VideoToolbox and posts your clicks and keys. It runs the web server, keeps it running, and manages the connection (a Cloudflare tunnel, or the address you give for Tailscale). | [`mac/`](mac/) and [`server/`](server/) |
-| **The PWA** (the client)           | A web app in Vue and Framework7: sign-in, the Remote page, settings and account management. Any current Chrome, Edge or Safari, on a phone or a computer.                                                                                                     | [`web/`](web/)                          |
+| **The PWA** (the client)           | A web app in Vue and Framework7: sign-in, the Remote page and settings.                        Any current Chrome, Edge or Safari, on a phone or a computer.                                                                                                     | [`web/`](web/)                          |
 
 ## Features
 

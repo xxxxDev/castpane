@@ -30,11 +30,12 @@
     <!-- Castpane has one account. Ones left from a version that had several still sign in,
          so they are shown here, plainly, to be deleted. -->
     <template v-if="others.length">
-      <f7-block-title class="others-title">{{ ct('還有 {n} 個其他帳號').replace('{n}', () => others.length) }}</f7-block-title>
+      <f7-block-title class="others-title">{{ othersTitle }}</f7-block-title>
       <f7-list inset class="cc-settings-list others-list">
-        <f7-list-item v-for="u in others" :key="u.id" :title="u.name || u.username" :footer="u.username + (u.lifecycleStatus === 'disabled' ? ' · ' + ct('已停用') : '')" class="other-account"><template #media><f7-icon f7="exclamationmark_triangle_fill" style="color:#ff9f0a"/></template><template #after><f7-button small round fill color="red" class="other-delete" @click="deleteOther(u)">{{ ct('刪除') }}</f7-button></template></f7-list-item>
+        <f7-list-item v-for="u in others" :key="u.id" :title="u.name || u.username" :footer="u.username + (u.lifecycleStatus === 'disabled' ? ' · ' + ct('已停用，不能登入') : '')" class="other-account"><template #media><f7-icon f7="exclamationmark_triangle_fill" style="color:#ff9f0a"/></template><template #after><f7-button small round fill color="red" class="other-delete" @click="deleteOther(u)">{{ ct('刪除') }}</f7-button></template></f7-list-item>
       </f7-list>
-      <p class="settings-note">{{ ct('Castpane 只有一個帳號。這些是舊版留下的帳號，仍然可以登入，請刪除。') }}</p>
+      <p v-if="othersFailed" class="settings-note">{{ ct('其他帳號讀取失敗，上面是上次讀到的。') }}</p>
+      <p class="settings-note">{{ ct('Castpane 只有一個帳號。這些是舊版留下的帳號，沒停用的仍然可以登入，請刪除。') }}</p>
     </template>
 
     <f7-block-title>{{ ct('安全') }}</f7-block-title>
@@ -323,10 +324,16 @@ async function onTrustToggle(e) {
   finally { trustBusy.value = false;e.target.checked = trust.value.trusted; }
 }
 // Accounts other than this one, left from a version that had several (not the deleted).
-const others = ref([]);
+const others = ref([]), othersFailed = ref(false);
+// Those that can still sign in are counted, as the Mac app counts them.
+const othersTitle = computed(() => {
+  const n = others.value.filter((u) => u.lifecycleStatus !== 'disabled').length;
+  return !n ? ct('舊版留下的帳號') : n === 1 ? ct('還有 1 個其他帳號可以登入') : ct('還有 {n} 個其他帳號可以登入').replace('{n}', () => n);
+});
 async function loadOthers() {
   if (currentUser.value?.role !== 'admin') return;
-  try { const r = await api('/auth/users');others.value = (r.users || []).filter((u) => u.id !== currentUser.value?.id && u.lifecycleStatus !== 'deleted_tombstone'); } catch { others.value = []; }
+  // A failed read keeps what was last read, said so, rather than the warning going away.
+  try { const r = await api('/auth/users');others.value = (r.users || []).filter((u) => u.id !== currentUser.value?.id && u.lifecycleStatus !== 'deleted_tombstone');othersFailed.value = false; } catch { othersFailed.value = true; }
 }
 function deleteOther(u) {
   f7.dialog.confirm(ct('「{name}」會被刪除，它的登入、通行密鑰和裝置都會失效。').replace('{name}', () => u.username), ct('刪除這個帳號？'), async () => {

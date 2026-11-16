@@ -32,7 +32,7 @@ struct Wizard: View {
     private func subtitle(_ s: Step) -> String {
         switch s {
         case .role: return "Is this the Mac your phone connects to, or one to show in another Mac's Castpane?"
-        case .account: return "This account signs in from your phone. More users can be added later in the web app."
+        case .account: return "Castpane has one account: this one, which signs in from your phone."
         case .permissions: return "Castpane needs two macOS permissions. The status updates by itself."
         case .connection: return "Choose how your phone reaches this Mac."
         case .join: return "On the other Mac's web app, open Remote and tap Add another Mac; enter its address and code here."
