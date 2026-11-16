@@ -1,5 +1,5 @@
 <template>
-  <!-- The Mac's Dock at the left edge, as a pill: its apps (a dot under those running), then
+  <!-- The Mac's Dock at the left edge, as a pill: its apps (a dot beside those running), then
        the windows put in the Dock. Opened by the handle (a slide from the edge is "back"). -->
   <div :class="docked ? 'remote-dock-rail' : 'remote-dock-layer'" @pointerdown.self="docked || $emit('close')">
     <div class="remote-dock" role="toolbar" :aria-label="ct('Dock')">
