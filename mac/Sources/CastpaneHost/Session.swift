@@ -636,7 +636,9 @@ actor Session {
         // A window in full screen (one put back there by unfit) cannot go in the Dock: macOS
         // ignores it, and the list that follows shows it where it is.
         await MainActor.run { if let w = Fit.axWindow(id, pid: pid), !Fit.isFullScreen(w) { Fit.minimize(w) } }
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        // The window is out of the list until its slide into the Dock ends (measured: gone
+        // at half a second, there and marked at one).
+        try? await Task.sleep(nanoseconds: 1_200_000_000)
         route(.list)
     }
 
