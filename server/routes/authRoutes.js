@@ -1,6 +1,6 @@
 const express = require('express');
 const authController = require('../controllers/authController');
-const { verifyToken, restrictTo } = require('../middlewares/authMiddleware');
+const { verifyToken } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
@@ -20,7 +20,6 @@ router.post('/change-password', verifyToken, authController.changePassword);
 // Passkeys.
 router.post('/passkey/start', authController.passkeyStart);
 router.post('/passkey/finish', authController.passkeyFinish);
-router.post('/passkey/again', verifyToken, authController.passkeyAgain);
 router.get('/passkeys', verifyToken, authController.listPasskeys);
 router.post('/passkeys/options', verifyToken, authController.passkeyOptions);
 router.post('/passkeys', verifyToken, authController.addPasskey);
@@ -36,9 +35,7 @@ router.delete('/devices/:id', verifyToken, authController.removeDevice);
 router.delete('/sessions/:id', verifyToken, authController.removeSession);
 
 // One account: the setup assistant makes it (localApi.js, createFirstAdmin) and nothing
-// makes another. Accounts left from a version that had several are listed, so they are
-// seen, and deleted; nothing else is done to them.
-router.get('/users', verifyToken, restrictTo('admin'), authController.listUsers);
-router.delete('/users/:id', verifyToken, restrictTo('admin'), authController.deleteUser);
+// makes another. Accounts are not listed or changed from here: which one stays is chosen
+// at the Mac (localApi.js, /api/local/accounts), and the others are then deleted.
 
 module.exports = router;

@@ -27,16 +27,6 @@
       <f7-list-item v-if="handheld" link :title="ct('掃碼登入')" class="scan-login-row" @click.prevent="goScanLogin"><template #media><f7-icon f7="qrcode_viewfinder" /></template></f7-list-item>
     </f7-list>
 
-    <!-- Castpane has one account. Ones left from a version that had several still sign in,
-         so they are shown here, plainly, to be deleted. -->
-    <template v-if="others.length">
-      <f7-block-title class="others-title">{{ othersTitle }}</f7-block-title>
-      <f7-list inset class="cc-settings-list others-list">
-        <f7-list-item v-for="u in others" :key="u.id" :title="u.name || u.username" :footer="u.username + (u.lifecycleStatus === 'disabled' ? ' · ' + ct('已停用，不能登入') : '')" class="other-account"><template #media><f7-icon f7="exclamationmark_triangle_fill" style="color:#ff9f0a"/></template><template #after><f7-button small round fill color="red" class="other-delete" @click="deleteOther(u)">{{ ct('刪除') }}</f7-button></template></f7-list-item>
-      </f7-list>
-      <p v-if="othersFailed" class="settings-note">{{ ct('其他帳號讀取失敗，上面是上次讀到的。') }}</p>
-      <p class="settings-note">{{ ct('Castpane 只有一個帳號。這些是舊版留下的帳號，沒停用的仍然可以登入，請刪除。') }}</p>
-    </template>
 
     <f7-block-title>{{ ct('安全') }}</f7-block-title>
     <f7-list inset class="cc-settings-list">
@@ -117,8 +107,7 @@ const {theme,setTheme}=useTheme();
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { f7 } from 'framework7-vue';
 import { t, lang, setLang } from '../js/i18n.js';
-import { currentUser, updateCurrentUser, logout, api } from '../js/auth.js';
-import { withAdminAgain, adminProblem } from '../js/adminAgain.js';
+import { currentUser, updateCurrentUser, logout } from '../js/auth.js';
 import {
   loadPushState,
   enablePush,
@@ -323,28 +312,8 @@ async function onTrustToggle(e) {
   } catch (err) { f7.dialog.alert(err.message); }
   finally { trustBusy.value = false;e.target.checked = trust.value.trusted; }
 }
-// Accounts other than this one, left from a version that had several (not the deleted).
-const others = ref([]), othersFailed = ref(false);
-// Those that can still sign in are counted, as the Mac app counts them.
-const othersTitle = computed(() => {
-  const n = others.value.filter((u) => u.lifecycleStatus !== 'disabled').length;
-  return !n ? ct('舊版留下的帳號') : n === 1 ? ct('還有 1 個其他帳號可以登入') : ct('還有 {n} 個其他帳號可以登入').replace('{n}', () => n);
-});
-async function loadOthers() {
-  if (currentUser.value?.role !== 'admin') return;
-  // A failed read keeps what was last read, said so, rather than the warning going away.
-  try { const r = await api('/auth/users');others.value = (r.users || []).filter((u) => u.id !== currentUser.value?.id && u.lifecycleStatus !== 'deleted_tombstone');othersFailed.value = false; } catch { othersFailed.value = true; }
-}
-function deleteOther(u) {
-  f7.dialog.confirm(ct('「{name}」會被刪除，它的登入、通行密鑰和裝置都會失效。').replace('{name}', () => u.username), ct('刪除這個帳號？'), async () => {
-    try {
-      const r = await withAdminAgain(ct('刪除這個帳號'), (again) => api(`/auth/users/${encodeURIComponent(u.id)}`, { method: 'DELETE', body: JSON.stringify(again) }));
-      if (r) loadOthers();
-    } catch (e) { f7.dialog.alert(adminProblem(e) || e.message); loadOthers(); }
-  });
-}
 onMounted(() => {
-  loadTrust();loadOthers();
+  loadTrust();
   document.addEventListener('visibilitychange', rereadPush);
   // The switch is free as soon as the state is read, and after three seconds
   // whatever happens: it used to wait for the repair below, which on a desktop
@@ -420,7 +389,6 @@ async function forceUpdate() {
 </script>
 
 <style scoped>
-.others-title {color:#ff9f0a;}
 .settings-note {font-size:13px;line-height:1.5;color:var(--dp-color-text-secondary,#8e8e93);margin:8px calc(var(--f7-block-padding-horizontal,16px) + 16px) 0;}
 @media (min-width: 800px){.settings-note{max-width:min(828px,calc(100% - 32px));margin-left:auto;margin-right:auto;padding:0 16px;box-sizing:border-box;}}
 /* The small test button left of the notifications switch. */

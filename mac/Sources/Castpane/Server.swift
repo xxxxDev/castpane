@@ -206,6 +206,24 @@ struct LocalAPI {
         }
     }
 
+    /// The admin accounts that can sign in; `wizard` marks the setup assistant's, when known.
+    struct Account: Identifiable, Equatable { let id: String; let username: String; let name: String; let wizard: Bool }
+    func accounts() async throws -> [Account] {
+        let data = try await request("GET", "accounts")
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let list = obj["accounts"] as? [[String: Any]] else { return [] }
+        return list.compactMap { a in
+            guard let id = a["id"] as? String, let username = a["username"] as? String else { return nil }
+            return Account(id: id, username: username, name: a["name"] as? String ?? "", wizard: a["wizard"] as? Bool ?? false)
+        }
+    }
+    /// Keeps that one account and deletes every other (docs/protocol.md). Answers how many
+    /// were not fully removed, which the next start or the next keep finishes.
+    func keepAccount(id: String) async throws -> Int {
+        let data = try await request("POST", "accounts/keep", body: ["id": id], timeout: 30)
+        let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return (obj?["failed"] as? [Any])?.count ?? 0
+    }
+
     func activity(limit: Int = 50) async throws -> [ActivityItem] {
         ActivityItem.decodeList(try await request("GET", "activity?limit=\(limit)"))
     }

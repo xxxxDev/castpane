@@ -1,25 +1,12 @@
-// The acting admin's own password again, and the code when their two-step is on:
-// making an administrator, resetting a password, enabling or renaming an
-// administrator, and what widens the peer link. One helper for every page that asks
-// for it.
+// Your own password again, and the code when two-step is on: opening Remote and trusting
+// a device, after their own passkey was not used (RemotePage.vue, trust.js).
 import {f7} from 'framework7-vue';
 import {t} from './i18n.js';
 import {ct} from './text.js';
 import {currentUser} from './auth.js';
-import {passkeyAgainChallenge, answerPasskeyAgain, cancelled} from './passkeys.js';
 
-// With a passkey that may stand for the password, it is asked for first; cancelled or
-// refused, the password (and code) as before. An account action's challenge answers only
-// account actions: Remote asks for its own passkey before this and passes passkey: false.
-export function adminAgain(title, then, text = ct('請輸入你自己的密碼確認。'), cancel = () => {}, { passkey = true } = {}) {
-  if (!passkey) return byPassword(title, then, text, cancel);
-  passkeyAgainChallenge().then((o) => {
-    if (!o) return byPassword(title, then, text, cancel);
-    f7.dialog.create({ title, text: ct('用通行密鑰確認這個動作。'), buttons: [
-      { text: ct('改用密碼'), onClick: () => byPassword(title, then, text, cancel) },
-      { text: ct('使用通行密鑰'), bold: true, onClick: () => answerPasskeyAgain(o).then((adminPasskey) => then({adminPasskey}), (e) => { if (!cancelled(e)) console.warn('passkey:', e?.message); byPassword(title, then, text, cancel); }) },
-    ] }).open();
-  });
+export function adminAgain(title, then, text = ct('請輸入你自己的密碼確認。'), cancel = () => {}) {
+  byPassword(title, then, text, cancel);
 }
 function byPassword(title, then, text, cancel) {
   f7.dialog.password(text, title, (adminPassword) => {
@@ -32,8 +19,8 @@ export const adminProblem = (err) => (err.code === 'NEED_CODE' ? ct('你的帳�
 // Asked first without: where the server answers NEED_PASSWORD (it widens something),
 // the password (and code) is asked for and the call made again with it. Resolves to
 // the call's answer, or null when the admin cancelled.
-export async function withAdminAgain(title, call, text, options) {
+export async function withAdminAgain(title, call, text) {
   try { return await call({}); } catch (e) { if (e.code !== 'NEED_PASSWORD') throw e; }
-  const again = await new Promise((done) => adminAgain(title, done, text, () => done(null), options));
+  const again = await new Promise((done) => adminAgain(title, done, text, () => done(null)));
   return again ? call(again) : null;
 }

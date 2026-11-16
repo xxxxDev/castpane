@@ -94,13 +94,16 @@ function publicLifecycleUser(user) {
   };
 }
 
-// The server itself, as the one deleting: authController.removeMembers removes at
-// start the member accounts (one account). Only
-// this object, by reference, is taken, and only for a delete: a request's principal is
-// always a user (trustedPrincipal.js) and an object of the same shape is refused.
+// The server itself, as the one deleting (one account): authController.removeMembers
+// removes the member accounts at start ('not-an-admin'), and authController.keepOneAccount
+// every account but the one the person at the Mac keeps ('one-account'). Only this object,
+// by reference, is taken, only for a delete and only with one of those reasons: a
+// request's principal is always a user (trustedPrincipal.js) and an object of the same
+// shape is refused.
 const SYSTEM_ACTOR = Object.freeze({
   type: 'system', id: 'castpane', username: 'castpane', name: 'Castpane', role: 'system',
 });
+const SYSTEM_DELETE_REASONS = Object.freeze(['not-an-admin', 'one-account']);
 
 function actorSnapshot(actor) {
   return {
@@ -146,9 +149,9 @@ function createUserLifecycleService({
     return user;
   }
 
-  function validateActor(input, action) {
+  function validateActor(input, action, reason) {
     if (input === SYSTEM_ACTOR) {
-      if (action !== 'delete') throw lifecycleError(403, 'FORBIDDEN', 'Only an admin can change user lifecycle');
+      if (action !== 'delete' || !SYSTEM_DELETE_REASONS.includes(reason)) throw lifecycleError(403, 'FORBIDDEN', 'Only an admin can change user lifecycle');
       return SYSTEM_ACTOR;
     }
     const actor = normalizeTrustedPrincipal(input);
@@ -412,7 +415,7 @@ function createUserLifecycleService({
     const transition = await beginTransition({ userId, action, actor, reason, timestamp });
     // A journal row this service wrote for the system delete names it as the actor.
     const durableActor = transition.actor?.type === 'system'
-      ? validateActor(SYSTEM_ACTOR, transition.action)
+      ? validateActor(SYSTEM_ACTOR, transition.action, transition.reason)
       : validateActor({ type: 'user', ...transition.actor }, transition.action);
     const durableReason = transition.reason;
     const durableTimestamp = transition.startedAt;
@@ -443,7 +446,7 @@ function createUserLifecycleService({
   }
 
   async function run(action, { targetUserId, actor: actorInput, reason: reasonInput }) {
-    const actor = validateActor(actorInput, action);
+    const actor = validateActor(actorInput, action, reasonInput);
     const userId = String(targetUserId || '');
     if (!userId) throw lifecycleError(400, 'USER_ID_INVALID', 'User id is required');
     if (actor.id === userId && ['disable', 'delete'].includes(action)) {
@@ -503,6 +506,7 @@ module.exports = {
   LIFECYCLE_STATUS,
   LIFECYCLE_SCHEMA_VERSION,
   SYSTEM_ACTOR,
+  SYSTEM_DELETE_REASONS,
   normalizeUsername,
   effectiveLifecycleStatus,
   isActiveUser,

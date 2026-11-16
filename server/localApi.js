@@ -1,6 +1,6 @@
 // The app ⇄ server channel (docs/protocol.md): Castpane.app asks the
-// server how it is doing, makes the first admin, reads recent activity and ends the
-// current viewer. It answers only a request made on this Mac to 127.0.0.1 (or ::1),
+// server how it is doing, makes the first admin, keeps the one account (the others are
+// deleted), reads recent activity and ends the current viewer. It answers only a request made on this Mac to 127.0.0.1 (or ::1),
 // named by its loopback address, that carries `Authorization: Bearer <local.token>`.
 //
 // Requests a tunnel or a proxy forwards also reach the server from loopback: cloudflared
@@ -14,7 +14,7 @@ const crypto = require('node:crypto');
 const express = require('express');
 const { isLoopback } = require('./services/clientIp');
 const { AUDIT_LOG } = require('./services/audit');
-const { activeUserQuery } = require('./services/userLifecycle');
+const { activeUserQuery, normalizeUsername } = require('./services/userLifecycle');
 
 const FORWARDED = ['cf-connecting-ip', 'cf-ray', 'cdn-loop', 'cf-ipcountry', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'forwarded', 'x-real-ip', 'tailscale-user-login', 'origin', 'cookie'];
 const sameToken = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
@@ -41,7 +41,8 @@ function ensureLocalToken(home) {
 }
 
 // The latest remote opens and ends, clipboard reads and writes, sign-ins and accounts the
-// server removed (not an administrator, authController.removeMembers), newest first, from the end of the
+// server removed (reason 'not-an-admin', authController.removeMembers, or 'one-account',
+// keepOneAccount), newest first, from the end of the
 // audit log (the last 2 MB of it: a week's log is rotated away by logRotation.js).
 function readActivity({ limit = 50, file = AUDIT_LOG } = {}) {
   let text = '';
@@ -73,10 +74,77 @@ function readActivity({ limit = 50, file = AUDIT_LOG } = {}) {
   return out;
 }
 
+// The name the setup assistant gave the first administrator: the newest
+// {source:'users', action:'first-admin'} line (authController.createFirstAdmin), from the
+// audit log and then its rotated segments (services/logRotation.js: archive/<name>-<stamp>.log
+// beside it, kept a year), newest first. At most SCAN_MAX bytes are read; null when none
+// is found. Only lines whose text holds the action's name are parsed. Links and anything
+// not a regular file are not read.
+const FIRST_ADMIN = Buffer.from('"first-admin"');
+const SCAN_MAX = 512 * 1024 * 1024, CHUNK = 1024 * 1024, LINE_MAX = 64 * 1024;
+const NOFOLLOW = fs.constants.O_NOFOLLOW || 0;
+function firstAdminOf(line) {
+  let e; try { e = JSON.parse(line.toString('utf8')); } catch { return null; }
+  return e && e.source === 'users' && e.action === 'first-admin' && typeof e.username === 'string' && e.username ? e.username : null;
+}
+async function lastFirstAdminIn(file, budget) {
+  let fh;
+  try { fh = await fs.promises.open(file, fs.constants.O_RDONLY | NOFOLLOW); } catch { return { name: null, read: 0 }; }
+  let found = null, read = 0;
+  try {
+    if (!(await fh.stat()).isFile()) return { name: null, read: 0 };
+    const chunk = Buffer.alloc(CHUNK);
+    let carry = Buffer.alloc(0), skipping = false;
+    while (read < budget) {
+      const { bytesRead } = await fh.read(chunk, 0, Math.min(CHUNK, budget - read), null);
+      if (!bytesRead) break;
+      read += bytesRead;
+      let buf = Buffer.concat([carry, chunk.subarray(0, bytesRead)]);
+      // The rest of a line too long to be one of these is passed over.
+      if (skipping) { const nl = buf.indexOf(10); if (nl === -1) { carry = Buffer.alloc(0); continue; } buf = buf.subarray(nl + 1); skipping = false; }
+      const end = buf.lastIndexOf(10) + 1;
+      for (let at = buf.indexOf(FIRST_ADMIN); at !== -1 && at < end; at = buf.indexOf(FIRST_ADMIN, at + 1)) {
+        const from = buf.lastIndexOf(10, at) + 1, to = buf.indexOf(10, at);
+        found = firstAdminOf(buf.subarray(from, to)) || found;
+        at = to;
+      }
+      carry = Buffer.from(buf.subarray(end));
+      if (carry.length > LINE_MAX) { carry = Buffer.alloc(0); skipping = true; }
+    }
+    if (!skipping && carry.length && carry.includes(FIRST_ADMIN)) found = firstAdminOf(carry) || found;
+  } finally { await fh.close().catch(() => {}); }
+  return { name: found, read };
+}
+async function findWizardName({ file = AUDIT_LOG, budget = SCAN_MAX } = {}) {
+  const files = [file];
+  const archive = path.join(path.dirname(file), 'archive'), base = path.basename(file, path.extname(file));
+  try {
+    const dir = await fs.promises.lstat(archive);
+    if (dir.isDirectory() && !dir.isSymbolicLink()) {
+      const segments = [];
+      for (const name of await fs.promises.readdir(archive)) {
+        if (!name.startsWith(`${base}-`) || !name.endsWith('.log')) continue;
+        const full = path.join(archive, name);
+        try { const st = await fs.promises.lstat(full); if (st.isFile()) segments.push({ full, name, at: st.mtimeMs }); } catch { /* gone meanwhile */ }
+      }
+      segments.sort((a, b) => b.at - a.at || b.name.localeCompare(a.name));
+      files.push(...segments.map((x) => x.full));
+    }
+  } catch { /* no archive yet */ }
+  let left = budget;
+  for (const f of files) {
+    if (left <= 0) break;
+    const { name, read } = await lastFirstAdminIn(f, left);
+    if (name) return name;
+    left -= read;
+  }
+  return null;
+}
+
 // home: CASTPANE_HOME. remote: what installRemote returned (viewer, endViewer).
 // sessionCount(): live sign-ins. version: this server's version.
 // memberLink: this Mac's link to another Mac it joined (server/memberLink.js).
-function createLocalRoutes({ home, remote, version, memberLink = null, auth = require('./controllers/authController'), usersDB = require('./stores').usersDB, sessionsDB = require('./stores').sessionsDB, publicOrigin = () => require('./siteConfig').publicOrigin(), loopbackHosts = () => require('./siteConfig').loopbackPorts().flatMap((p) => [`127.0.0.1:${p}`, `localhost:${p}`]), activity = readActivity }) {
+function createLocalRoutes({ home, remote, version, memberLink = null, auth = require('./controllers/authController'), usersDB = require('./stores').usersDB, sessionsDB = require('./stores').sessionsDB, publicOrigin = () => require('./siteConfig').publicOrigin(), loopbackHosts = () => require('./siteConfig').loopbackPorts().flatMap((p) => [`127.0.0.1:${p}`, `localhost:${p}`]), activity = readActivity, wizardName = findWizardName }) {
   const token = () => ensureLocalToken(home);
   const router = express.Router();
   router.use((req, res, next) => {
@@ -102,6 +170,28 @@ function createLocalRoutes({ home, remote, version, memberLink = null, auth = re
     try { res.status(201).json({ user: await auth.createFirstAdmin(req.body || {}) }); }
     catch (e) { res.status(e.status || 500).json({ message: e.status ? e.message : 'Error', ...(e.code ? { code: e.code } : {}) }); }
   });
+  // One account (docs/protocol.md): the active administrators to choose from, when there
+  // is more than one (status.admins), and the choice. wizard marks the one the setup
+  // assistant made, when the audit log still says which (findWizardName); never a hash or
+  // a secret.
+  const sayError = (res, e) => res.status(e.status || 500).json({ message: e.status ? e.message : 'Error', ...(e.code ? { code: e.code } : {}) });
+  router.get('/accounts', async (req, res) => {
+    try {
+      const [admins, wizard] = await Promise.all([auth.activeAdmins(), wizardName().catch(() => null)]);
+      const key = (v) => { try { return normalizeUsername(v); } catch { return null; } };
+      const wanted = wizard ? key(wizard) : null;
+      // Only a name that is one account's: two that fold the same mark neither.
+      const matching = wanted ? admins.filter((a) => key(a.username) === wanted) : [];
+      // The setup assistant marks its account (madeBySetup) from this version; for one made
+      // before, its audit line, as above.
+      const marked = admins.filter((a) => a.madeBySetup);
+      res.json({ accounts: admins.map((a) => ({ id: a.id, username: a.username, name: a.name, wizard: marked.length ? marked.length === 1 && marked[0] === a : matching.length === 1 && matching[0] === a })) });
+    } catch (e) { console.error('local accounts:', e.message); sayError(res, e); }
+  });
+  router.post('/accounts/keep', async (req, res) => {
+    try { res.json(await auth.keepOneAccount(req.body?.id)); }
+    catch (e) { if (!e.status) console.error('keep account:', e.message); sayError(res, e); }
+  });
   router.get('/activity', (req, res) => {
     const n = Number(req.query.limit);
     res.json({ items: activity({ limit: Number.isInteger(n) && n > 0 ? Math.min(n, 200) : 50 }) });
@@ -122,4 +212,4 @@ function createLocalRoutes({ home, remote, version, memberLink = null, auth = re
   return router;
 }
 
-module.exports = { createLocalRoutes, ensureLocalToken, readActivity };
+module.exports = { createLocalRoutes, ensureLocalToken, readActivity, findWizardName };

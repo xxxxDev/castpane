@@ -36,6 +36,7 @@ final class AppModel: ObservableObject {
     private var permissionPoll: Timer?
     private var booted = false
     private var wizardOffered = false
+    private var keepOffered = false
 
     var address: String { config.address }
     var paused: Bool { config.paused }
@@ -167,6 +168,12 @@ final class AppModel: ObservableObject {
             if let s, s.users == 0, !self.wizardOffered, !UserDefaults.standard.bool(forKey: Wizard.doneKey) {
                 self.wizardOffered = true
                 Windows.shared.showWizard(self)
+            }
+            // Castpane keeps one account: with more than one admin account left from an
+            // earlier version, the person at this Mac picks the one to keep, once per launch.
+            if let s, s.admins > 1, !self.keepOffered {
+                self.keepOffered = true
+                Windows.shared.showKeepAccount(self)
             }
         }
     }

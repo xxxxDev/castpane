@@ -15,12 +15,12 @@ what protects that, where the secrets are, and what Castpane cannot stop.
 - **Accounts left from an earlier version,** which allowed several: a member account is deleted
   by the server when it starts, and the Activity tab says so; only while an admin account is
   active, so a database cut short or edited by hand is left alone (and logged). A delete stopped
-  part-way is finished at the next start. An admin account is kept, as the
-  server cannot tell which one is yours; it still signs in and can open Remote (a disabled one
-  does not). Settings lists them under a warning, the Mac app's Account tab counts them, and Settings deletes them (each delete asks for your
-  password, or passkey, again). Delete them soon: a leftover admin
-  account sees yours as the other one, and can delete it just the same. A deleted account stays as
-  a record that signs nothing in and keeps its name taken.
+  part-way is finished at the next start. With more than one admin
+  account, the server cannot tell which is yours: the Mac app asks, at the Mac, which one to keep
+  (the setup assistant's is chosen first when the audit log still says which it was), and
+  deletes every other over the app's channel. Until then they sign in and can open Remote.
+  Nothing on the web lists or deletes accounts. A deleted account stays as a record that signs
+  nothing in and keeps its name taken.
   The account may trust a device (**Settings › This device › Trust this device**, which asks again
   once): from it, a pass is given with no password or passkey for 30, 60, 90 or 180 days (set
   in **Settings › Trusted devices**, and a shorter setting counts at once) from its last use. The device keeps an HttpOnly, SameSite=Strict

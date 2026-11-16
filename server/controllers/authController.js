@@ -9,7 +9,6 @@ const passkeys = require('../services/passkeys');
 const { audit } = require('../services/audit');
 const { resolveClientIp, isLoopback, trustsCloudflare } = require('../services/clientIp');
 const { security, accountKey } = require('../services/securityLog');
-const { resolveLivePrincipal } = require('../services/livePrincipal');
 const { hashSessionToken } = require('../services/sessionTokens');
 const { compactQuietly } = require('../services/compactQuietly');
 const { isHttpsRequest, isPasskeyOrigin } = require('../middlewares/requestGuards');
@@ -20,6 +19,7 @@ const trustedDevices = () => TRUST.sharedTrustedDevices();
 const {
   LIFECYCLE_STATUS,
   SYSTEM_ACTOR,
+  SYSTEM_DELETE_REASONS,
   effectiveLifecycleStatus,
   isActiveUser,
   normalizeUsername,
@@ -34,7 +34,6 @@ const {
 // to re-login; 15 idle days logs them out. All knobs are env-overridable.
 const IDLE_SECONDS = Number(process.env.SESSION_IDLE_DAYS || 15) * 24 * 60 * 60;
 const TOKEN_TTL_SECONDS = Number(process.env.SESSION_MAX_DAYS || 400) * 24 * 60 * 60;
-const ONLINE_WINDOW_MS = Number(process.env.ONLINE_WINDOW_MINUTES || 5) * 60 * 1000;
 const SLIDE_THROTTLE_MS = 60 * 1000; // rewrite lastSeen / slide expiresAt at most once per 60s per user
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -222,15 +221,6 @@ let injectedLifecycleService = null;
 function lifecycleService() {
   return injectedLifecycleService
     || require('../services/userLifecycle').getDefaultUserLifecycleService();
-}
-
-function sendLifecycleError(res, error, extra = {}) {
-  res.status(error.status || 500).json({
-    message: error.message,
-    code: error.code || 'USER_LIFECYCLE_FAILED',
-    details: error.details,
-    ...extra,
-  });
 }
 
 const COOKIE_OPTS = {
@@ -683,9 +673,10 @@ exports._passkeyChallenges = passkeyChallenges;
 // owner (UV), the key is this admin's own, and the challenge came from a pool of its
 // own, so a login page's challenge is never accepted here.
 const againChallenges = passkeys.createChallenges();
-// purpose: 'remote' (opening Remote, trusting a device for it) or 'admin' (account
-// management). A challenge answers only an action of its own purpose.
-const AGAIN_PURPOSES = new Set(['remote', 'admin']);
+// purpose: 'remote' (opening Remote, trusting a device for it), the one kind left since
+// accounts are no longer managed from the web (one account). A challenge answers only an
+// action of its own purpose.
+const AGAIN_PURPOSES = new Set(['remote']);
 exports.adminPasskeyStart = async (req, purpose) => {
   if (!AGAIN_PURPOSES.has(purpose)) throw new Error(`unknown purpose ${purpose}`);
   const me = await activeAccount(req.userId);
@@ -718,15 +709,6 @@ exports.adminPasskeyAgain = async (req, res, body = {}, purpose) => {
     throw e;
   }
   return me;
-};
-// POST /api/auth/passkey/again: a challenge for the signed-in admin to confirm one action
-// with a passkey, and which of their keys may answer it. None: the page asks for the
-// password (and code) instead.
-exports.passkeyAgain = async (req, res) => {
-  try {
-    if (req.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
-    res.json((await exports.adminPasskeyStart(req, 'admin')) || { challenge: null, allow: [] });
-  } catch (e) { sendPasskeyError(res, e); }
 };
 exports._applySignInRescue = applySignInRescue;
 
@@ -922,32 +904,16 @@ exports.changePassword = (req, res) => {
   });
 };
 
-// --- admin user management ---
-
-exports.listUsers = (req, res) => {
-  usersDB.find({}, (err, users) => {
-    if (err) return res.status(500).json({ message: 'Error reading users' });
-    const now = Date.now();
-    // By name, then id: the same order every time.
-    const key = (u) => String(u.username || '').toLowerCase();
-    const ordered = [...users].sort((a, b) => key(a).localeCompare(key(b)) || String(a._id).localeCompare(String(b._id)));
-    res.json({
-      users: ordered.map((u) => ({
-        ...publicUser(u),
-        lastSeen: u.lastSeen || null,
-        online: Boolean(isActiveUser(u) && u.lastSeen && now - u.lastSeen < ONLINE_WINDOW_MS),
-      })),
-    });
-  });
-};
+// --- asking an admin again ---
 
 // The acting admin's own password again, and the two-step code when theirs is on, or a
-// passkey: for deleting an account (deleteUser) and for Remote (server/remote.js). A
-// session alone must not be enough for either.
-// how: what is confirmed ('delete', or Remote's own), written to the audit line.
-// purpose: the kind of action ('admin' for account management, 'remote' for Remote), which
-// a passkey's challenge must have been issued for.
-async function adminAgain(req, res, how, target, { purpose = 'admin' } = {}) {
+// passkey: for Remote (server/remote.js, opening it and trusting a device for it). A
+// session alone must not be enough. (Deleting an account, the other action that asked,
+// went with the web's account management: one account, kept from the Mac, localApi.js.)
+// how: what is confirmed (Remote's own), written to the audit line.
+// purpose: the kind of action (AGAIN_PURPOSES), which a passkey's challenge must have
+// been issued for; named by every caller, none is assumed.
+async function adminAgain(req, res, how, target, { purpose } = {}) {
   const { adminPassword, adminCode, adminPasskey } = req.body || {};
   // A passkey stands for the password and the code together (adminPasskeyAgain): one
   // challenge, one action, of its own kind.
@@ -961,7 +927,7 @@ async function adminAgain(req, res, how, target, { purpose = 'admin' } = {}) {
       else throw e;
       return false;
     }
-    req.adminGrant = { how, target, me, claimed: null, by: 'passkey' };
+    req.adminGrant = { how, target, me, by: 'passkey' };
     return true;
   }
   if (typeof adminPassword !== 'string' || !adminPassword) { res.status(400).json({ message: 'Enter your own password to do this', code: 'NEED_PASSWORD' }); return false; }
@@ -978,82 +944,49 @@ async function adminAgain(req, res, how, target, { purpose = 'admin' } = {}) {
     if (codesFrozen(me, adminCode)) { res.status(429).json(TOO_MANY); return false; }
     if (codeRefusedToday(me, adminCode)) { sayCodesSpent(req, res, me); return false; }
     // A code is spent as it is looked at, so one code is one action however many
-    // requests carry it at once, here or at any other door that takes one. A
-    // recovery code is given back when the action then does not happen
-    // (adminRefused): a grant that fails on a taken name must not cost one.
+    // requests carry it at once, here or at any other door that takes one. It stays
+    // spent whatever the action then does.
     if (adminCode.length > 40 || !(await passesTwoStep(me, adminCode))) {
       recordLoginFailure(ip, req, me.username, 'wrong-code', 'admin-grant');
       res.status(400).json({ message: 'Invalid code', code: 'WRONG_CODE' }); return false;
     }
   }
-  req.adminGrant = { how, target, me, claimed: me.twoStep && recoveryShaped(adminCode) ? twoStep.hashRecovery(adminCode) : null };
+  req.adminGrant = { how, target, me };
   return true;
 }
-// The administrator was made: the line is written now, not before, so the record
-// shows only grants that happened.
+// The confirmed action is going ahead: the line is written now, not before, so the
+// record shows only confirmations that were used.
 function adminGranted(req, userId) {
   const grant = req.adminGrant;
   if (!grant) return;
   req.adminGrant = null;
-  audit({ source: 'users', action: grant.how === 'create' || grant.how === 'promote' ? 'admin-grant' : 'admin-again', how: grant.how, by: req.username, with: grant.by || 'password', target: String(userId || grant.target) });
+  audit({ source: 'users', action: 'admin-again', how: grant.how, by: req.username, with: grant.by || 'password', target: String(userId || grant.target) });
 }
 // It may have happened: a store write reported as failed can have been made all the
 // same (NeDB changes its rows in memory before it saves them), or the action stopped
 // part-way. The confirmation counts as used and its code stays spent; no line is
-// written, since the record shows only what is known to have happened. A code is
-// given back only when the action certainly did not happen.
+// written, since the record shows only what is known to have happened.
 function adminKept(req) { req.adminGrant = null; }
 // A recovery code that was claimed for something that then did not happen goes back,
 // to the two-step it came from and no other (one turned off or set up anew meanwhile
-// has other codes).
+// has other codes): a password change that was not made (changePassword).
 const giveRecoveryBack = (user, hash) => (!hash || !user?.twoStep?.secret ? Promise.resolve()
   : updateUser({ _id: user._id, 'twoStep.secret': user.twoStep.secret }, { $addToSet: { 'twoStep.recovery': hash } }).then(() => {}, (e) => console.error('recovery code not given back:', e.message)));
-// The handler answered with its confirmation unused: the code it claimed goes back.
-function adminRefused(req) {
-  const grant = req.adminGrant;
-  req.adminGrant = null;
-  return giveRecoveryBack(grant?.me, grant?.claimed);
-}
-// What an administrator does to accounts (now only deleting one left from before) is
-// done one request at a time, each reading the account as the one before left it.
-// The turn ends when the handler itself answers, not when the connection closes: a
-// client that goes away must neither free the turn under a handler still at work
-// nor get its code back for an action that then happens. One that never answers
-// gives way after a minute, and keeps what it claimed. Who is acting is read again
-// when the turn comes: an administrator demoted, disabled or signed out while
-// waiting does nothing more.
-let adminTurn = Promise.resolve(), adminWaiting = 0;
-const ADMIN_TURN_MS = 60_000, ADMIN_WAITING_MAX = 40;
-const inTurn = (handler) => (req, res) => {
-  if (adminWaiting >= ADMIN_WAITING_MAX) return res.status(429).json(TOO_MANY);
-  adminWaiting += 1;
-  adminTurn = adminTurn.catch(() => {}).then(() => new Promise((done) => {
-    let over = false;
-    const free = () => { if (over) return false; over = true; clearTimeout(timer); adminWaiting -= 1; return true; };
-    const timer = setTimeout(() => { if (free()) done(); }, ADMIN_TURN_MS);
-    timer.unref?.();
-    // Given back only on an answer that says it did not happen.
-    const answered = () => { if (free()) (res.statusCode >= 400 ? adminRefused(req) : Promise.resolve()).then(done, done); };
-    for (const m of ['json', 'send', 'end']) if (typeof res[m] === 'function') { const say = res[m]; res[m] = function (...a) { try { return say.apply(this, a); } finally { answered(); } }; }
-    Promise.resolve().then(async () => {
-      // Nobody is there to answer: nothing is done.
-      if (res.destroyed || res.writableEnded || req.socket?.destroyed) return answered();
-      // A request with no session to read (a test calling the handler) is taken as it came.
-      if (req.sessionToken) {
-        const actor = await resolveLivePrincipal(req.sessionToken, req.userId);
-        if (!actor) return res.status(401).json({ message: 'Invalid or expired session' });
-        if (actor.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
-        req.username = actor.username; req.role = actor.role; req.principal = actor;
-      }
-      return handler(req, res);
-    }).catch((e) => { console.error('admin action:', e.message); try { if (!res.headersSent) res.status(500).json({ message: 'Error' }); } finally { answered(); } });
-  }));
-};
 // Two names that are one name once folded (a Kelvin sign for k, ß for ẞ), or that the
 // security log counts under one key (accountKey), would share its counts while being two
 // accounts.
 const nameFold = (v) => String(v || '').normalize('NFKC').trim().toLowerCase();
 const sameName = (a, b) => nameFold(a) === nameFold(b) || accountKey(a) === accountKey(b);
+
+// What changes which accounts there are is done one at a time, each reading the accounts
+// as the one before left it: the setup assistant's first administrator and the Mac's
+// choice of the one account to keep (server/localApi.js), and the removals at start.
+let accountTurn = Promise.resolve();
+const inAccountTurn = (work) => {
+  const run = accountTurn.catch(() => {}).then(work);
+  accountTurn = run;
+  return run;
+};
 
 // The first administrator, made by Castpane.app's setup wizard (server/localApi.js)
 // while there is no active account: the rule /api/local/status counts by
@@ -1061,32 +994,27 @@ const sameName = (a, b) => nameFold(a) === nameFold(b) || accountKey(a) === acco
 // disabled or deleted by a version that had several do not count. One at a time: a
 // second call while the first is writing finds the first account and is refused like
 // any later one.
-let firstAdminTurn = Promise.resolve();
-exports.createFirstAdmin = ({ username, password } = {}) => {
-  const run = firstAdminTurn.catch(() => {}).then(async () => {
-    const name = typeof username === 'string' ? username.trim() : '';
-    if (!name || typeof password !== 'string') throw Object.assign(new Error('Username and password are required'), { status: 400 });
-    const problem = textProblem(name, USERNAME_MAX_LENGTH, 'Username');
-    if (problem) throw Object.assign(new Error(problem), { status: 400 });
-    if (password.length < MIN_PASSWORD_LENGTH) throw Object.assign(new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`), { status: 400 });
-    if (password.length > 1024) throw Object.assign(new Error('Password is too long'), { status: 400 });
-    const rows = await new Promise((ok, no) => usersDB.find({}, (e, r) => (e ? no(e) : ok(r))));
-    const active = await new Promise((ok, no) => usersDB.count(activeUserQuery(), (e, n) => (e ? no(e) : ok(n))));
-    if (active > 0) throw Object.assign(new Error('An account already exists'), { status: 409, code: 'ALREADY_SET_UP' });
-    // An old account keeps its name (a deleted one too, as its record): sign-in finds
-    // accounts by name, and the security log counts by it.
-    if (rows.some((u) => sameName(u.username, name) || u.normalizedUsername === normalizeUsername(name))) {
-      throw Object.assign(new Error('This name is taken by an old account kept from an earlier version. Choose another name.'), { status: 409, code: 'NAME_TAKEN_BY_OLD_ACCOUNT' });
-    }
-    const hashed = await bcrypt.hash(password, 10);
-    const user = await new Promise((ok, no) => usersDB.insert({ username: name, normalizedUsername: normalizeUsername(name), password: hashed, role: 'admin', language: 'en', lifecycleStatus: LIFECYCLE_STATUS.ACTIVE, lifecycleSchemaVersion: 1 }, (e, u) => (e ? no(e) : ok(u))));
-    compactQuietly(usersDB, 'users');
-    audit({ source: 'users', action: 'first-admin', username: user.username });
-    return publicUser(user);
-  });
-  firstAdminTurn = run;
-  return run;
-};
+exports.createFirstAdmin = ({ username, password } = {}) => inAccountTurn(async () => {
+  const name = typeof username === 'string' ? username.trim() : '';
+  if (!name || typeof password !== 'string') throw Object.assign(new Error('Username and password are required'), { status: 400 });
+  const problem = textProblem(name, USERNAME_MAX_LENGTH, 'Username');
+  if (problem) throw Object.assign(new Error(problem), { status: 400 });
+  if (password.length < MIN_PASSWORD_LENGTH) throw Object.assign(new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`), { status: 400 });
+  if (password.length > 1024) throw Object.assign(new Error('Password is too long'), { status: 400 });
+  const rows = await new Promise((ok, no) => usersDB.find({}, (e, r) => (e ? no(e) : ok(r))));
+  const active = await new Promise((ok, no) => usersDB.count(activeUserQuery(), (e, n) => (e ? no(e) : ok(n))));
+  if (active > 0) throw Object.assign(new Error('An account already exists'), { status: 409, code: 'ALREADY_SET_UP' });
+  // An old account keeps its name (a deleted one too, as its record): sign-in finds
+  // accounts by name, and the security log counts by it.
+  if (rows.some((u) => sameName(u.username, name) || u.normalizedUsername === normalizeUsername(name))) {
+    throw Object.assign(new Error('This name is taken by an old account kept from an earlier version. Choose another name.'), { status: 409, code: 'NAME_TAKEN_BY_OLD_ACCOUNT' });
+  }
+  const hashed = await bcrypt.hash(password, 10);
+  const user = await new Promise((ok, no) => usersDB.insert({ username: name, normalizedUsername: normalizeUsername(name), password: hashed, role: 'admin', language: 'en', lifecycleStatus: LIFECYCLE_STATUS.ACTIVE, lifecycleSchemaVersion: 1, madeBySetup: true }, (e, u) => (e ? no(e) : ok(u))));
+  compactQuietly(usersDB, 'users');
+  audit({ source: 'users', action: 'first-admin', username: user.username });
+  return publicUser(user);
+});
 
 // What a disabled or deleted account runs stops (server/productAccountHooks.js; nothing
 // in Castpane, whose remote viewer is cut by the relay's own re-check). Only for an
@@ -1106,8 +1034,8 @@ async function stopAgentsIfOff(id) {
   } catch (e) { console.error('account off: its agents not all stopped:', e.message); return { agentsStopUnchecked: true }; }
 }
 
-// What goes with an account once the lifecycle delete has made it a tombstone, for the
-// route below and for removeMembers. A deleted account keeps no login-key phone, nor
+// What goes with an account once the lifecycle delete has made it a tombstone, for
+// removeMembers and keepOneAccount (finishSystemRemovals). A deleted account keeps no login-key phone, nor
 // anything they approved; `left` says they did not all go (they open nothing while the
 // account is off). A delete forgets what the security log holds for the account.
 async function afterDelete(id, username) {
@@ -1118,93 +1046,118 @@ async function afterDelete(id, username) {
   return { left, agentsLeft: await stopAgentsIfOff(id) };
 }
 
-// DELETE /api/auth/users/:id: an account left from a version that had several. Always
-// confirmed with the acting admin's own password (and code when two-step is on) or a
-// passkey, member or administrator alike: a session alone must not be able to remove
-// accounts. What would be refused anyway (one's own account, one not there) is refused
-// before the code is asked for and spent. A deletion wins over a disable or enable left
-// pending by an older version (services/userLifecycle.js), which nothing else can finish.
-exports.deleteUser = inTurn(async (req, res) => {
-  const id = String(req.params.id || '');
-  try {
-    if (id === String(req.userId)) return res.status(400).json({ message: 'You cannot delete your own account', code: 'USER_LIFECYCLE_SELF_ACTION' });
-    const before = await findUser({ _id: id });
-    if (!before) return res.status(404).json({ message: 'User not found', code: 'USER_NOT_FOUND' });
-    if (!(await adminAgain(req, res, 'delete', id))) return;
-    const result = await lifecycleService().deleteUser({
-      targetUserId: id,
-      actor: req.principal,
-      reason: req.body?.reason,
-    });
-    adminGranted(req, id);
-    const { left, agentsLeft } = await afterDelete(id, before.username);
-    if (left) return res.status(500).json({ message: 'User deleted, but its passkeys or bound phones could not all be removed. Delete it again to remove them.', code: 'CREDENTIAL_CLEANUP_INCOMPLETE', ...result, ...agentsLeft });
-    res.json({ message: 'User deleted', ...result, ...agentsLeft });
-  } catch (error) {
-    // Stopped part-way, the account is already changed: the confirmation was used,
-    // its code stays spent and the line is written.
-    let agentsLeft = {};
-    if (error?.code === 'USER_LIFECYCLE_PARTIAL') { adminGranted(req, id); agentsLeft = await stopAgentsIfOff(id); }
-    // Any other failure that is not a refusal (a 4xx said before anything was written)
-    // may have written something, a pending transition among it: the code stays spent.
-    else if (!(error?.status >= 400 && error.status < 500)) adminKept(req);
-    sendLifecycleError(res, error, agentsLeft);
-  }
-});
-
-// One account: a member account (role 'user') left from a version that had several is
-// deleted by the server itself at start (server/start.js), through the same delete as the
-// route, by SYSTEM_ACTOR (services/userLifecycle.js). Disabled ones and ones with a
-// disable or enable left pending go too. Only while an administrator is active, with
-// nothing pending: with none, the accounts are not what Castpane makes (a database cut
-// short, restored or edited by hand) and nothing is deleted; it is logged instead.
-// Administrators stay (Settings lists the others, with a delete by hand). A removal
-// stopped before its clean-up or its audit line, or with a clean-up left undone, is
-// finished at the next start: the tombstone keeps systemRemoval until it is clean. Each
-// removal is one audit line, which the Mac app's Activity shows (localApi.js, kind
-// account-removed). Nothing here throws.
+// One account. A member account (role 'user') left from a version that had several is
+// deleted by the server itself at start (server/start.js, removeMembers); every account
+// but the one administrator the person at the Mac keeps is deleted when they choose it
+// (keepOneAccount, localApi.js). Both delete by SYSTEM_ACTOR (services/userLifecycle.js),
+// with their own reason ('not-an-admin', 'one-account'). Disabled ones and ones with a
+// disable or enable left pending go too. A removal stopped before its clean-up or its
+// audit line, or with a clean-up left undone, is finished at the next start: the
+// tombstone keeps systemRemoval until it is clean, and a system delete left pending is
+// run again. Each removal is one audit line, which the Mac app's Activity shows
+// (localApi.js, kind account-removed, with its reason). Nothing here throws but the
+// refusal of an account to keep that is not an active administrator.
 const usersNow = () => new Promise((ok, no) => usersDB.find({}, (e, r) => (e ? no(e) : ok(r))));
+const pendingNow = () => new Promise((ok, no) => userLifecycleTransitionsDB.find({ status: 'pending' }, (e, r) => (e ? no(e) : ok(r))));
 const markRemoval = (id, mark) => new Promise((ok, no) => usersDB.update({ _id: id }, { $set: { systemRemoval: mark } }, {}, (e) => (e ? no(e) : ok())));
-exports.removeMembers = async () => {
+const isTombstone = (u) => u.lifecycleStatus === LIFECYCLE_STATUS.DELETED_TOMBSTONE;
+// A tombstone written before the reason was kept with it is a member's.
+const removalReason = (u) => (SYSTEM_DELETE_REASONS.includes(u.deletionReason) ? u.deletionReason : 'not-an-admin');
+
+async function systemDelete(id, reason, failed) {
+  try { await lifecycleService().deleteUser({ targetUserId: id, actor: SYSTEM_ACTOR, reason }); return true; }
+  catch (e) {
+    if (e?.code === 'USER_LIFECYCLE_PARTIAL') await stopAgentsIfOff(id);
+    console.error(`account ${id} not removed (tried again at the next start):`, e?.code || '', e?.message);
+    failed.push({ id, error: e?.code || e?.message });
+    return false;
+  }
+}
+
+// Every tombstone the server deleted that is not yet clean, of those `only` takes: the
+// rest of the removal (afterDelete), its audit line once, and the mark.
+async function finishSystemRemovals(only = () => true) {
   const removed = [], failed = [];
   let rows;
-  try { rows = await usersNow(); }
-  catch (e) { console.error('members not removed (tried again at the next start):', e.message); return { removed, failed: [{ error: e.message }], skipped: false }; }
-  let adminActive = false;
-  for (const u of rows) if (u.role === 'admin' && await activeAccount(String(u._id)).catch(() => null)) { adminActive = true; break; }
-  const members = rows.filter((u) => u.role === 'user' && u.lifecycleStatus !== LIFECYCLE_STATUS.DELETED_TOMBSTONE);
-  if (members.length && !adminActive) {
-    console.error(`${members.length} member account(s) not removed: no administrator is active, so the accounts are not as Castpane leaves them`);
-    audit({ source: 'users', action: 'members-kept', count: members.length, reason: 'no-active-admin', by: SYSTEM_ACTOR.id });
-    return { removed, failed, skipped: true };
-  }
-  for (const u of members) {
-    const id = String(u._id);
-    try { await lifecycleService().deleteUser({ targetUserId: id, actor: SYSTEM_ACTOR, reason: 'not-an-admin' }); }
-    catch (e) {
-      if (e?.code === 'USER_LIFECYCLE_PARTIAL') await stopAgentsIfOff(id);
-      console.error(`member ${id} not removed (tried again at the next start):`, e?.code || '', e?.message);
-      failed.push({ id, error: e?.code || e?.message });
-    }
-  }
-  // Every tombstone this deleted that is not yet clean: those just made, and those an
-  // earlier start left part-way.
-  try { rows = await usersNow(); } catch (e) { console.error('removals not finished (tried again at the next start):', e.message); return { removed, failed, skipped: false }; }
+  try { rows = await usersNow(); } catch (e) { console.error('removals not finished (tried again at the next start):', e.message); return { removed, failed: [{ error: e.message }] }; }
   for (const u of rows) {
-    if (u.lifecycleStatus !== LIFECYCLE_STATUS.DELETED_TOMBSTONE || u.deletedBy?.type !== 'system' || u.systemRemoval?.clean) continue;
+    if (!isTombstone(u) || u.deletedBy?.type !== 'system' || u.systemRemoval?.clean || !only(u)) continue;
     const id = String(u._id);
     try {
       const { left } = await afterDelete(id, u.username);
-      if (!u.systemRemoval?.logged) audit({ source: 'users', action: 'account-removed', username: u.username, target: id, reason: 'not-an-admin', by: SYSTEM_ACTOR.id, ...(left ? { cleanupIncomplete: true } : {}) });
+      if (!u.systemRemoval?.logged) audit({ source: 'users', action: 'account-removed', username: u.username, target: id, reason: removalReason(u), by: SYSTEM_ACTOR.id, ...(left ? { cleanupIncomplete: true } : {}) });
       await markRemoval(id, { logged: true, clean: !left });
       if (left) failed.push({ id, error: 'CREDENTIAL_CLEANUP_INCOMPLETE' }); else removed.push(id);
     } catch (e) {
-      console.error(`member ${id} removal not finished (tried again at the next start):`, e?.message);
+      console.error(`account ${id} removal not finished (tried again at the next start):`, e?.message);
       failed.push({ id, error: e?.message });
     }
   }
-  return { removed, failed, skipped: false };
+  return { removed, failed };
+}
+
+// At start. Only while an administrator is active, with nothing pending: with none, the
+// accounts are not what Castpane leaves (a database cut short, restored or edited by
+// hand) and nothing is deleted; it is logged instead. Administrators stay unless a
+// keepOneAccount left their delete pending, which is run again here.
+exports.removeMembers = () => inAccountTurn(async () => {
+  const failed = [];
+  let rows, pending;
+  try { [rows, pending] = await Promise.all([usersNow(), pendingNow()]); }
+  catch (e) { console.error('members not removed (tried again at the next start):', e.message); return { removed: [], failed: [{ error: e.message }], skipped: false }; }
+  let adminActive = false;
+  for (const u of rows) if (u.role === 'admin' && await activeAccount(String(u._id)).catch(() => null)) { adminActive = true; break; }
+  const targets = new Map();
+  for (const u of rows) if (u.role === 'user' && !isTombstone(u)) targets.set(String(u._id), 'not-an-admin');
+  // A system delete stopped part-way (a tombstone too: its journal row is then closed).
+  for (const t of pending) {
+    if (t.action === 'delete' && t.actor?.type === 'system' && SYSTEM_DELETE_REASONS.includes(t.reason)) targets.set(String(t.userId), t.reason);
+  }
+  if (targets.size && !adminActive) {
+    console.error(`${targets.size} account(s) not removed: no administrator is active, so the accounts are not as Castpane leaves them`);
+    audit({ source: 'users', action: 'members-kept', count: targets.size, reason: 'no-active-admin', by: SYSTEM_ACTOR.id });
+    return { removed: [], failed, skipped: true };
+  }
+  for (const [id, reason] of targets) await systemDelete(id, reason, failed);
+  // Every tombstone the server deleted that is not yet clean: those just made, and those
+  // an earlier start or keep left part-way.
+  const done = await finishSystemRemovals();
+  return { removed: done.removed, failed: [...failed, ...done.failed], skipped: false };
+});
+
+// The administrators the person at the Mac can choose from (localApi.js, GET
+// /api/local/accounts): active, with nothing pending (activeAccount), by name. Only the
+// id and the names.
+exports.activeAdmins = async () => {
+  const [rows, pending] = await Promise.all([usersNow(), pendingNow()]);
+  const busy = new Set(pending.map((t) => String(t.userId)));
+  const key = (u) => String(u.username || '').toLowerCase();
+  return rows
+    .filter((u) => u.role === 'admin' && isActiveUser(u) && !busy.has(String(u._id)))
+    .sort((a, b) => key(a).localeCompare(key(b)) || String(a._id).localeCompare(String(b._id)))
+    .map((u) => ({ id: String(u._id), username: u.username, name: u.name || u.username, madeBySetup: u.madeBySetup === true }));
 };
+
+// POST /api/local/accounts/keep (localApi.js): the person at the Mac keeps one active
+// administrator and every other account goes, whatever its role or state; a tombstone
+// is already gone. In the account turn, so two keeps (or a keep and the setup assistant)
+// never interleave. Said again, it deletes nothing more and finishes what an earlier
+// one left part-way. The kept account's sign-ins are untouched; the others' end with
+// their delete (services/userLifecycle.js removes their sessions).
+const KEEP_ID_MAX = 128;
+exports.keepOneAccount = (id) => inAccountTurn(async () => {
+  const keep = typeof id === 'string' && id.length <= KEEP_ID_MAX ? id : '';
+  const kept = keep ? await activeAccount(keep) : null;
+  if (!kept || kept.role !== 'admin') throw Object.assign(new Error('Choose an active administrator account to keep'), { status: 400, code: 'NOT_AN_ACTIVE_ADMIN' });
+  const failed = [];
+  const targets = (await usersNow()).filter((u) => String(u._id) !== keep && !isTombstone(u)).map((u) => String(u._id));
+  if (targets.length) audit({ source: 'users', action: 'one-account-kept', username: kept.username, target: keep, count: targets.length, by: SYSTEM_ACTOR.id });
+  for (const target of targets) await systemDelete(target, 'one-account', failed);
+  const notDone = new Set(failed.map((f) => f.id));
+  const chosen = new Set(targets);
+  const done = await finishSystemRemovals((u) => !notDone.has(String(u._id)) && (chosen.has(String(u._id)) || u.deletionReason === 'one-account'));
+  return { kept: keep, removed: done.removed, failed: [...failed, ...done.failed] };
+});
 
 exports._setUserLifecycleServiceForTests = (service) => {
   injectedLifecycleService = service || null;

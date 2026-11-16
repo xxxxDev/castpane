@@ -134,8 +134,8 @@ back, with touch modes made for a small screen.
 - **One account, its devices.** One Castpane account, the one you connect with; every
   signed-in device with a way to sign it out, and the devices trusted to skip asking again.
   Coming from a version that allowed several accounts, the server deletes the member accounts
-  when it starts (shown in the Mac app's Activity), and Settings lists any other admin account
-  to delete; back up `~/Library/Application Support/Castpane/data/db` first if you want to keep them.
+  when it starts (shown in the Mac app's Activity), and with more than one admin account the Mac
+  app asks which one to keep and deletes the others; back up `~/Library/Application Support/Castpane/data/db` first if you want to keep them.
 - **An installable app.** Add it to the Home Screen for a full-screen app with notifications.
   It offers each new version as it arrives.
 - **English and Traditional Chinese** in the web app.

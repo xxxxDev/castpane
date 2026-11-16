@@ -456,7 +456,7 @@ async function getPass(fresh = false) {
       if (passkey) { const r = await api('/remote/pass', { method: 'POST', body: JSON.stringify({ passkey }) });sessionSet('castpane-remote-pass', r);return r.pass; }
     } catch (e) { if (!cancelled(e) && e.code !== 'PASSKEY_REFUSED') throw e; }
   }
-  const r = await withAdminAgain(ct('連線到 Mac'), (again) => api('/remote/pass', { method: 'POST', body: JSON.stringify(again) }), ct('請輸入你自己的密碼，開始遠端操作。'), { passkey: false });
+  const r = await withAdminAgain(ct('連線到 Mac'), (again) => api('/remote/pass', { method: 'POST', body: JSON.stringify(again) }), ct('請輸入你自己的密碼，開始遠端操作。'));
   if (!r) return null;
   sessionSet('castpane-remote-pass', r);
   return r.pass;

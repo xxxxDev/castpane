@@ -114,6 +114,10 @@ final class Windows: NSObject, NSWindowDelegate {
         show("wizard", title: "Set up Castpane", size: Wizard.size, bare: true) { Wizard().environmentObject(model) }
     }
 
+    func showKeepAccount(_ model: AppModel) {
+        show("keep-account", title: "One Castpane account", size: NSSize(width: 480, height: 420)) { KeepAccountView().environmentObject(model) }
+    }
+
     func showSettings(_ model: AppModel) {
         show("settings", title: "Castpane Settings", size: SettingsView.size, resizable: true, bare: true) {
             SettingsView().environmentObject(model)
