@@ -17,7 +17,7 @@ export async function trustThisDevice() {
       if (passkey) return await api('/remote/trust', { method: 'POST', body: JSON.stringify({ passkey }) });
     } catch (e) { if (!cancelled(e) && e.code !== 'PASSKEY_REFUSED') throw e; }
   }
-  return withAdminAgain(ct('信任這台裝置'), (again) => api('/remote/trust', { method: 'POST', body: JSON.stringify(again) }), ct('請輸入你自己的密碼，信任這台裝置。'));
+  return withAdminAgain(ct('信任這台裝置'), (again) => api('/remote/trust', { method: 'POST', body: JSON.stringify(again) }), ct('請輸入你自己的密碼，信任這台裝置。'), { passkey: false });
 }
 
 // A pass from this device's trust, or null when it is not trusted (or no longer).

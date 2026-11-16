@@ -9,8 +9,10 @@ import {currentUser} from './auth.js';
 import {passkeyAgainChallenge, answerPasskeyAgain, cancelled} from './passkeys.js';
 
 // With a passkey that may stand for the password, it is asked for first; cancelled or
-// refused, the password (and code) as before.
-export function adminAgain(title, then, text = ct('請輸入你自己的密碼確認。'), cancel = () => {}) {
+// refused, the password (and code) as before. An account action's challenge answers only
+// account actions: Remote asks for its own passkey before this and passes passkey: false.
+export function adminAgain(title, then, text = ct('請輸入你自己的密碼確認。'), cancel = () => {}, { passkey = true } = {}) {
+  if (!passkey) return byPassword(title, then, text, cancel);
   passkeyAgainChallenge().then((o) => {
     if (!o) return byPassword(title, then, text, cancel);
     f7.dialog.create({ title, text: ct('用通行密鑰確認這個動作。'), buttons: [
@@ -30,8 +32,8 @@ export const adminProblem = (err) => (err.code === 'NEED_CODE' ? ct('你的帳�
 // Asked first without: where the server answers NEED_PASSWORD (it widens something),
 // the password (and code) is asked for and the call made again with it. Resolves to
 // the call's answer, or null when the admin cancelled.
-export async function withAdminAgain(title, call, text) {
+export async function withAdminAgain(title, call, text, options) {
   try { return await call({}); } catch (e) { if (e.code !== 'NEED_PASSWORD') throw e; }
-  const again = await new Promise((done) => adminAgain(title, done, text, () => done(null)));
+  const again = await new Promise((done) => adminAgain(title, done, text, () => done(null), options));
   return again ? call(again) : null;
 }
