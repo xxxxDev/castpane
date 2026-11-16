@@ -1290,9 +1290,12 @@ function quitStillOpen() {
 }
 // As the Mac's Force Quit: no question asked, nothing saved. Asked once more here.
 function forceQuit(w) {
+  const on = machine;
   f7.dialog.create({ title: ct('強制結束「{name}」？').replace('{name}', () => w.name), text: ct('它不會先存檔或詢問：沒存的內容、正在跑的指令都會直接中斷。'),
     buttons: [{ text: ct('取消') }, { text: ct('強制結束'), bold: true, color: 'red', onClick: () => {
-      link?.send({ t: 'quit', bundle: w.bundle, force: true });
+      // Only to the Mac it was asked about: the page may have gone to another since.
+      if (machine !== on || !link) return;
+      link.send({ t: 'quit', bundle: w.bundle, force: true });
       const gone = new Set(items.value.filter((x) => x.kind === 'window' && x.bundle === w.bundle).map((x) => x.id));
       items.value = items.value.filter((x) => !gone.has(x.id));
       setTimeout(list, 1500);

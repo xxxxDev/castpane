@@ -447,6 +447,8 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
       host.write(frame(1, Buffer.from(JSON.stringify(clean))));
       // Each use in the log and the Mac's Activity, without its text.
       if (clipboard) audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: principal.username, ...(clean.s ? { chars: clean.s.length } : {}), ...(member ? { member: machine, machine: me.machine } : {}) });
+      // A force quit loses what was not saved: who did it, and to which app, is kept.
+      if (clean.t === 'quit' && clean.force) audit({ source: 'remote', action: 'force-quit', bundle: clean.bundle, username: principal.username, ...(member ? { member: machine, machine: me.machine } : {}) });
     });
     // Still an active admin, still this sign-in, pass not run out.
     timer = setInterval(async () => {

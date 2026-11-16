@@ -114,6 +114,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
       if (!msg || typeof msg !== 'object' || Array.isArray(msg) || !FROM_PAGE.has(msg.t)) return endSession();
       const clean = fromPage(msg);
       if (!clean) continue;
+      if (clean.t === 'quit' && clean.force) audit({ source: 'remote', action: 'force-quit', bundle: clean.bundle, username: s.by, via: config?.hub || '' });
       if (clean.t.startsWith('clipboard-')) {
         if (Date.now() - s.lastClipboard < 1000) { busy(s); continue; }
         s.lastClipboard = Date.now();
