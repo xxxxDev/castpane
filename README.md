@@ -117,7 +117,7 @@ in it may still change. The Remote tab is not affected and stays the whole scree
 </p>
 
 - **The Mac's apps, as a phone's.** On a phone or tablet the Labs tab opens on the apps open
-  on the Mac, one card each, with this Mac's whole screen one button below them.
+  on the Mac, one card each, with this Mac's whole screen one button above them.
 - **Every app.** All apps lists every app on the Mac as Launchpad shows them, with a search
   field; one not running starts, and its window opens as soon as it has one.
 - **Made the device's shape.** Tap an app and its window fills the screen, made the shape of
