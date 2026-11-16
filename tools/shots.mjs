@@ -107,12 +107,5 @@ const shot = async (page, name) => { await page.screenshot({path: path.join(asse
   await shot(page, 'shot-phone-signin.png');
   await context.close();
 }
-{ // Admin: the accounts.
-  const {context, page} = await open({viewport: {width: 390, height: 844}, mobile: true});
-  await page.locator('a.tab-link[data-tab="#view-admin"]').filter({visible: true}).first().click();
-  await page.locator('#view-admin .users-row').filter({visible: true}).first().click(); await page.waitForTimeout(800);
-  await shot(page, 'shot-phone-users.png');
-  await context.close();
-}
 await browser.close();
 stop();
