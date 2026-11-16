@@ -1,6 +1,6 @@
 <template>
-  <!-- The Labs page's home: the apps open on the Mac, one card each (its windows stacked),
-       as a phone's own app switcher. Every app is a button away, as Launchpad shows them;
+  <!-- The Labs page's home: the apps open on the Mac, one card each (its windows stacked,
+       their number on it: a tap then asks which one), as a phone's own app switcher. Every app is a button away, as Launchpad shows them;
        the whole screen (the remote desktop) is at the top, in reach without scrolling past
        every app. -->
   <div class="remote-home">
@@ -15,7 +15,7 @@
     <div class="remote-home-title">{{ ct('開著的 App') }}</div>
     <div v-if="!openApps.length" class="remote-home-empty">{{ ct('正在讀取…') }}</div>
     <div class="remote-home-open">
-      <button v-for="o in openApps" :key="o.key" type="button" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.window ? $emit('open', o.window) : $emit('app', o.app)">
+      <button v-for="o in openApps" :key="o.key" type="button" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.count > 1 ? $emit('windows', o.bundle) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
         <span class="remote-home-shot">
           <img v-if="o.window?.thumb" :src="o.window.thumb" alt=""/>
           <img v-else-if="icons[o.bundle]" class="remote-home-shot-icon" :src="icons[o.bundle]" alt=""/>
@@ -54,7 +54,8 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
 const props = defineProps({ name: { type: String, default: '' }, windows: { type: Array, default: () => [] }, apps: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, launching: { type: String, default: '' }, notice: { type: String, default: '' } });
-const emit = defineEmits(['open', 'app', 'desktop', 'leave', 'all', 'cancel']);
+// windows: an app with several windows, whose card asks which one (RemoteWindows.vue).
+const emit = defineEmits(['open', 'app', 'desktop', 'leave', 'all', 'cancel', 'windows']);
 const launchingName = computed(() => props.apps.find((a) => a.bundle === props.launching)?.name || props.windows.find((w) => w.bundle === props.launching)?.app || props.launching);
 // One card an app with a window open, its window used last on top. Apps running with no
 // window (helpers in the background, menu-bar apps) are left to All apps.

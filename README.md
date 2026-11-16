@@ -129,6 +129,10 @@ in it may still change. The Remote tab is not affected and stays the whole scree
 - **Moving between apps as on a phone.** Slide the bar at the bottom sideways for the app
   used before or after, up for the open windows as cards (tap one to open it, slide one up to
   close that window on the Mac), or slide in from the left edge for the home.
+- **Windows, the Dock and quitting.** An app's card with a number on it lists its windows to
+  pick from. Its menu, or a card held down among the cards, puts the window in the Dock,
+  closes it, or quits the app as ⌘Q does (asked first). The handle at the left edge opens
+  the Mac's Dock: its apps, and the windows put in it.
 - **The same keys.** The capsule of keys and the keyboard's round button are there under an
   app as on the Remote tab.
 - **Apps left at their own size.** An app's menu can leave that app at its own size from then

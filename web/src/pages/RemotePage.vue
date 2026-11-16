@@ -85,6 +85,13 @@
           <button type="button" class="remote-btn more" :class="{on: menuOpen}" :title="ct('更多')" @pointerdown.prevent @mousedown.prevent @click="menuOpen = !menuOpen;settingsOpen = false"><f7-icon f7="ellipsis" :size="18"/></button>
         </div>
         <div v-if="menuOpen" ref="menuEl" class="remote-menu" :style="menuMax ? {maxHeight: menuMax + 'px'} : null" @pointerdown.stop>
+          <template v-if="appMode === 'app' && currentWindow">
+            <button v-if="appWindowCount > 1" type="button" class="remote-menu-item other-windows" @click="menuOpen = false;showWindows(currentWindow.bundle)"><f7-icon f7="rectangle_on_rectangle" :size="18"/>{{ ct('其他視窗（{n}）').replace('{n}', () => appWindowCount - 1) }}</button>
+            <button type="button" class="remote-menu-item minimize" @click="menuOpen = false;minimizeWindow(currentWindow)"><f7-icon f7="arrow_down_right_square" :size="18"/>{{ ct('縮到 Dock') }}</button>
+            <button type="button" class="remote-menu-item close-window" @click="menuOpen = false;closeWindow(currentWindow)"><f7-icon f7="xmark_square" :size="18"/>{{ ct('關閉視窗') }}</button>
+            <button v-if="currentWindow.bundle" type="button" class="remote-menu-item quit-app" @click="menuOpen = false;quitApp(currentWindow)"><f7-icon f7="power" :size="18"/>{{ ct('結束 App') }}</button>
+            <div class="remote-menu-sep"></div>
+          </template>
           <template v-if="appMode === 'app'">
             <button type="button" class="remote-menu-item go-desktop" @click="menuOpen = false;goDesktop()"><f7-icon f7="desktopcomputer" :size="18"/>{{ ct('整個螢幕（遠端桌面）') }}</button>
             <button v-if="currentWindow?.bundle" type="button" class="remote-menu-item never-fit" @click="toggleNever"><f7-icon :f7="neverFits(currentWindow.bundle) ? 'checkmark_square' : 'square'" :size="18"/>{{ ct('這個 App 永不調整') }}</button>
@@ -139,7 +146,12 @@
             </div>
           </div>
         </div>
-        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @cancel="stopLaunch"/>
+        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @cancel="stopLaunch" @windows="showWindows"/>
+        <!-- An app's windows to choose from (its card's number, or More › Other windows). -->
+        <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''"/>
+        <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
+        <button v-if="labs && appMode !== 'home' && !dockOpen && !switcherOpen" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
+        <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @close="dockOpen = false"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
@@ -173,7 +185,15 @@
               <div v-else class="remote-switcher-blank"><img v-if="icons[w.bundle]" :src="icons[w.bundle]" alt=""/></div>
             </div>
           </div>
-          <div class="remote-switcher-hint">{{ ct('點一下打開，往上滑在 Mac 上關掉') }}</div>
+          <div class="remote-switcher-hint">{{ ct('點一下打開，往上滑在 Mac 上關掉，長按有更多') }}</div>
+          <!-- A card held down: what else can be done with its window. -->
+          <div v-if="cardMenu" class="remote-card-menu-layer" @pointerdown.self="cardMenu = null">
+            <div class="remote-card-menu" :style="{left: cardMenu.x + 'px', top: cardMenu.y + 'px'}">
+              <button type="button" class="minimize" @click="minimizeWindow(cardMenu.w);cardMenu = null">{{ ct('縮到 Dock') }}</button>
+              <button type="button" class="close-window" @click="closeWindow(cardMenu.w);cardMenu = null">{{ ct('關閉視窗') }}</button>
+              <button v-if="cardMenu.w.bundle" type="button" class="quit-app" @click="quitApp(cardMenu.w);cardMenu = null">{{ ct('結束 App') }}</button>
+            </div>
+          </div>
         </div>
         <!-- The pencil's field: text written on the phone, input method and all, and sent
              to where the Mac's cursor is in one go. -->
@@ -246,6 +266,8 @@ import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
 import RemoteHome from '../components/RemoteHome.vue';
+import RemoteWindows from '../components/RemoteWindows.vue';
+import RemoteDock from '../components/RemoteDock.vue';
 import { trustedPass } from '../js/trust.js';
 import { neverFits, setNever, noteNarrow, noteApps } from '../js/noFit.js';
 
@@ -497,7 +519,7 @@ function onMessage(msg) {
   } else if (msg.t === 'started') {
     if (!current.value || current.value.kind !== msg.kind || current.value.id !== msg.id) resetView();
     current.value = { kind: msg.kind, id: msg.id };notice.value = '';
-  } else if (msg.t === 'apps' || msg.t === 'icons' || msg.t === 'launched' || msg.t === 'fitted') {
+  } else if (msg.t === 'apps' || msg.t === 'icons' || msg.t === 'launched' || msg.t === 'fitted' || msg.t === 'dock' || msg.t === 'quit') {
     appsMessage(msg);
   } else if (msg.t === 'caret') {
     if (keyboardOpen.value && Array.isArray(msg.caret) && !zoomTo) keepInSight({ x: msg.caret[0] + msg.caret[2] / 2, y: msg.caret[1] + msg.caret[3] / 2 });
@@ -1162,6 +1184,53 @@ function appsMessage(msg) {
   } else if (msg.t === 'launched') {
     if (!msg.ok && launching.value === msg.bundle) { launching.value = '';toast(ct('這個 App 打不開')); }
   } else if (msg.t === 'fitted') { fitWait?.(msg); }
+  else if (msg.t === 'dock') { dockApps.value = msg.apps || [];askIconsFor(dockApps.value.map((a) => a.bundle)); }
+  else if (msg.t === 'quit') { if (!msg.ok) toast(ct('這個 App 沒有結束')); }
+}
+// Icons for these bundles that the page has not kept yet (the Dock's, which `apps` may not
+// have asked for).
+function askIconsFor(bundles) {
+  const missing = bundles.filter((b) => b && !icons[b] && !iconsAsked.has(b)).slice(0, 40);
+  if (!missing.length) return;
+  for (const b of missing) iconsAsked.add(b);
+  link?.send({ t: 'icons', bundles: missing });
+}
+// An app's windows to choose from, by its bundle id ('' when closed).
+const windowsOf = ref('');
+const windowsOfList = computed(() => orderedWindows.value.filter((w) => (w.bundle || w.app) === windowsOf.value));
+const windowsOfName = computed(() => windowsOfList.value[0]?.app || apps.value.find((a) => a.bundle === windowsOf.value)?.name || '');
+const appWindowCount = computed(() => { const b = currentWindow.value?.bundle;return b ? orderedWindows.value.filter((w) => w.bundle === b).length : 0; });
+function showWindows(bundle) { if (bundle) windowsOf.value = bundle; }
+// The Mac's Dock: asked for each time it opens; the windows in it from the list.
+const dockOpen = ref(false), dockApps = ref([]);
+const dockWindows = computed(() => orderedWindows.value.filter((w) => w.minimized));
+function openDock() { dockOpen.value = true;link?.send({ t: 'dock' });list(); }
+// A window gone from here (closed, or put in the Dock): the one shown now goes back home.
+function leaveIfShown(w) { if (current.value?.kind === 'window' && current.value.id === w.id) goHome(); }
+function minimizeWindow(w) {
+  link?.send({ t: 'minimize', id: w.id });
+  w.minimized = true;
+  leaveIfShown(w);
+}
+function closeWindow(w) {
+  link?.send({ t: 'close', id: w.id });
+  recent.value = recent.value.filter((x) => x !== w.id);items.value = items.value.filter((x) => !(x.kind === 'window' && x.id === w.id));switcherCards.value = switcherCards.value.filter((x) => x.id !== w.id);
+  leaveIfShown(w);
+}
+// ⌘Q on the Mac, asked first: every window of the app goes (one with unsaved documents asks
+// on the Mac).
+function quitApp(w) {
+  const name = w.app || apps.value.find((a) => a.bundle === w.bundle)?.name || w.bundle;
+  f7.dialog.create({
+    title: ct('結束「{name}」？').replace('{name}', () => name),
+    text: ct('像在 Mac 上按 ⌘Q，這個 App 的所有視窗都會關閉。有沒存的文件時，Mac 上會先問要不要存。'),
+    buttons: [{ text: ct('取消') }, { text: ct('結束'), bold: true, color: 'red', onClick: () => {
+      link?.send({ t: 'quit', bundle: w.bundle });
+      const gone = new Set(items.value.filter((x) => x.kind === 'window' && x.bundle === w.bundle).map((x) => x.id));
+      items.value = items.value.filter((x) => !gone.has(x.id));switcherCards.value = switcherCards.value.filter((x) => !gone.has(x.id));
+      if (current.value?.kind === 'window' && gone.has(current.value.id)) goHome();
+    } }],
+  }).open();
 }
 // The list came: a window of the app being opened, or the one to come back to.
 function appsListed() {
@@ -1375,7 +1444,21 @@ onBeforeUnmount(() => clearTimeout(barSettle));
 // A card slid up closes its window on the Mac; a tap opens it.
 let card = null;
 // Sideways is the browser's scroll through the cards: only a slide mostly upward moves a card.
-function cardDown(e, w) { card = { id: w.id, x: e.clientX, y: e.clientY, moved: 0 }; }
+// Held half a second without moving: its menu (縮到 Dock, 關閉視窗, 結束 App) instead of a tap.
+let cardHold = 0;
+const cardMenu = ref(null);
+function cardDown(e, w) {
+  card = { id: w.id, x: e.clientX, y: e.clientY, moved: 0 };
+  clearTimeout(cardHold);
+  const el = e.currentTarget;
+  cardHold = setTimeout(() => {
+    if (!card || card.id !== w.id || card.moved >= 10) return;
+    card = null;
+    const box = el.getBoundingClientRect(), stage = cardsEl.value?.closest('.remote-switcher')?.getBoundingClientRect() || { left: 0, top: 0, width: innerWidth, height: innerHeight };
+    cardMenu.value = { w, x: Math.max(8, Math.min(box.left - stage.left + 12, stage.width - 228)), y: Math.min(box.bottom - stage.top + 8, stage.height - 160) };
+  }, 500);
+}
+onBeforeUnmount(() => clearTimeout(cardHold));
 function cardMove(e, w) {
   if (!card || card.id !== w.id) return;
   const dx = e.clientX - card.x, dy = e.clientY - card.y;
@@ -1383,11 +1466,12 @@ function cardMove(e, w) {
   if (-dy > Math.abs(dx)) cardSwipe[w.id] = Math.min(0, dy);
 }
 // The browser took the touch for its scroll: neither a tap nor a close (its point can be 0, 0).
-function cardCancel(w) { card = null;delete cardSwipe[w.id]; }
+function cardCancel(w) { card = null;clearTimeout(cardHold);delete cardSwipe[w.id]; }
 function cardUp(e, w) {
+  clearTimeout(cardHold);
   if (!card || card.id !== w.id) return;
   const dx = e.clientX - card.x, dy = e.clientY - card.y, moved = card.moved;card = null;
-  if (dy < -120 && -dy > Math.abs(dx)) { link?.send({ t: 'close', id: w.id });recent.value = recent.value.filter((x) => x !== w.id);items.value = items.value.filter((x) => !(x.kind === 'window' && x.id === w.id));switcherCards.value = switcherCards.value.filter((x) => x.id !== w.id);delete cardSwipe[w.id];return; }
+  if (dy < -120 && -dy > Math.abs(dx)) { closeWindow(w);delete cardSwipe[w.id];return; }
   delete cardSwipe[w.id];
   if (moved < 10) openWindow(w);
 }
@@ -1727,6 +1811,12 @@ function keyUp(e) {
 .remote-apphead-title {flex:1;min-width:0;text-align:center;font-size:15px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-homebar {flex:0 0 auto;height:22px;display:flex;align-items:center;justify-content:center;touch-action:none;}
 .remote-homebar span {width:120px;height:5px;border-radius:3px;background:rgba(255,255,255,.7);}
+.remote-card-menu-layer {position:absolute;inset:0;z-index:6;}
+.remote-card-menu {position:absolute;width:220px;background:rgba(44,44,46,.98);border-radius:14px;padding:4px;box-shadow:0 10px 40px rgba(0,0,0,.6);}
+.remote-stage .remote-card-menu button {display:block;width:100%;height:auto;margin:0;padding:12px;border:0;border-radius:10px;background:none;color:#fff;font-size:16px;text-align:left;cursor:pointer;}
+.remote-stage .remote-card-menu button + button {border-top:1px solid rgba(255,255,255,.08);border-radius:0;}
+.remote-stage .remote-card-menu .quit-app {color:#ff6961;}
+.remote-menu-item.quit-app {color:#ff6961;}
 .remote-switcher {position:absolute;inset:0;z-index:5;background:#0b0b0d;display:flex;flex-direction:column;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}
 /* Room on both sides so the last card, the app just left, can sit in the middle. */
 .remote-switcher-cards {display:flex;gap:14px;overflow-x:auto;scrollbar-width:none;padding:0 calc(50% - min(31vw, 150px));scroll-snap-type:x mandatory;}
