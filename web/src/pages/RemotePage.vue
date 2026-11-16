@@ -242,14 +242,10 @@
           <div v-if="rowKeys.pages.length > 1" class="remote-keys-dots" aria-hidden="true"><span v-for="i in rowKeys.pages.length" :key="i" :class="{on: i - 1 === keyPage}"></span></div>
           <template v-for="id in rowKeys.right" :key="'r' + id"><button v-if="keyDef(id)" type="button" :class="['remote-round', keyDef(id).cls, {on: keyDef(id).on}]" :data-key="id" :aria-pressed="keyDef(id).pressed" :title="keyDef(id).title" :aria-label="keyDef(id).title" @pointerdown.prevent @mousedown.prevent @click="keyDef(id).act()"><f7-icon :f7="keyDef(id).icon" :size="18"/></button></template>
         </div>
+        <!-- A computer: the same keys as the phone's row (Settings › Remote › Key row, kept on the
+             account), in one line, the room being there; its own keyboard needs no button. -->
         <div v-if="!isTouch && keyboardOpen" class="remote-keys" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
-          <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
-          <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
-          <!-- The Mac's desktops and Mission Control are a press away with the keyboard up. -->
-          <button type="button" class="remote-key tool mission" :title="ct('指揮中心')" @pointerdown.prevent @click="space('ArrowUp')"><f7-icon v-if="isTouch" f7="rectangle_3_offgrid" :size="17"/><template v-else>{{ ct('指揮中心') }}</template></button>
-          <button type="button" class="remote-key tool space-left" :title="ct('上一個桌面')" @pointerdown.prevent @click="space('ArrowLeft')"><f7-icon v-if="isTouch" f7="arrow_left_square" :size="17"/><template v-else>{{ ct('上桌面') }}</template></button>
-          <button type="button" class="remote-key tool space-right" :title="ct('下一個桌面')" @pointerdown.prevent @click="space('ArrowRight')"><f7-icon v-if="isTouch" f7="arrow_right_square" :size="17"/><template v-else>{{ ct('下桌面') }}</template></button>
-          <button v-for="k in LAST_KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
+          <template v-for="id in deskKeys" :key="id"><button v-if="keyDef(id)" type="button" :class="['remote-key', keyDef(id).cls, {on: keyDef(id).on}]" :data-key="id" :aria-pressed="keyDef(id).pressed" :title="keyDef(id).title" :aria-label="keyDef(id).title" @pointerdown.prevent @mousedown.prevent @click="keyDef(id).act()"><f7-icon v-if="keyDef(id).icon" :f7="keyDef(id).icon" :size="16"/><template v-else><span v-if="keyDef(id).shift" class="remote-key-mod">⇧</span>{{ keyDef(id).label }}</template></button></template>
         </div>
         <!-- In the phone keyboard's place: pages of keys, swiped sideways. -->
         <div v-if="panel" class="remote-panel" @pointerdown.stop>
@@ -303,14 +299,12 @@ const clipOpen = ref(false), panel = ref(false), pageNo = ref(0), pagesEl = ref(
 const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 const mode = ref(isTouch ? (localGet('castpane-remote-mode') || 'direct') : 'direct');
 const QUALITY_LABEL = { auto: '自動', low: '低', standard: '標準', high: '高', max: '最高' };
-const KEYS = [{ code: 'Escape', label: 'esc' }, { code: 'Tab', label: 'tab' }];
 // The phone's capsule (as CC Agent's terminal keys): a terminal's on its first page, editing
 // and moving keys on its third. `mods` go with the key, as well as those held.
 const TERM_KEYS = [{ code: 'Escape', label: 'esc', name: 'esc' }, { code: 'Tab', label: 'tab', name: 'tab' }, { code: 'Tab', label: 'tab', name: '⇧tab', shift: true, mods: ['shift'] },
   { code: 'ArrowUp', icon: 'chevron_up', name: '↑' }, { code: 'ArrowDown', icon: 'chevron_down', name: '↓' }, { code: 'ArrowLeft', icon: 'chevron_left', name: '←' }, { code: 'ArrowRight', icon: 'chevron_right', name: '→' },
   { code: 'KeyC', label: '^C', name: '⌃C', mods: ['ctrl'] }];
 const EDIT_KEYS = [{ code: 'Backspace', icon: 'delete_left', name: 'delete' }, { code: 'Enter', icon: 'return', name: 'return' }, { code: 'Home', label: 'home', name: 'home' }, { code: 'End', label: 'end', name: 'end' }, { code: 'PageUp', label: 'pgup', name: 'page up' }, { code: 'PageDown', label: 'pgdn', name: 'page down' }];
-const LAST_KEYS = [{ code: 'Backspace', label: '⌫', icon: 'delete_left', name: 'delete' }, { code: 'Enter', label: '⏎', icon: 'return', name: 'return' }, { code: 'ArrowLeft', label: '←', icon: 'arrow_left', name: '←' }, { code: 'ArrowUp', label: '↑', icon: 'arrow_up', name: '↑' }, { code: 'ArrowDown', label: '↓', icon: 'arrow_down', name: '↓' }, { code: 'ArrowRight', label: '→', icon: 'arrow_right', name: '→' }];
 // The phone's capsule: which page of keys shows.
 const keyTrack = ref(null), keyPage = ref(0);
 // The row as set (js/remotePrefs.js), without the Dock on a Mac that cannot list it and
@@ -319,6 +313,7 @@ const rowKeys = computed(() => {
   const l = keyLayout.value, ok = (id) => id !== 'dock' || macWindows.value;
   return { left: l.left.filter(ok), right: l.right.filter(ok), pages: l.pages.map((p) => p.filter(ok)).filter((p) => p.length) };
 });
+const deskKeys = computed(() => [...rowKeys.value.left, ...rowKeys.value.pages.flat(), ...rowKeys.value.right].filter((id) => id !== 'kb'));
 // What a key in the row is and does, wherever it is put. The keyboard's follows whether it is
 // really up (the page's height), not the field's focus: on an iPhone a focused field does not
 // mean a keyboard came up.

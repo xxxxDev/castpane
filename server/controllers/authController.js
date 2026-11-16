@@ -210,6 +210,7 @@ function publicUser(user) {
     name: user.name || user.username,
     role: user.role,
     language: user.language || 'en',
+    keyLayout: keyLayoutOf(user.keyLayout),
     lifecycleStatus,
     disabledAt: user.disabledAt || null,
     deletedAt: user.deletedAt || null,
@@ -788,6 +789,26 @@ exports.me = (req, res) => {
   });
 };
 
+// The phone's key row as the account has set it (Settings › Remote › Key row), the same on
+// every device: one round button at most at the left, two at the right, four pages between,
+// each a key of the page's own list (web/src/js/remotePrefs.js), each once. Anything else
+// is no layout (the page's default).
+const KEY_IDS = new Set(['dock', 'kb', 'compose', 'esc', 'tab', '⇧tab', '↑', '↓', '←', '→', '⌃C', 'shift', 'ctrl', 'alt', 'meta', 'clip', 'panel', 'delete', 'return', 'home', 'end', 'page up', 'page down', 'mission', 'space-left', 'space-right']);
+function keyLayoutOf(v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const seen = new Set();
+  const list = (a, max) => {
+    if (!Array.isArray(a) || a.length > max) return null;
+    for (const id of a) { if (typeof id !== 'string' || !KEY_IDS.has(id) || seen.has(id)) return null;seen.add(id); }
+    return [...a];
+  };
+  const left = list(v.left, 1), right = list(v.right, 2);
+  if (!left || !right || !Array.isArray(v.pages) || v.pages.length !== 4) return null;
+  const pages = v.pages.map((p) => list(p, KEY_IDS.size));
+  return pages.every(Boolean) ? { left, pages, right } : null;
+}
+exports.keyLayoutOf = keyLayoutOf;
+
 exports.updateMe = (req, res) => {
   const allowedLanguages = ['en', 'zh-TW'];
   const update = {};
@@ -799,6 +820,10 @@ exports.updateMe = (req, res) => {
       return res.status(400).json({ message: 'Unsupported language' });
     }
     update.language = req.body.language;
+  }
+  if ('keyLayout' in (req.body || {})) {
+    if (req.body.keyLayout === null) update.keyLayout = null;
+    else if (!(update.keyLayout = keyLayoutOf(req.body.keyLayout))) return res.status(400).json({ message: 'Unsupported key layout' });
   }
   // Settings an older build kept that this product does not have: a value still
   // stored, or one sent here, is ignored.

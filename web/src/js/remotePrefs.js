@@ -1,6 +1,7 @@
 // Whether the whole screen lists the Mac's app windows beside its desktops
 // (pages/RemotePage.vue). Off by default: the apps have their own home. Kept on each device.
-import {ref} from 'vue';
+import {ref, watch} from 'vue';
+import {currentUser, updateCurrentUser} from './auth.js';
 import {PRODUCT} from './productConfig.js';
 
 const KEY = PRODUCT.storageKeys.deskWindows;
@@ -47,10 +48,18 @@ function whole(saved) {
 }
 function readLayout() { try { return whole(JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null')); } catch { return whole(null); } }
 export const keyLayout = ref(readLayout());
-export function setKeyLayout(layout) {
+// Kept on the account, so every device shows the same row (PUT /api/auth/me), and on this
+// device too, for a start before the account is read.
+function keepHere(layout) {
   keyLayout.value = layout ? whole(layout) : whole(null);
   try { if (layout) localStorage.setItem(LAYOUT_KEY, JSON.stringify(keyLayout.value));else localStorage.removeItem(LAYOUT_KEY); } catch {}
 }
+export function setKeyLayout(layout) {
+  keepHere(layout);
+  if (currentUser.value) updateCurrentUser({keyLayout: layout ? keyLayout.value : null}).catch((e) => console.warn('key row not kept on the account:', e?.message));
+}
+// The account's row, as each sign-in or reading of the account brings it.
+watch(() => (currentUser.value ? JSON.stringify(currentUser.value.keyLayout || null) : ''), (j) => { if (j) keepHere(JSON.parse(j)); }, {immediate: true});
 // A key moved: to another place ('left', 'right' or a page 0 to 3), at its end.
 export function moveKey(id, to) {
   const l = copy(keyLayout.value);
