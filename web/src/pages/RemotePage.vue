@@ -38,6 +38,8 @@
           <button v-for="g in groups" :key="g.key" type="button" class="remote-desk" :class="{active: g.key === groupKey, current: g.current}" @click="groupKey = g.key">{{ g.label }}<span class="remote-desk-count">{{ g.items.length }}</span></button>
         </div>
         <div v-if="appMode === 'desktop'" class="remote-bar">
+          <!-- Labs: back to the apps, where an app's own bar has it (a grid icon at the right was missed). -->
+          <button v-if="labs" type="button" class="remote-apphead-back remote-desktop-back" @click="goHome"><f7-icon f7="chevron_left" :size="17"/>{{ ct('首頁') }}</button>
           <div v-if="!headFolded" class="remote-thumbs" role="tablist">
             <button v-for="w in shownItems" :key="w.kind + w.id" type="button" class="remote-thumb" :class="{active: current && current.kind === w.kind && current.id === w.id}" :title="w.app ? w.app + ' · ' + w.title : w.title" @click="show(w)">
               <img v-if="w.thumb" :src="w.thumb" alt=""/><f7-icon v-else :f7="w.kind === 'display' ? 'desktopcomputer' : 'macwindow'" :size="20"/>
@@ -46,7 +48,6 @@
             </button>
           </div>
           <div class="remote-actions">
-            <button v-if="labs" type="button" class="remote-btn home" :title="ct('首頁')" @click="goHome"><f7-icon f7="square_grid_2x2" :size="17"/></button>
             <!-- The screens, desktops and windows fold away for a bigger picture. -->
             <button type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headFolded ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
             <button v-if="isTouch && view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
@@ -146,11 +147,19 @@
             </div>
           </div>
         </div>
-        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @cancel="stopLaunch" @windows="showWindows"/>
+        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows"/>
+        <!-- An app starting takes the Mac a few seconds: said wherever it was started from (the
+             home, All apps, the Dock over an app or the whole screen), with a way to cancel. -->
+        <div v-if="launching" class="remote-home-launching" :class="{over: appMode !== 'home'}" role="status">
+          <img v-if="icons[launching]" :src="icons[launching]" alt=""/>
+          <span class="remote-home-launching-text">{{ ct('正在打開「{name}」…').replace('{name}', () => launchingName) }}</span>
+          <f7-preloader :size="18"/>
+          <button type="button" class="remote-home-launching-cancel" :title="ct('取消')" :aria-label="ct('取消')" @click="stopLaunch"><f7-icon f7="xmark" :size="13"/></button>
+        </div>
         <!-- An app's windows to choose from (its card's number, or More › Other windows). -->
         <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''"/>
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
-        <button v-if="labs && macWindows && appMode !== 'home' && !dockOpen && !switcherOpen" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
+        <button v-if="labs && macWindows && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @close="dockOpen = false"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
@@ -1218,6 +1227,7 @@ function askIconsFor(bundles) {
   for (const b of missing) iconsAsked.add(b);
   link?.send({ t: 'icons', bundles: missing });
 }
+const launchingName = computed(() => apps.value.find((a) => a.bundle === launching.value)?.name || dockApps.value.find((a) => a.bundle === launching.value)?.name || items.value.find((w) => w.bundle === launching.value)?.app || launching.value);
 // An app's windows to choose from, by its bundle id ('' when closed).
 const windowsOf = ref('');
 const windowsOfList = computed(() => orderedWindows.value.filter((w) => (w.bundle || w.app) === windowsOf.value));
@@ -1861,6 +1871,13 @@ function keyUp(e) {
 .remote-apphead-title {flex:1;min-width:0;text-align:center;font-size:15px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-homebar {flex:0 0 auto;height:22px;display:flex;align-items:center;justify-content:center;touch-action:none;}
 .remote-homebar span {width:120px;height:5px;border-radius:3px;background:rgba(255,255,255,.7);}
+/* The app starting (moved here from the home, so it shows over an app too). */
+.remote-home-launching {position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 44px);transform:translateX(-50%);z-index:21;display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);box-sizing:border-box;padding:8px 8px 8px 12px;border-radius:24px;background:rgba(44,44,46,.96);box-shadow:0 6px 24px rgba(0,0,0,.45);color:#fff;font-size:14px;}
+.remote-home-launching img {flex:0 0 auto;width:28px;height:28px;border-radius:7px;}
+.remote-home-launching-text {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.remote-stage .remote-home-launching-cancel {flex:0 0 auto;width:28px;height:28px;margin:0;padding:0;border:0;border-radius:14px;background:rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.remote-home-launching.over {bottom:auto;top:calc(env(safe-area-inset-top) + 56px);}
+.remote-stage .remote-desktop-back {padding-left:0;}
 .remote-card-menu-layer {position:absolute;inset:0;z-index:6;}
 .remote-card-menu {position:absolute;width:220px;background:rgba(44,44,46,.98);border-radius:14px;padding:4px;box-shadow:0 10px 40px rgba(0,0,0,.6);}
 .remote-stage .remote-card-menu button {display:block;width:100%;height:auto;margin:0;padding:12px;border:0;border-radius:10px;background:none;color:#fff;font-size:16px;text-align:left;cursor:pointer;}
