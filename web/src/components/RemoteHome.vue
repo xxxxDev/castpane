@@ -32,8 +32,8 @@
     <div class="remote-home-open" :class="{one: cols === 1}">
       <div v-for="o in openApps" :key="o.key" role="button" tabindex="0" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.enter.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.space.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
         <span class="remote-home-shot">
-          <!-- A Mac window's buttons, as big as the two-or-one switch's: red at the top left closes the window
-               on top, yellow at the top right puts it in the Dock; the number of windows at the
+          <!-- A Mac window's buttons, as big as the two-or-one switch's: × at the top left closes the window
+               on top, − at the top right puts it in the Dock; the number of windows at the
                bottom right. -->
           <button v-if="o.window" type="button" class="light close" :title="ct('關閉視窗')" :aria-label="ct('關閉視窗')" @click.stop="$emit('closeWindow', o.window)"><f7-icon f7="xmark" :size="13"/></button>
           <button v-if="o.window && canMinimize && !o.window.minimized" type="button" class="light minimize" :title="ct('縮到 Dock')" :aria-label="ct('縮到 Dock')" @click.stop="$emit('minimize', o.window)"><f7-icon f7="minus" :size="13"/></button>
@@ -124,38 +124,42 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-home {position:relative;flex:1;min-height:0;display:flex;flex-direction:column;box-sizing:border-box;}
 .remote-home-body {flex:1;min-height:0;display:flex;}
 .remote-home-scroll {flex:1;min-width:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px calc(env(safe-area-inset-bottom) + 16px);box-sizing:border-box;}
+/* Capsules throughout. Glass only on what floats over a window (the cards' buttons, the count)
+   and on the Dock; the rest plain fills, so the page is not all glass. */
 .remote-home-head {flex:0 0 auto;z-index:2;display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(0,0,0,.92);}
-.remote-stage .remote-home-back {flex:0 0 auto;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:17px;background:rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.remote-stage .remote-home-back, .remote-stage .remote-home-all, .remote-stage .remote-home-desktop, .remote-home-filter, .remote-home-cols {background:rgba(255,255,255,.12);}
+.remote-stage .remote-home-back {flex:0 0 auto;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:17px;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .remote-home-name {flex:1;min-width:0;font-size:18px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.remote-stage .remote-home-all {flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;width:auto;height:34px;margin:0;padding:0 14px;border:0;border-radius:17px;background:rgba(255,255,255,.14);color:#fff;font-size:14px;cursor:pointer;}
+.remote-stage .remote-home-all {flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;width:auto;height:34px;margin:0;padding:0 14px;border:0;border-radius:17px;color:#fff;font-size:14px;cursor:pointer;}
 .remote-home-notice {margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,69,58,.18);color:#fff;font-size:14px;}
 .remote-home-title {display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px;font-size:13px;color:#999;}
-.remote-home-filter {display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:rgba(255,255,255,.08);}
-.remote-stage .remote-home-filter button {height:24px;margin:0;padding:0 10px;white-space:nowrap;border:0;border-radius:7px;background:none;color:#999;font-size:12px;cursor:pointer;}
-.remote-stage .remote-home-filter button.on {background:rgba(255,255,255,.18);color:#fff;}
-.remote-home-cols {display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:rgba(255,255,255,.08);}
-.remote-stage .remote-home-cols button {width:30px;height:24px;margin:0;padding:0;border:0;border-radius:7px;background:none;color:#999;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.remote-stage .remote-home-cols button.on {background:rgba(255,255,255,.18);color:#fff;}
+.remote-home-filter {display:inline-flex;gap:2px;padding:3px;border-radius:100px;}
+.remote-stage .remote-home-filter button {height:26px;margin:0;padding:0 11px;white-space:nowrap;border:0;border-radius:100px;background:none;color:#999;font-size:12px;cursor:pointer;}
+.remote-stage .remote-home-filter button.on {background:rgba(255,255,255,.22);color:#fff;}
+.remote-home-cols {display:inline-flex;gap:2px;padding:3px;border-radius:100px;}
+.remote-stage .remote-home-cols button {width:34px;height:26px;margin:0;padding:0;border:0;border-radius:100px;background:none;color:#999;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.remote-stage .remote-home-cols button.on {background:rgba(255,255,255,.22);color:#fff;}
 .remote-home-open.one {grid-template-columns:1fr;}
 .remote-home-open.one .remote-home-shot {aspect-ratio:16/10;}
-/* The Mac's window buttons, the size of the two-or-one switch's buttons above. */
-.remote-stage .remote-home-shot .light {position:absolute;top:6px;z-index:1;width:30px;height:24px;margin:0;padding:0;border:0;border-radius:7px;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,.6);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4);}
+/* The Mac's window buttons, the size of the two-or-one switch's buttons above: clear glass,
+   no colour, darker so they read over any window. */
+.remote-stage .remote-home-shot .light {position:absolute;top:6px;z-index:1;width:34px;height:26px;margin:0;padding:0;border:0;border-radius:100px;display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;background:rgba(30,30,32,.45);-webkit-backdrop-filter:saturate(180%) blur(12px);backdrop-filter:saturate(180%) blur(12px);box-shadow:rgba(255,255,255,.5) 0 0 1px 0 inset,rgba(255,255,255,.35) 1px 1px 2px -1px inset,rgba(0,0,0,.35) 0 2px 8px;}
 .remote-stage .remote-home-shot .light .icon {font-weight:700;}
-.remote-stage .remote-home-shot .light.close {left:6px;background:#ff5f57;}
-.remote-stage .remote-home-shot .light.minimize {right:6px;background:#febc2e;}
+.remote-stage .remote-home-shot .light.close {left:6px;}
+.remote-stage .remote-home-shot .light.minimize {right:6px;}
 .remote-home-empty {font-size:14px;color:#888;}
 .remote-home-open {display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:14px 12px;}
 /* A tablet or a computer: as many as fit, two at the least. */
 @media (min-width: 700px) { .remote-home-open:not(.one) {grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));} }
 .remote-stage .remote-home-card {display:flex;flex-direction:column;align-items:stretch;gap:6px;width:auto;height:auto;margin:0;padding:0;border:0;background:none;color:#ddd;font-size:13px;cursor:pointer;text-align:center;}
-.remote-home-shot {position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;border-radius:12px;background:#2c2c2e;overflow:hidden;}
+.remote-home-shot {position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;border-radius:18px;background:#2c2c2e;overflow:hidden;}
 .remote-home-shot img {width:100%;height:100%;object-fit:cover;object-position:top;}
 .remote-home-shot img.remote-home-shot-icon {width:56px;height:56px;object-fit:contain;}
-.remote-home-count {position:absolute;bottom:6px;right:6px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:rgba(0,0,0,.7);color:#fff;font-size:12px;line-height:20px;box-sizing:border-box;}
+.remote-home-count {position:absolute;bottom:6px;right:6px;min-width:22px;height:22px;padding:0 7px;border-radius:100px;background:rgba(30,30,32,.55);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:rgba(255,255,255,.4) 0 0 1px 0 inset;color:#fff;font-size:12px;line-height:22px;box-sizing:border-box;}
 .remote-home-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-home-card.launching .remote-home-shot, .remote-home-app.launching .remote-home-icon {opacity:.5;animation:remote-home-pulse 1s ease-in-out infinite alternate;}
 @keyframes remote-home-pulse {to {opacity:1;}}
-.remote-stage .remote-home-desktop {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;margin:4px 0 0;padding:0;border:0;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;font-size:15px;cursor:pointer;}
+.remote-stage .remote-home-desktop {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;margin:4px 0 0;padding:0;border:0;border-radius:100px;color:#fff;font-size:15px;cursor:pointer;}
 .remote-launchpad {position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;background:rgba(18,18,20,.97);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);padding:calc(env(safe-area-inset-top) + 12px) 0 calc(env(safe-area-inset-bottom) + 12px);}
 .remote-launchpad-top {display:flex;gap:10px;align-items:center;padding:0 16px 12px;}
 .remote-launchpad-search {flex:1;min-width:0;height:36px;box-sizing:border-box;padding:0 14px;border-radius:18px;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:16px;}

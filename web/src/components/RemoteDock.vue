@@ -24,11 +24,11 @@ defineEmits(['app', 'window', 'close']);
 </script>
 <style>
 .remote-dock-layer {position:absolute;inset:0;z-index:28;}
-.remote-dock {position:absolute;left:8px;top:50%;transform:translateY(-50%);max-height:calc(100% - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px 8px;border-radius:36px;background:rgba(28,28,30,.92);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 40px rgba(0,0,0,.6);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);}
+.remote-dock {position:absolute;left:8px;top:50%;transform:translateY(-50%);max-height:calc(100% - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px 8px;border-radius:36px;background:rgba(28,28,30,.6);border:0;box-shadow:rgba(255,255,255,.4) 2px 2px 2px -2px inset,rgba(255,255,255,.4) -2px -2px 2px -2px inset,rgba(255,255,255,.4) 0 0 1px 0 inset,0 10px 40px rgba(0,0,0,.6);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);}
 .remote-dock::-webkit-scrollbar {display:none;}
 /* Kept open beside the home's cards: a column, so the pill shrinks to the height there is
    (a percentage of a stretched flex item is not one Safari keeps) and scrolls inside. */
-.remote-dock-rail {flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;padding:8px 0 8px 8px;min-height:0;box-sizing:border-box;}
+.remote-dock-rail {flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;padding:8px 0 calc(env(safe-area-inset-bottom) + 8px) 8px;min-height:0;box-sizing:border-box;}
 .remote-dock-rail .remote-dock {position:static;transform:none;flex:0 1 auto;min-height:0;max-height:none;}
 .remote-stage .remote-dock-app, .remote-stage .remote-dock-window {position:relative;flex:0 0 auto;width:52px;height:52px;margin:0;padding:0;border:0;background:none;cursor:pointer;}
 .remote-dock-app img {width:52px;height:52px;}
