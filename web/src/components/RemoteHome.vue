@@ -32,11 +32,11 @@
     <div class="remote-home-open" :class="{one: cols === 1}">
       <div v-for="o in openApps" :key="o.key" role="button" tabindex="0" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.enter.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.space.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
         <span class="remote-home-shot">
-          <!-- A Mac window's buttons, as big as the bar's: red at the top left closes the window
+          <!-- A Mac window's buttons, as big as the two-or-one switch's: red at the top left closes the window
                on top, yellow at the top right puts it in the Dock; the number of windows at the
                bottom right. -->
-          <button v-if="o.window" type="button" class="light close" :title="ct('關閉視窗')" :aria-label="ct('關閉視窗')" @click.stop="$emit('closeWindow', o.window)"><f7-icon f7="xmark" :size="15"/></button>
-          <button v-if="o.window && canMinimize && !o.window.minimized" type="button" class="light minimize" :title="ct('縮到 Dock')" :aria-label="ct('縮到 Dock')" @click.stop="$emit('minimize', o.window)"><f7-icon f7="minus" :size="15"/></button>
+          <button v-if="o.window" type="button" class="light close" :title="ct('關閉視窗')" :aria-label="ct('關閉視窗')" @click.stop="$emit('closeWindow', o.window)"><f7-icon f7="xmark" :size="13"/></button>
+          <button v-if="o.window && canMinimize && !o.window.minimized" type="button" class="light minimize" :title="ct('縮到 Dock')" :aria-label="ct('縮到 Dock')" @click.stop="$emit('minimize', o.window)"><f7-icon f7="minus" :size="13"/></button>
           <img v-if="o.window?.thumb" :src="o.window.thumb" alt=""/>
           <img v-else-if="icons[o.bundle]" class="remote-home-shot-icon" :src="icons[o.bundle]" alt=""/>
           <span v-if="o.count > 1" class="remote-home-count">{{ o.count }}</span>
@@ -131,15 +131,15 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-home-notice {margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,69,58,.18);color:#fff;font-size:14px;}
 .remote-home-title {display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px;font-size:13px;color:#999;}
 .remote-home-filter {display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:rgba(255,255,255,.08);}
-.remote-stage .remote-home-filter button {height:24px;margin:0;padding:0 10px;border:0;border-radius:7px;background:none;color:#999;font-size:12px;cursor:pointer;}
+.remote-stage .remote-home-filter button {height:24px;margin:0;padding:0 10px;white-space:nowrap;border:0;border-radius:7px;background:none;color:#999;font-size:12px;cursor:pointer;}
 .remote-stage .remote-home-filter button.on {background:rgba(255,255,255,.18);color:#fff;}
 .remote-home-cols {display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:rgba(255,255,255,.08);}
 .remote-stage .remote-home-cols button {width:30px;height:24px;margin:0;padding:0;border:0;border-radius:7px;background:none;color:#999;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .remote-stage .remote-home-cols button.on {background:rgba(255,255,255,.18);color:#fff;}
 .remote-home-open.one {grid-template-columns:1fr;}
 .remote-home-open.one .remote-home-shot {aspect-ratio:16/10;}
-/* The Mac's window buttons, the size of the bar's round buttons. */
-.remote-stage .remote-home-shot .light {position:absolute;top:6px;z-index:1;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:17px;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,.6);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4);}
+/* The Mac's window buttons, the size of the two-or-one switch's buttons above. */
+.remote-stage .remote-home-shot .light {position:absolute;top:6px;z-index:1;width:30px;height:24px;margin:0;padding:0;border:0;border-radius:7px;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,.6);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4);}
 .remote-stage .remote-home-shot .light .icon {font-weight:700;}
 .remote-stage .remote-home-shot .light.close {left:6px;background:#ff5f57;}
 .remote-stage .remote-home-shot .light.minimize {right:6px;background:#febc2e;}
