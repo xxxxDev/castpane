@@ -127,7 +127,7 @@ const english = {
 "Castpane 帳號":"Castpane account",
 "已停用":"Disabled",
 "安全":"Security",
-"點兩下即時操作":"Double-click to use it live",
+"單獨全畫面":"Alone, full size",
 "從下面的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。":"Open an app from the Dock below: its window comes here, to drag and resize.",
 "已在 Mac 上打開「{name}」":"Opened “{name}” on the Mac",
 "有些 App 只在選單列或整個螢幕上出現，沒有可以單獨顯示的視窗。要改看整個螢幕嗎？":"Some apps appear only in the menu bar or over the whole screen, with no window to show alone. See the whole screen instead?",

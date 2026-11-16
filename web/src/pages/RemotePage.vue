@@ -156,7 +156,7 @@
         </div>
         <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
         <!-- CastpaneOS: on a computer, the Mac's windows as windows of this page (components/CastpaneDesk.vue). -->
-        <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" @home="goHome" @all="goHome();allAppsAsked++" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
+        <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" @live="osFocus" @home="goHome" @all="goHome();allAppsAsked++" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
         <RemoteHome v-if="appMode === 'home'" :os="osAvailable" @os="goOs" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
           <template #dock><RemoteDock v-if="macWindows" docked :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="openApp" @window="openWindow" @other="openDockOther" @trash="openDockTrash"/></template>
         </RemoteHome>
@@ -173,7 +173,7 @@
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
         <button v-if="!isTouch && macWindows && appMode !== 'home' && appMode !== 'os' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @other="(i, o) => { dockOpen = false;openDockOther(i, o); }" @trash="dockOpen = false;openDockTrash()" @close="dockOpen = false"/>
-        <div v-show="appMode !== 'home' && appMode !== 'os'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
+        <div v-show="(appMode !== 'home' && appMode !== 'os') || (appMode === 'os' && osLive)" ref="area" class="remote-area" :class="{'cp-live': appMode === 'os'}" :style="appMode === 'os' && osLive ? {left: osLive.rect.left + 'px', top: osLive.rect.top + 'px', width: osLive.rect.width + 'px', height: osLive.rect.height + 'px'} : null" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
@@ -1486,7 +1486,16 @@ async function openWindow(w, keepOrder = false, tried = new Set()) {
 // CastpaneOS, a computer's only (a mouse and the room): its windows' pictures read again every
 // five seconds while it is up and shown (a list takes the Mac about half a second of work).
 const osAvailable = computed(() => !isTouch && typeof window !== 'undefined' && window.innerWidth >= 1024);
-const deskRef = ref(null), machineId = ref('');
+const deskRef = ref(null), machineId = ref(''), osLive = ref(null);
+// The desk's window in front, live over its body: its picture started when it changes, the
+// box only moved when the window is dragged or resized. None in front: the picture stops.
+function osFocus(f) {
+  if (appMode.value !== 'os') return;
+  if (!f) { if (osLive.value) { link?.send({ t: 'stop' });current.value = null;hasPicture.value = false; } osLive.value = null;return; }
+  const changed = osLive.value?.id !== f.win.id;
+  osLive.value = { id: f.win.id, rect: f.rect };
+  if (changed) { resetView();hasPicture.value = false;show(f.win); }
+}
 let osTimer = 0;
 function goOs() {
   goHome();
@@ -1501,7 +1510,7 @@ function goHome() {
   if (keyboardOpen.value) { keyboardOpen.value = false;typing.value?.blur(); }
   link?.send({ t: 'stop' });
   stopFollowing();
-  current.value = null;hasPicture.value = false;fitSize = null;
+  current.value = null;hasPicture.value = false;fitSize = null;osLive.value = null;
   appMode.value = 'home';
   list();link?.send({ t: 'apps' });if (macWindows.value) link?.send({ t: 'dock' });
 }
@@ -1876,6 +1885,8 @@ function keyUp(e) {
 @keyframes remote-hint {50% {box-shadow:0 0 0 5px rgba(10,132,255,.35);}}
 .remote-btn.danger {background:rgba(255,69,58,.25);color:#ff6961;}
 .remote-area {position:relative;flex:1;min-height:0;touch-action:none;overflow:hidden;}
+/* CastpaneOS: the live picture over the window in front (components/CastpaneDesk.vue). */
+.remote-stage .remote-area.cp-live {position:fixed;z-index:8999;flex:none;border-radius:0 0 4px 4px;}
 .remote-canvas {width:100%;height:100%;object-fit:contain;display:block;cursor:default;transform-origin:0 0;}
 .remote-canvas.smooth {transition:transform .28s cubic-bezier(.2, .8, .2, 1);}
 .remote-btn.zoom {font-size:12px;font-weight:600;}

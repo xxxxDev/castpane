@@ -2,8 +2,9 @@
   <!-- CastpaneOS: a computer's page as a desktop of the Mac's windows, each one a window here
        that is dragged by its bar, resized from its corner and brought to the front with a
        click; the Mac's Dock at the foot. Which windows are open here, where and how big, is
-       kept on this device for each Mac. Their pictures are the Mac's thumbnails, read again
-       every few seconds; a double click opens one live (stage 1 of .local/CASTPANEOS-PLAN). -->
+       kept on this device for each Mac. The one in front is live (the page lays its picture over
+       it), the others show the Mac's thumbnails, read again every few seconds; a window's last
+       bar button opens it alone, full size. -->
   <div ref="deskEl" class="cp-desk" @pointerdown.self="focused = null">
     <div class="cp-desk-top">
       <button type="button" class="cp-desk-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="$emit('home')"><f7-icon f7="chevron_left" :size="16"/></button>
@@ -22,11 +23,11 @@
         <img v-if="icons[o.win.bundle]" :src="icons[o.win.bundle]" alt=""/>
         <b>{{ o.win.app || o.win.title }}</b>
         <span class="cp-win-title">{{ o.win.title && o.win.title !== o.win.app ? o.win.title : '' }}</span>
+        <button type="button" class="cp-win-full" :title="ct('單獨全畫面')" :aria-label="ct('單獨全畫面')" @pointerdown.stop @click="$emit('open', o.win)"><f7-icon f7="arrow_up_left_arrow_down_right" :size="13"/></button>
       </div>
-      <div class="cp-win-body" @dblclick="$emit('open', o.win)">
+      <div class="cp-win-body">
         <img v-if="o.win.thumb" :src="o.win.thumb" alt="" draggable="false"/>
         <div v-else class="cp-win-blank"><img v-if="icons[o.win.bundle]" :src="icons[o.win.bundle]" alt=""/></div>
-        <span class="cp-win-hint">{{ ct('點兩下即時操作') }}</span>
       </div>
       <div v-if="!o.max" class="cp-win-grip" @pointerdown.stop="resizeStart($event, o)"></div>
     </div>
@@ -40,10 +41,10 @@
   </div>
 </template>
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
 const props = defineProps({ name: { type: String, default: '' }, machine: { type: String, default: '' }, windows: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, dockApps: { type: Array, default: () => [] } });
-const emit = defineEmits(['home', 'all', 'desktop', 'open', 'app', 'closeWindow', 'minimize']);
+const emit = defineEmits(['home', 'all', 'desktop', 'open', 'app', 'closeWindow', 'minimize', 'live']);
 const deskEl = ref(null), focused = ref(null);
 // The windows open here: {id, x, y, w, h, z, max}, kept for this Mac on this device.
 const KEY = () => 'castpane-desk-' + (props.machine || 'local');
@@ -80,6 +81,16 @@ function pick(a) {
   if (w) place(w);else emit('app', a);
 }
 defineExpose({ place });
+// The window in front is live: the page lays its picture over this window's body (a strip at
+// the foot left for the corner that resizes it), told again as the window moves or is resized.
+function liveRect() {
+  const o = shown.value.find((x) => x.id === focused.value);
+  const el = o && deskEl.value?.querySelector(`.cp-win[data-id="${o.id}"] .cp-win-body`);
+  if (!el) return null;
+  const b = el.getBoundingClientRect();
+  return { win: o.win, rect: { left: Math.round(b.left), top: Math.round(b.top), width: Math.round(b.width), height: Math.round(b.height - (o.max ? 0 : 14)) } };
+}
+watch([focused, placed], () => nextTick(() => emit('live', liveRect())), { deep: true });
 // Dragging and resizing, kept within the desk.
 let drag = null;
 function bounds() { const b = deskEl.value?.getBoundingClientRect();return b ? { w: b.width, h: b.height } : { w: 1200, h: 800 }; }
@@ -123,8 +134,8 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
 .cp-win-body > img {width:100%;height:100%;object-fit:contain;object-position:top center;}
 .cp-win-blank {width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
 .cp-win-blank img {width:64px;height:64px;}
-.cp-win-hint {position:absolute;right:8px;bottom:8px;padding:3px 8px;border-radius:10px;background:rgba(0,0,0,.55);color:#ddd;font-size:11px;opacity:0;transition:opacity .2s;}
-.cp-win-body:hover .cp-win-hint {opacity:1;}
+.remote-stage .cp-win-full {margin:0 0 0 auto;width:24px;height:22px;padding:0;border:0;border-radius:6px;background:none;color:#bbb;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.remote-stage .cp-win-full:hover {background:rgba(255,255,255,.12);color:#fff;}
 .cp-win-grip {position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;touch-action:none;}
 .cp-win-grip::after {content:'';position:absolute;right:4px;bottom:4px;width:8px;height:8px;border-right:2px solid rgba(255,255,255,.4);border-bottom:2px solid rgba(255,255,255,.4);}
 .cp-desk-empty {position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);color:#9a9a9f;font-size:14px;}
