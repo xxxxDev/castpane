@@ -8,6 +8,7 @@
     <div class="remote-home-head">
       <button type="button" class="remote-home-back" :title="ct('中斷連線')" @click="$emit('leave')"><f7-icon f7="chevron_left" :size="18"/></button>
       <div class="remote-home-name">{{ name }}</div>
+      <button v-if="os" type="button" class="remote-home-all remote-home-os" @click="$emit('os')"><f7-icon f7="rectangle_on_rectangle" :size="15"/>CastpaneOS</button>
       <button type="button" class="remote-home-all" @click="allOpen = true"><f7-icon f7="square_grid_2x2" :size="15"/>{{ ct('所有 App') }}</button>
     </div>
     <!-- Under the bar: the Mac's Dock at the left (the page's slot), the apps beside it. -->
@@ -86,9 +87,9 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
-const props = defineProps({ name: { type: String, default: '' }, windows: { type: Array, default: () => [] }, apps: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, launching: { type: String, default: '' }, notice: { type: String, default: '' }, canMinimize: { type: Boolean, default: false }, allAsked: { type: Number, default: 0 } });
+const props = defineProps({ name: { type: String, default: '' }, windows: { type: Array, default: () => [] }, apps: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, launching: { type: String, default: '' }, notice: { type: String, default: '' }, canMinimize: { type: Boolean, default: false }, allAsked: { type: Number, default: 0 }, os: { type: Boolean, default: false } });
 // windows: an app with several windows, whose card asks which one (RemoteWindows.vue).
-const emit = defineEmits(['open', 'app', 'desktop', 'leave', 'all', 'windows', 'closeWindow', 'minimize', 'allTaken']);
+const emit = defineEmits(['open', 'app', 'desktop', 'leave', 'all', 'windows', 'closeWindow', 'minimize', 'allTaken', 'os']);
 const COLS_KEY = 'castpane-home-cols';
 const cols = ref((() => { try { return localStorage.getItem(COLS_KEY) === '1' ? 1 : 2; } catch { return 2; } })());
 function setCols(n) { cols.value = n;try { localStorage.setItem(COLS_KEY, String(n)); } catch { /* this time only */ } }

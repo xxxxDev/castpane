@@ -34,7 +34,7 @@
         <!-- The bar: every window, the Desktop first, as Sill's bar of thumbnails. -->
         <!-- The Mac's desktops first, then the windows on the one picked: whole
              screens, each desktop, full-screen apps, the Dock. -->
-        <div v-if="appMode !== 'home'" class="remote-head" :class="{collapsed: headFolded && appMode === 'desktop'}">
+        <div v-if="appMode !== 'home' && appMode !== 'os'" class="remote-head" :class="{collapsed: headFolded && appMode === 'desktop'}">
         <!-- Back to the apps at the top left, the size and place an app's own bar has it. -->
         <div v-if="appMode === 'desktop'" class="remote-apphead remote-desktop-head">
           <button type="button" class="remote-apphead-back remote-desktop-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goHome"><f7-icon f7="chevron_left" :size="18"/></button>
@@ -155,12 +155,14 @@
           </div>
         </div>
         <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
-        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
+        <!-- CastpaneOS: on a computer, the Mac's windows as windows of this page (components/CastpaneDesk.vue). -->
+        <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineName" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" @home="goHome" @all="goHome();allAppsAsked++" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
+        <RemoteHome v-if="appMode === 'home'" :os="osAvailable" @os="goOs" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
           <template #dock><RemoteDock v-if="macWindows" docked :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="openApp" @window="openWindow" @other="openDockOther" @trash="openDockTrash"/></template>
         </RemoteHome>
         <!-- An app starting takes the Mac a few seconds: said wherever it was started from (the
              home, All apps, the Dock over an app or the whole screen), with a way to cancel. -->
-        <div v-if="launching" class="remote-home-launching" :class="{over: appMode !== 'home'}" role="status">
+        <div v-if="launching" class="remote-home-launching" :class="{over: appMode !== 'home' && appMode !== 'os'}" role="status">
           <img v-if="icons[launching]" :src="icons[launching]" alt=""/>
           <span class="remote-home-launching-text">{{ ct('正在打開「{name}」…').replace('{name}', () => launchingName) }}</span>
           <f7-preloader :size="18"/>
@@ -169,9 +171,9 @@
         <!-- An app's windows to choose from (its card's number, or More › Other windows). -->
         <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''" :can-quit="mayQuit(windowsOfList[0])" @quit="() => { const w = windowsOfList[0];windowsOf = '';quitApp(w); }" @force-quit="() => { const w = windowsOfList[0];windowsOf = '';forceQuit(w); }"/>
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
-        <button v-if="!isTouch && macWindows && appMode !== 'home' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
+        <button v-if="!isTouch && macWindows && appMode !== 'home' && appMode !== 'os' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @other="(i, o) => { dockOpen = false;openDockOther(i, o); }" @trash="dockOpen = false;openDockTrash()" @close="dockOpen = false"/>
-        <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
+        <div v-show="appMode !== 'home' && appMode !== 'os'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
@@ -231,7 +233,7 @@
         <!-- On a phone: the keys a phone's keyboard lacks in one capsule, a page at a time
              sideways, with the keyboard's own round button beside it; ⇧ ⌃ ⌥ ⌘ hold for the
              next key. Always there, so the keyboard can be called up from it. -->
-        <div v-if="isTouch && appMode !== 'home'" class="remote-keys remote-keys-touch" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
+        <div v-if="isTouch && appMode !== 'home' && appMode !== 'os'" class="remote-keys remote-keys-touch" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
           <!-- As set in Settings › Remote › Key row (js/remotePrefs.js): a round button at most at
                the left, two at the right, four pages of keys between; any key in any of them. -->
           <template v-for="id in rowKeys.left" :key="'l' + id"><button v-if="keyDef(id)" type="button" :class="['remote-round', keyDef(id).cls, {on: keyDef(id).on}]" :data-key="id" :aria-pressed="keyDef(id).pressed" :title="keyDef(id).title" :aria-label="keyDef(id).title" @pointerdown.prevent @mousedown.prevent @click="keyDef(id).act()"><f7-icon :f7="keyDef(id).icon" :size="18"/></button></template>
@@ -275,6 +277,7 @@ import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
 import RemoteHome from '../components/RemoteHome.vue';
+import CastpaneDesk from '../components/CastpaneDesk.vue';
 import { deskWindows, keyLayout, rereadAccount } from '../js/remotePrefs.js';
 import RemoteWindows from '../components/RemoteWindows.vue';
 import RemoteDock from '../components/RemoteDock.vue';
@@ -1362,7 +1365,7 @@ function appsListed() {
   quitStillOpen();
   if (launching.value) {
     const w = items.value.find((x) => x.kind === 'window' && x.bundle === launching.value && !skipped(x.id));
-    if (w) { launching.value = '';clearInterval(launchTimer);openWindow(w); }
+    if (w) { launching.value = '';clearInterval(launchTimer);if (appMode.value === 'os') deskRef.value?.place(w);else openWindow(w); }
   } else if (resumeItem && appMode.value === 'home') {
     const w = items.value.find((x) => x.kind === resumeItem.kind && x.id === resumeItem.id);
     resumeItem = null;
@@ -1476,6 +1479,17 @@ async function openWindow(w, keepOrder = false, tried = new Set()) {
   show(w);
   watchPicture(w, tried);
 }
+// CastpaneOS, a computer's only (a mouse and the room): its windows' pictures read again every
+// two seconds while it is up.
+const osAvailable = computed(() => !isTouch && typeof window !== 'undefined' && window.innerWidth >= 1024);
+const deskRef = ref(null);
+let osTimer = 0;
+function goOs() {
+  goHome();
+  appMode.value = 'os';
+  clearInterval(osTimer);osTimer = setInterval(() => { if (appMode.value === 'os' && document.visibilityState === 'visible') list();else if (appMode.value !== 'os') clearInterval(osTimer); }, 2000);
+}
+onBeforeUnmount(() => clearInterval(osTimer));
 function goHome() {
   snapCurrent();
   closeWindowViews();
