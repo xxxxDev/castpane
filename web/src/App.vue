@@ -116,7 +116,6 @@
 
         <f7-view v-if="isAdmin" id="view-remote" main tab :tab-active="active === 'view-remote'" url="/remote/" />
         <f7-view id="view-settings" :main="!isAdmin" tab :tab-active="active === 'view-settings'" url="/settings/" />
-        <f7-view v-if="isAdmin" id="view-admin" tab :tab-active="active === 'view-admin'" url="/admin/" />
       </f7-views>
     </template>
   </f7-app>
@@ -189,7 +188,6 @@ function useInBrowser() {
 const ALL_TABS = [
   { id: 'view-remote', labelKey: 'tabRemote', icon: 'desktopcomputer', iconClass: 'f7-icons', admin: true },
   { id: 'view-settings', labelKey: 'tabSettings', icon: 'gear_alt_fill', iconClass: 'f7-icons' },
-  { id: 'view-admin', labelKey: 'tabAdmin', icon: 'shield_lefthalf_fill', iconClass: 'f7-icons', admin: true },
 ];
 const isAdmin = computed(() => currentUser.value?.role === 'admin');
 // Signed in or out in another tab of this site: every other open page follows at once,

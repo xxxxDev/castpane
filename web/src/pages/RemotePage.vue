@@ -3,7 +3,7 @@
        screen or one of its windows, live, with clicks, scrolls and keys sent back. -->
   <f7-page name="remote" class="page-large-static remote-page" @page:afterin="load">
     <f7-navbar :title="ct('遠端')" large></f7-navbar>
-    <p class="remote-note">{{ ct('把 Mac 上開著的 App 當成這台裝置的 App 來用，或看整個螢幕。只有管理員能用，開始前要再驗證一次（有通行密鑰就用密鑰，沒有就輸入密碼），8 小時內不用再驗證。') }}</p>
+    <p class="remote-note">{{ ct('把 Mac 上開著的 App 當成這台裝置的 App 來用，或看整個螢幕。開始前要再驗證一次（有通行密鑰就用密鑰，沒有就輸入密碼），8 小時內不用再驗證。') }}</p>
     <f7-block v-if="!supported" class="remote-error" role="alert">{{ ct('這個瀏覽器不支援影片解碼（WebCodecs），請改用新版的 Edge、Chrome 或 Safari。') }}</f7-block>
     <f7-block v-if="error" class="remote-error" role="alert">{{ error }}</f7-block>
 

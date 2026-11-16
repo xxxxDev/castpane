@@ -1,13 +1,10 @@
 import RemotePage from './pages/RemotePage.vue';
 import SettingsPage from './pages/SettingsPage.vue';
-import AdminPage from './pages/AdminPage.vue';
 import ChangePasswordPage from './pages/ChangePasswordPage.vue';
 import ScanLoginPage from './pages/ScanLoginPage.vue';
 import DevicesPage from './pages/DevicesPage.vue';
 import TwoStepPage from './pages/TwoStepPage.vue';
 import PasskeysPage from './pages/PasskeysPage.vue';
-import UsersPage from './pages/UsersPage.vue';
-import UserEditPage from './pages/UserEditPage.vue';
 import SecurityPage from './pages/SecurityPage.vue';
 import TrustedDevicesPage from './pages/TrustedDevicesPage.vue';
 import NoFitPage from './pages/NoFitPage.vue';
@@ -29,11 +26,6 @@ export default [
   { path: '/two-step/', component: TwoStepPage },
   { path: '/passkeys/', component: PasskeysPage },
 
-  // The admin's tab; everything below is pushed within the #view-admin stack.
-  { path: '/admin/', component: AdminPage },
-  { path: '/users/', component: UsersPage },
-  // User edit, opened from Manage Users rows.
-  { path: '/user/', component: UserEditPage },
   // Sign-in defence: what was tried and which addresses are blocked.
   { path: '/security/', component: SecurityPage },
   // Devices trusted to open Remote without asking each time.

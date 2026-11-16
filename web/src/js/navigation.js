@@ -5,15 +5,12 @@
 export const ID = '[A-Za-z0-9_-]{1,64}';
 
 // Every tab, and the one a stored tab that is no longer there falls back to.
-// 'view-remote' and 'view-admin' are an admin's only; App.vue moves anyone else to
-// Settings.
-export const TAB_IDS = ['view-remote', 'view-settings', 'view-admin'];
+// 'view-remote' is the account's with Remote; App.vue moves anyone else to Settings.
+export const TAB_IDS = ['view-remote', 'view-settings'];
 export const HOME_TAB = 'view-remote';
 // Where someone who is not an admin goes.
 export const MEMBER_TAB = 'view-settings';
-export const ADMIN_TABS = new Set(['view-remote', 'view-admin']);
-// The tab that holds Manage Users (pages/UsersPage.vue opens an account in it).
-export const ADMIN_TAB = 'view-admin';
+export const ADMIN_TABS = new Set(['view-remote']);
 
 // The product's tabs whose pages live in their own F7 router, rows as in appUrl.js's
 // Settings pages.
@@ -21,18 +18,12 @@ export const TAB_PAGES = {
   'view-remote': [
     {route: '/remote/', path: '/', admin: true},
   ],
-  'view-admin': [
-    {route: '/admin/', path: '/admin', admin: true},
-    {route: '/users/', path: '/admin/users', parent: '/admin/', admin: true},
-    {route: '/user/', path: '/admin/users/:id', id: ID, parent: '/users/', admin: true},
-    {route: '/security/', path: '/admin/security', parent: '/admin/', admin: true},
-    {route: '/devices/', path: '/admin/devices', parent: '/admin/', admin: true},
-    {route: '/trusted/', path: '/admin/trusted', parent: '/admin/', admin: true},
-  ],
 };
 
-// The Labs tab's address from before it became the Remote tab goes there too.
-export const oldPath = (path) => (path === '/remote' || path === '/labs' ? '/' : path);
+// Addresses from before: the Labs tab's went to the Remote tab, the Admin tab's pages to
+// Settings (its Manage Users to Settings itself: one account, nothing to manage).
+const ADMIN_MOVED = {'/admin': '/settings', '/admin/users': '/settings', '/admin/security': '/settings/security', '/admin/devices': '/settings/devices', '/admin/trusted': '/settings/trusted'};
+export const oldPath = (path) => (path === '/remote' || path === '/labs' ? '/' : ADMIN_MOVED[path] || (path.startsWith('/admin/users/') ? '/settings' : path));
 
 // The address of a tab with no page table (appUrl.js asks only for those).
 export function tabAddress() { return '/'; }

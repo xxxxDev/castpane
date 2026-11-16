@@ -30,7 +30,7 @@ on a phone. When the screen stops changing, the picture sharpens within about a 
 back, with touch modes made for a small screen.
 
 > [!WARNING]
-> Castpane gives whoever signs in as an admin full control of your Mac, as you. Use a strong
+> Castpane gives whoever signs in to its account full control of your Mac, as you. Use a strong
 > password, turn on two-step sign-in or a passkey, and read [docs/security.md](docs/security.md)
 > before you open it to the internet. It cannot protect you from other programs that already
 > run on your Mac under your account.
@@ -123,16 +123,16 @@ back, with touch modes made for a small screen.
   own, and 30 or 60 fps, any time; the bitrate grows with the picture's size.
 - **Sign-in that holds up.** Passwords, passkeys (Face ID, Touch ID, Windows Hello), two-step
   codes with recovery codes, and QR sign-in from a phone that is already signed in. Failed
-  sign-ins lock an address out for longer each time; an admin sees what was tried and from
+  sign-ins lock an address out for longer each time; Settings shows what was tried and from
   where.
-- **Asked again before control.** Opening Remote needs the admin's passkey, or their password
-  and code, again. The pass lasts 8 hours, for that sign-in only. A device you keep with you
+- **Asked again before control.** Opening Remote needs your passkey, or your password and
+  code, again. The pass lasts 8 hours, for that sign-in only. A device you keep with you
   can be trusted to skip that for 30 to 180 days from its last use.
 - **One viewer at a time.** A second page takes over from the first. The Mac's menu shows who
-  is watching and can stop it at once. Every admin gets a notification when a session
-  opens, with who and from where.
-- **Users and devices.** Admins and members, disabled and deleted accounts, every signed-in
-  device with a way to sign it out. Only admins can open Remote.
+  is watching and can stop it at once. You get a notification when a session opens, from
+  where.
+- **One account, its devices.** One Castpane account, the one you connect with; every
+  signed-in device with a way to sign it out, and the devices trusted to skip asking again.
 - **An installable app.** Add it to the Home Screen for a full-screen app with notifications.
   It offers each new version as it arrives.
 - **English and Traditional Chinese** in the web app.
@@ -143,7 +143,6 @@ back, with touch modes made for a small screen.
   <img src="docs/assets/shot-phone-remote.png" alt="The Remote tab on a phone: this Mac, another Mac that joined it, and Add another Mac" width="200">
   <img src="docs/assets/shot-phone-stage.png" alt="A phone showing the Mac's desktop, with the desktops and windows above" width="200">
   <img src="docs/assets/shot-phone-keys.png" alt="The key panel in the phone keyboard's place: copy, paste, undo, Spotlight, Mission Control and more" width="200">
-  <img src="docs/assets/shot-phone-users.png" alt="Manage Users on a phone: an admin and a member" width="200">
 </p>
 
 <p align="center"><img src="docs/assets/shot-desktop-stage.png" alt="Remote in a computer's browser: the desktops and windows across the top, the Mac's screen below" width="820"></p>
@@ -197,7 +196,7 @@ open mac/build/Castpane.app
 
 The setup assistant first asks what this Mac is for. For the Mac you connect to, it then:
 
-1. makes your admin account;
+1. makes your Castpane account;
 2. asks for Screen Recording and Accessibility (Castpane offers to restart after the first);
 3. asks how to connect: a quick tunnel, your own domain or Tailscale;
 4. shows the address and a QR code. Open it on the phone, sign in, and use **Share › Add to
@@ -233,7 +232,7 @@ certificate instead), and audio.
 
 ## Security
 
-Whoever signs in as an admin can control your Mac, as you. See [SECURITY.md](SECURITY.md) for
+Whoever signs in to its account can control your Mac, as you. See [SECURITY.md](SECURITY.md) for
 the security model and how to report a vulnerability privately.
 
 ## Contributing

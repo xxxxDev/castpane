@@ -166,7 +166,7 @@ const REASONS = { 'no-such-user': '帳號不存在', 'wrong-password': '密碼�
 const TWO_STEP = { on: '開啟兩步驟驗證', off: '關閉兩步驟驗證', reset: '重設兩步驟驗證' };
 const QR = { bind: '綁定手機', unbind: '解除手機', approve: '手機核准', deny: '手機拒絕', 'wrong-code': '選錯數字', 'wrong-account': '帳號不符', 'signed-in': '掃碼登入' };
 function eventTitle(e) {
-  if (e.kind === 'login') return (e.username || ct('（沒有帳號）')) + (e.method === 'bind' ? ` · ${ct('綁定手機')}` : e.method === 'change-password' ? ` · ${ct('修改密碼')}` : e.method === 'admin-grant' ? ` · ${ct('管理員再次確認')}` : e.method === 'passkey' ? ` · ${ct('通行密鑰')}` : String(e.method).startsWith('two-step') ? ` · ${ct('兩步驟驗證')}` : '');
+  if (e.kind === 'login') return (e.username || ct('（沒有帳號）')) + (e.method === 'bind' ? ` · ${ct('綁定手機')}` : e.method === 'change-password' ? ` · ${ct('修改密碼')}` : e.method === 'admin-grant' ? ` · ${ct('再次確認')}` : e.method === 'passkey' ? ` · ${ct('通行密鑰')}` : String(e.method).startsWith('two-step') ? ` · ${ct('兩步驟驗證')}` : '');
   if (e.kind === 'account') return `${e.action === 'protect' ? ct('帳號進入保護') : ct('解除帳號保護')} ${e.name}`;
   if (e.kind === 'two-step') return ct(TWO_STEP[e.action] || e.action);
   if (e.kind === 'passkey') return e.action === 'add' ? ct('建立通行密鑰') : ct('刪除通行密鑰');

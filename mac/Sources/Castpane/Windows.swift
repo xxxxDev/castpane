@@ -22,7 +22,7 @@ struct Wizard: View {
     private func title(_ s: Step) -> String {
         switch s {
         case .role: return "Set up this Mac"
-        case .account: return "Create the admin account"
+        case .account: return "Create your Castpane account"
         case .permissions: return "Permissions"
         case .connection: return "Connection"
         case .join: return "Join another Mac"
@@ -176,7 +176,7 @@ private struct AccountStep: View {
 
     var body: some View {
         if let s = model.status, s.users > 0 {
-            Label("An admin account exists (\(s.admins) admin\(s.admins == 1 ? "" : "s"), \(s.users) user\(s.users == 1 ? "" : "s")).",
+            Label("Your Castpane account is set up.",
                   systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.title3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .glassCard()
@@ -252,7 +252,7 @@ struct SettingsView: View {
 
     enum Page: String, CaseIterable, Identifiable {
         case general = "General", permissions = "Permissions", connection = "Connection"
-        case others = "Other Macs", accounts = "Accounts", activity = "Activity", about = "About"
+        case others = "Other Macs", accounts = "Account", activity = "Activity", about = "About"
         var id: Self { self }
         var symbol: String {
             switch self {
@@ -260,7 +260,7 @@ struct SettingsView: View {
             case .permissions: return "lock.shield"
             case .connection: return "network"
             case .others: return "macbook.and.iphone"
-            case .accounts: return "person.2"
+            case .accounts: return "person.crop.circle"
             case .activity: return "clock"
             case .about: return "info.circle"
             }
@@ -436,7 +436,7 @@ struct OtherMacsTab: View {
     var body: some View {
         Form {
             if showIntro { Section {
-                Text("Show this Mac in another Mac's Castpane: its admins can then see and use this screen from that Mac's web app, as they do that Mac's own. This Mac needs no address or account for it.")
+                Text("Show this Mac in another Mac's Castpane: whoever signs in there can then see and use this screen from that Mac's web app, as they do that Mac's own. This Mac needs no address or account for it.")
                     .foregroundStyle(.secondary)
             } }
             if status.state == "off" {
@@ -511,14 +511,13 @@ struct AccountsTab: View {
     var body: some View {
         Form {
             if let s = model.status {
-                LabeledContent("Users", value: String(s.users))
-                LabeledContent("Admins", value: String(s.admins))
+                LabeledContent("Account", value: s.users > 0 ? "Set up" : "Not yet")
                 LabeledContent("Signed-in sessions", value: String(s.sessions))
             } else {
                 Text("The castpane server is not answering (\(model.serverState.summary)).").foregroundStyle(.secondary)
             }
-            Button("Open Account Management") { model.openAccountManagement() }
-            Text("Users, passwords, passkeys and devices are managed in the web app's admin pages.")
+            Button("Open Settings") { model.openAccountManagement() }
+            Text("The password, passkeys, two-step sign-in and devices are in the web app's Settings.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .formStyle(.grouped)

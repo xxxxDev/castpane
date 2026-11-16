@@ -310,7 +310,7 @@ final class AppModel: ObservableObject {
         if let url = URL(string: target) { NSWorkspace.shared.open(url) }
     }
 
-    func openAccountManagement() { NSWorkspace.shared.open(localURL.appendingPathComponent("admin/users")) }
+    func openAccountManagement() { NSWorkspace.shared.open(localURL.appendingPathComponent("settings")) }
 
     func openLogs() { NSWorkspace.shared.open(paths.logs) }
 }
