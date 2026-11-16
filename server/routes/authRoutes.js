@@ -35,17 +35,10 @@ router.post('/devices', verifyToken, authController.bindDevice);
 router.delete('/devices/:id', verifyToken, authController.removeDevice);
 router.delete('/sessions/:id', verifyToken, authController.removeSession);
 
-// admin user management
+// One account: the setup assistant makes it (localApi.js, createFirstAdmin) and nothing
+// makes another. Accounts left from a version that had several are listed, so they are
+// seen, and deleted; nothing else is done to them.
 router.get('/users', verifyToken, restrictTo('admin'), authController.listUsers);
-// The list's order, dragged by an admin; before /users/:id.
-router.put('/users/order', verifyToken, restrictTo('admin'), authController.reorderUsers);
-router.post('/users', verifyToken, restrictTo('admin'), authController.createUser);
-router.put('/users/:id', verifyToken, restrictTo('admin'), authController.updateUser);
-router.post('/users/:id/disable', verifyToken, restrictTo('admin'), authController.disableUser);
-router.post('/users/:id/enable', verifyToken, restrictTo('admin'), authController.enableUser);
 router.delete('/users/:id', verifyToken, restrictTo('admin'), authController.deleteUser);
-router.delete('/users/:id/purge', verifyToken, restrictTo('admin'), authController.purgeUser);
-router.post('/users/:id/reset-password', verifyToken, restrictTo('admin'), authController.resetUserPassword);
-router.post('/users/:id/reset-two-step', verifyToken, restrictTo('admin'), authController.resetUserTwoStep);
 
 module.exports = router;

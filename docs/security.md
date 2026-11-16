@@ -6,20 +6,24 @@ what protects that, where the secrets are, and what Castpane cannot stop.
 ## Who can do what
 
 - **Signed out:** the sign-in page only. Every API request needs a session, except signing in.
-- **A member:** their own settings, devices, passkeys and two-step sign-in. No Remote, no
-  account management.
-- **An admin:** everything, and Remote. Opening Remote asks again: a passkey of the admin's that
-  may stand for the password and code (below), or their password and, with two-step on, a
-  code. That gives a pass for 8 hours, for that admin and that sign-in only, kept in the
-  server's memory (a restart ends every pass).
-  An admin may trust a device (**Settings › Account › Trust this device**, which asks again
+- **The Castpane account:** there is one. The setup assistant makes it on the Mac, over the
+  app's channel (below), and nothing makes another: the server has no route that creates an
+  account, changes a role or enables one. Signed in, it has everything, and Remote. Opening
+  Remote asks again: a passkey of the account's that may stand for the password and code
+  (below), or the password and, with two-step on, a code. That gives a pass for 8 hours, for
+  that sign-in only, kept in the server's memory (a restart ends every pass).
+- **Accounts left from an earlier version,** which allowed several, still sign in as they did:
+  one that was an admin can open Remote, one that was a member cannot. Settings lists them under
+  a warning, the Mac app's Account tab counts them, and Settings deletes them (deleting one that
+  was an admin asks for your password, or passkey, again). Delete them.
+  The account may trust a device (**Settings › Account › Trust this device**, which asks again
   once): from it, a pass is given with no password or passkey for 30, 60, 90 or 180 days (set
-  in **Admin › Trusted devices**, and a shorter setting counts at once) from its last use. The device keeps an HttpOnly, SameSite=Strict
+  in **Settings › Trusted devices**, and a shorter setting counts at once) from its last use. The device keeps an HttpOnly, SameSite=Strict
   cookie for `/api`, its id and a 256-bit secret; the server keeps only the secret's SHA-256.
   Signing out on that device, a new password, the account disabled, deleted or reset, turning
-  it off or removing it on the admin page ends it at once; turning it off or removing it also ends
+  it off or removing it under **Settings › Trusted devices** ends it at once; turning it off or removing it also ends
   the passes that account already has, and a picture open with one. Signing a device out from
-  another one does not end its trust: remove it under **Admin › Trusted devices** as well. Each pass given this way is in the
+  another one does not end its trust: remove it under **Settings › Trusted devices** as well. Each pass given this way is in the
   audit log. Whoever holds that signed-in, trusted device can open Remote: trust only a device
   you keep with you.
 - **Unlocking from Remote:** a Mac at its lock screen asks the viewer for its login password,
@@ -68,16 +72,16 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   the oldest let go first, so filling it does not lock new visitors out; past 16 IPv6 /64s
   under one /48, the rest of that /48 shares one bucket. Someone with more than 5,000
   addresses can get past the per-address limit; the per-account sign-in lockout still holds.
-- Admins see what was tried, from where, and which addresses are blocked, and can block or
-  unblock an address (but not their own).
+- **Settings › Sign-in defence** shows what was tried, from where, and which addresses are
+  blocked, and can block or unblock an address (but not your own).
 - Passkeys are bound to the public HTTPS address. A key cannot be used from another origin, and
   the server checks the signature counter. Adding one always takes the password again (and the
   two-step code when that is on), however recently the session signed in, and only a page on
   the public HTTPS address may add one: this Mac's own loopback page is refused
   (`PASSKEY_ORIGIN`). QR sign-in needs a phone already bound as a login
   key and a matching number chosen on it.
-- Where an admin is asked again (opening Remote, making an administrator, resetting a
-  password), a passkey stands for the password and code, one answer for one action. A
+- Where you are asked again (opening Remote, deleting a leftover admin account, trusting a
+  device), a passkey stands for the password and code, one answer for one action. A
   challenge answers only its own kind: one asked for Remote does not confirm an account
   action, and one asked for an account action does not open Remote or trust a device. With
   two-step on, only a key added while two-step was on counts (the code was asked when it was
@@ -90,7 +94,7 @@ what protects that, where the secrets are, and what Castpane cannot stop.
 
 - The `/remote` WebSocket needs a live session, the admin role and a valid pass for that
   session. The server checks all three again every 5 seconds and cuts the stream when one
-  fails: an admin made a member, signed out or disabled loses the picture within seconds.
+  fails: an account signed out or deleted loses the picture within seconds.
 - One viewer at a time. A new page takes over from the last one; the Mac's menu shows who is
   watching and can end it (**Stop sharing now**: the viewer is cut off, their passes end and the
   sign-in they watched from is signed out, so that page cannot simply open the stream again),
@@ -108,7 +112,7 @@ what protects that, where the secrets are, and what Castpane cannot stop.
 - When the page falls behind, video is dropped up to the next key frame, so input does not
   queue behind a backlog. Input stops if the capture core stops reading.
 - Every pass, every session opened and ended (with its length), and every app force-quit (who,
-  and which app) is in the audit log. Every admin gets a push notification when a session
+  and which app) is in the audit log. The account gets a push notification when a session
   opens, naming who and from where.
 - The server never starts the capture core or any other program. It connects to `host.sock` in
   Castpane's folder and proves itself with `host.token`; if the socket is not there, it says
@@ -116,10 +120,10 @@ what protects that, where the secrets are, and what Castpane cannot stop.
 
 **The app's channel**
 
-`/api/local/*` (status, making the first admin, activity, ending the viewer) answers only a
+`/api/local/*` (status, making the account, activity, ending the viewer) answers only a
 request from `127.0.0.1` or `::1`, addressed to the loopback host, with no `Origin`, cookie or
 forwarding header (Cloudflare's, `X-Forwarded-For`, `Forwarded`, Tailscale's), and with
-`Authorization: Bearer <local.token>`. Anything else gets 404 or 401. Making an admin works only
+`Authorization: Bearer <local.token>`. Anything else gets 404 or 401. Making the account works only
 while there is no account at all.
 
 ## Secrets and files
@@ -170,8 +174,8 @@ unreadable, so the server refuses to start in that state instead of making a new
   terminates TLS: your password, session and the picture are decrypted at Cloudflare's edge.
   With Tailscale, TLS ends on your Mac.
 - **A signed-in device you lose.** Its session works until it is signed out. Sign it out from
-  **Settings › Devices** on another device. Remote still needs the admin's passkey or password
-  again, unless that device was trusted: remove it in **Admin › Trusted devices** too.
+  **Settings › Devices** on another device. Remote still needs your passkey or password
+  again, unless that device was trusted: remove it in **Settings › Trusted devices** too.
 - **Everyone behind one address.** Behind `tailscale serve`, every request reaches the server
   from `127.0.0.1`, so the sign-in defence sees one address. An address block then shuts out
   your own devices too, until it runs out or you sign in on the Mac at `127.0.0.1` and lift it.

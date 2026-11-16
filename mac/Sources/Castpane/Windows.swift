@@ -512,6 +512,12 @@ struct AccountsTab: View {
         Form {
             if let s = model.status {
                 LabeledContent("Account", value: s.users > 0 ? "Set up" : "Not yet")
+                // Castpane has one account; ones left from a version that had several still
+                // sign in, so they are said plainly here.
+                if s.users > 1 {
+                    Label("\(s.users - 1) other account\(s.users - 1 == 1 ? "" : "s") from an earlier version can still sign in. Delete \(s.users - 1 == 1 ? "it" : "them") in the web app's Settings.",
+                          systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                }
                 LabeledContent("Signed-in sessions", value: String(s.sessions))
             } else {
                 Text("The castpane server is not answering (\(model.serverState.summary)).").foregroundStyle(.secondary)

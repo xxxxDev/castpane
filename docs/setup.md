@@ -84,7 +84,7 @@ It first asks what this Mac is for:
 
 For the Mac you connect to:
 
-1. **Admin account.** The name and password you will sign in with. Use a long password; you
+1. **Castpane account.** The one account, the name and password you will sign in with. Use a long password; you
    can add a passkey and two-step sign-in later, in Settings on the web app.
 2. **Permissions.** Castpane needs two, both in **System Settings › Privacy & Security**:
    - **Screen & System Audio Recording**, to capture the screen. macOS applies it only after
@@ -220,6 +220,6 @@ Security. Putting text on the Mac's clipboard needs nothing.
 
 ## Notifications
 
-Every admin gets a notification when a remote session opens. To receive them on a phone, add
+You get a notification when a remote session opens. To receive them on a phone, add
 the app to the Home Screen (iOS sends Web Push only to installed apps), open **Settings ›
 Notifications** in it and allow them. Notifications need an HTTPS mode.
