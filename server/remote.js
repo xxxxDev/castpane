@@ -84,7 +84,8 @@ const MESSAGES = {
   close: (m) => (int(m.id, 0, 0xffffffff) ? { id: m.id } : null),
   // A window put in the Dock; an app quit as ⌘Q would; the apps in the Mac's Dock.
   minimize: (m) => (int(m.id, 0, 0xffffffff) ? { id: m.id } : null),
-  quit: (m) => (typeof m.bundle === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(m.bundle) ? { bundle: m.bundle } : null),
+  // force: as Force Quit (no question asked, nothing saved).
+  quit: (m) => (typeof m.bundle === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(m.bundle) && (m.force === undefined || bool(m.force)) ? { bundle: m.bundle, ...(m.force ? { force: true } : {}) } : null),
   dock: none,
   icons: (m) => (Array.isArray(m.bundles) && m.bundles.length <= 40 && m.bundles.every((b) => typeof b === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(b)) ? { bundles: m.bundles } : null),
   launch: (m) => (typeof m.bundle === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(m.bundle) ? { bundle: m.bundle } : null),

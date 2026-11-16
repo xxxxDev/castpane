@@ -51,8 +51,9 @@ enum Request: Equatable, Sendable {
     case close(id: Int)
     /// A window put in the Dock, as its yellow button would.
     case minimize(id: Int)
-    /// An app quit as ⌘Q would: it may ask about unsaved documents on the Mac first.
-    case quit(String)
+    /// An app quit as ⌘Q would: it may ask about unsaved documents on the Mac first. With
+    /// `force`, as Force Quit does: no question, nothing saved.
+    case quit(String, force: Bool = false)
     /// The apps kept in the Mac's Dock, in its order.
     case dock
     /// The Mac's password typed into its lock screen; never kept or logged.
@@ -108,8 +109,11 @@ enum Request: Equatable, Sendable {
             guard let b = bundleID(msg["bundle"]) else { return .invalid(t) }
             return .launch(b)
         case "quit":
-            guard let b = bundleID(msg["bundle"]) else { return .invalid(t) }
-            return .quit(b)
+            // A JSON true or false only: a number would pass as a Bool here.
+            let force = msg["force"]
+            guard let b = bundleID(msg["bundle"]),
+                  force == nil || (force as? NSNumber).map({ CFGetTypeID($0) == CFBooleanGetTypeID() }) == true else { return .invalid(t) }
+            return .quit(b, force: (force as? NSNumber)?.boolValue ?? false)
         case "fit":
             guard let id = Field.exactInt(msg["id"], in: ids), let w = Field.clampedInt(msg["width"], 240...8000, default: 0),
                   let h = Field.clampedInt(msg["height"], 240...8000, default: 0), w > 0, h > 0 else { return .invalid(t) }

@@ -1285,8 +1285,18 @@ function quitStillOpen() {
   if (!quitWatch || Date.now() - quitWatch.at < 2500) return;
   const w = quitWatch;quitWatch = null;
   if (Date.now() - w.at > 15000 || !items.value.some((x) => x.kind === 'window' && x.bundle === w.bundle)) return;
-  f7.dialog.create({ title: ct('「{name}」還沒結束').replace('{name}', () => w.name), text: ct('它可能正在 Mac 上詢問（例如要不要存檔），可以到整個螢幕回答。'),
-    buttons: [{ text: ct('好') }, { text: ct('整個螢幕'), bold: true, onClick: () => goDesktop() }] }).open();
+  f7.dialog.create({ title: ct('「{name}」還沒結束').replace('{name}', () => w.name), text: ct('它可能正在 Mac 上詢問（例如要不要存檔），可以到整個螢幕回答，或強制結束。'), verticalButtons: true,
+    buttons: [{ text: ct('整個螢幕'), bold: true, onClick: () => goDesktop() }, { text: ct('強制結束'), color: 'red', onClick: () => forceQuit(w) }, { text: ct('取消') }] }).open();
+}
+// As the Mac's Force Quit: no question asked, nothing saved. Asked once more here.
+function forceQuit(w) {
+  f7.dialog.create({ title: ct('強制結束「{name}」？').replace('{name}', () => w.name), text: ct('它不會先存檔或詢問：沒存的內容、正在跑的指令都會直接中斷。'),
+    buttons: [{ text: ct('取消') }, { text: ct('強制結束'), bold: true, color: 'red', onClick: () => {
+      link?.send({ t: 'quit', bundle: w.bundle, force: true });
+      const gone = new Set(items.value.filter((x) => x.kind === 'window' && x.bundle === w.bundle).map((x) => x.id));
+      items.value = items.value.filter((x) => !gone.has(x.id));
+      setTimeout(list, 1500);
+    } }] }).open();
 }
 function appsListed() {
   quitStillOpen();

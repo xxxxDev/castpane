@@ -134,7 +134,7 @@ in it may still change. The Remote tab is not affected and stays the whole scree
 - **Windows, the Dock and quitting.** An app's card with a number on it lists its windows to
   pick from. Its menu, or a card held down among the cards, puts the window in the Dock,
   closes it, or quits the app as ⌘Q does (asked first; an app that stays, asking something on
-  the Mac, is said so, with the whole screen a tap away). The handle at the left edge opens
+  the Mac, is said so, with the whole screen a tap away, or a force quit, asked once more). The handle at the left edge opens
   the Mac's Dock: its apps, and the windows put in it.
 - **The same keys.** The capsule of keys and the keyboard's round button are there under an
   app as on the Remote tab.

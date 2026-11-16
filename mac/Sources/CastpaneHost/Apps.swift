@@ -100,13 +100,13 @@ enum Apps {
     /// Quits the running app with this bundle id as ⌘Q would (it may ask on the Mac about
     /// unsaved documents first); an app in the Dock only, never the Finder nor this process
     /// (Castpane), whatever the id's spelling.
-    @MainActor static func quit(_ bundle: String) -> Bool {
+    @MainActor static func quit(_ bundle: String, force: Bool = false) -> Bool {
         guard !neverQuit.contains(bundle.lowercased()) else { return false }
         let me = ProcessInfo.processInfo.processIdentifier
         let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundle)
             .filter { $0.activationPolicy == .regular && $0.processIdentifier != me && !neverQuit.contains(($0.bundleIdentifier ?? "").lowercased()) }
         guard !apps.isEmpty else { return false }
-        for app in apps { app.terminate() }
+        for app in apps { if force { app.forceTerminate() } else { app.terminate() } }
         return true
     }
 }

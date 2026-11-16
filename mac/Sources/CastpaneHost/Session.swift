@@ -381,10 +381,10 @@ actor Session {
         case .dock:
             let link = self.link
             Task { @MainActor in link.send(json: ["t": "dock", "apps": Apps.dock()]) }
-        case let .quit(bundle):
+        case let .quit(bundle, force):
             let link = self.link
             Task { @MainActor in
-                let asked = Apps.quit(bundle)
+                let asked = Apps.quit(bundle, force: force)
                 link.send(json: ["t": "quit", "bundle": bundle, "ok": asked])
                 // Its windows go as it quits; one with unsaved documents asks on the Mac and stays.
                 try? await Task.sleep(nanoseconds: 800_000_000)
@@ -392,7 +392,7 @@ actor Session {
                 // Asked and still running: it is asking something (iTerm2's "Quit iTerm2?", a
                 // document to save). Brought to the front so its question is where the whole
                 // screen shows it. One refused (the Finder) is left where it is.
-                if asked { Apps.bringForwardIfRunning(bundle) }
+                if asked && !force { Apps.bringForwardIfRunning(bundle) }
                 await self.route(.list)
             }
         case .ack: video.ack()
