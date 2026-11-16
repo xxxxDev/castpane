@@ -12,10 +12,10 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   Remote asks again: a passkey of the account's that may stand for the password and code
   (below), or the password and, with two-step on, a code. That gives a pass for 8 hours, for
   that sign-in only, kept in the server's memory (a restart ends every pass).
-- **Accounts left from an earlier version,** which allowed several, still sign in as they did:
+- **Accounts left from an earlier version,** which allowed several, still sign in as they did (a disabled one does not):
   one that was an admin can open Remote, one that was a member cannot. Settings lists them under
-  a warning, the Mac app's Account tab counts them, and Settings deletes them (deleting one that
-  was an admin asks for your password, or passkey, again). Delete them soon: a leftover admin
+  a warning, the Mac app's Account tab counts them, and Settings deletes them (each delete asks for your
+  password, or passkey, again). Delete them soon: a leftover admin
   account sees yours as the other one, and can delete it just the same. A deleted account stays as
   a record that signs nothing in and keeps its name taken.
   The account may trust a device (**Settings › This device › Trust this device**, which asks again
@@ -82,7 +82,7 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   the public HTTPS address may add one: this Mac's own loopback page is refused
   (`PASSKEY_ORIGIN`). QR sign-in needs a phone already bound as a login
   key and a matching number chosen on it.
-- Where you are asked again (opening Remote, deleting a leftover admin account, trusting a
+- Where you are asked again (opening Remote, deleting a leftover account, trusting a
   device), a passkey stands for the password and code, one answer for one action. A
   challenge answers only its own kind: one asked for Remote does not confirm an account
   action, and one asked for an account action does not open Remote or trust a device. With

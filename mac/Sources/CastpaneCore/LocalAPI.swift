@@ -102,6 +102,11 @@ enum LocalJSON {
 }
 
 /// The server's error text in `{error: "…"}` or `{message: "…"}`, if it sent one.
+public func localErrorCode(_ data: Data) -> String? {
+    guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+    return obj["code"] as? String
+}
+
 public func localErrorMessage(_ data: Data) -> String? {
     guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
     return (obj["error"] ?? obj["message"]) as? String

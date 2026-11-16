@@ -154,10 +154,13 @@ struct LocalAPI {
 
     enum Failure: Error, LocalizedError {
         case unreachable, status(Int, String?)
+        /// The name is kept by an old account from an earlier version (NAME_TAKEN_BY_OLD_ACCOUNT).
+        case nameTaken(String?)
         var errorDescription: String? {
             switch self {
             case .unreachable: return "The castpane server is not answering."
             case .status(let code, let message): return message ?? "The server answered \(code)."
+            case .nameTaken(let message): return message ?? "This name is taken by an old account. Choose another name."
             }
         }
     }
@@ -181,6 +184,7 @@ struct LocalAPI {
         let data: Data, response: URLResponse
         do { (data, response) = try await Self.session.data(for: r) } catch { throw Failure.unreachable }
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if code == 409, localErrorCode(data) == "NAME_TAKEN_BY_OLD_ACCOUNT" { throw Failure.nameTaken(localErrorMessage(data)) }
         guard (200..<300).contains(code) else { throw Failure.status(code, localErrorMessage(data)) }
         return data
     }
@@ -196,10 +200,8 @@ struct LocalAPI {
         do {
             _ = try await request("POST", "setup", body: ["username": username, "password": password])
             return .created
-        } catch Failure.status(409, let message) {
-            // A name an old account from an earlier version keeps is said, not taken for
-            // an account already made (NAME_TAKEN_BY_OLD_ACCOUNT, docs/protocol.md).
-            if message?.contains("old account") == true { throw Failure.status(409, message) }
+        } catch Failure.status(409, _) {
+            // A name an old account keeps comes as Failure.nameTaken and is said.
             return .alreadyExists
         }
     }
