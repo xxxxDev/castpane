@@ -55,12 +55,17 @@ function keepHere(layout) {
   keyLayout.value = layout ? whole(layout) : whole(null);
   try { if (layout) localStorage.setItem(LAYOUT_KEY, JSON.stringify(keyLayout.value));else localStorage.removeItem(LAYOUT_KEY); } catch {}
 }
+// While a change made here is on its way, what the account says is not taken: a reading
+// started before it would put back the row just changed (two quick drags).
+let saving = 0;
 export function setKeyLayout(layout) {
   keepHere(layout);
-  if (currentUser.value) updateCurrentUser({keyLayout: layout ? keyLayout.value : null}).catch((e) => console.warn('key row not kept on the account:', e?.message));
+  if (!currentUser.value) return;
+  saving++;
+  updateCurrentUser({keyLayout: layout ? keyLayout.value : null}).catch((e) => console.warn('key row not kept on the account:', e?.message)).finally(() => { saving--; });
 }
 // The account's row, as each sign-in or reading of the account brings it.
-watch(() => (currentUser.value ? JSON.stringify(currentUser.value.keyLayout || null) : ''), (j) => { if (j) keepHere(JSON.parse(j)); }, {immediate: true});
+watch(() => (currentUser.value ? JSON.stringify(currentUser.value.keyLayout || null) : ''), (j) => { if (j && !saving) keepHere(JSON.parse(j)); }, {immediate: true});
 // Changed on another device: read again whenever this one comes back to the page.
 if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') rereadAccount(); });
 // A key moved: to another place ('left', 'right' or a page 0 to 3), at its end.
