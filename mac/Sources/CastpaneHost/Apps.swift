@@ -85,6 +85,15 @@ enum Apps {
         return out
     }
 
+    /// An app asked to quit that is still running, brought to the front with its windows.
+    @MainActor static func bringForwardIfRunning(_ bundle: String) {
+        let me = ProcessInfo.processInfo.processIdentifier
+        for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundle)
+        where app.activationPolicy == .regular && app.processIdentifier != me && !app.isTerminated {
+            app.activate(options: [.activateAllWindows])
+        }
+    }
+
     /// Apps never quit from the page: the Finder (nothing here starts it again).
     static let neverQuit: Set<String> = ["com.apple.finder"]
 

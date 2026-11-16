@@ -387,6 +387,9 @@ actor Session {
                 link.send(json: ["t": "quit", "bundle": bundle, "ok": Apps.quit(bundle)])
                 // Its windows go as it quits; one with unsaved documents asks on the Mac and stays.
                 try? await Task.sleep(nanoseconds: 800_000_000)
+                // Still running: it is asking something (iTerm2's "Quit iTerm2?", a document to
+                // save). Brought to the front so its question is where the whole screen shows it.
+                Apps.bringForwardIfRunning(bundle)
                 if !link.isClosed { await self.route(.list) }
             }
         case .ack: video.ack()
