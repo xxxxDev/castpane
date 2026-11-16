@@ -21,7 +21,7 @@
         </f7-list>
       </template>
     </template>
-    <f7-list v-else :key="listKey" inset sortable sortable-enabled :sortable-move-elements="false" class="cc-settings-list key-row-all" @sortable:sort="dragged">
+    <f7-list v-else inset sortable sortable-enabled :sortable-move-elements="false" class="cc-settings-list key-row-all" @sortable:sort="dragged">
       <template v-for="(x, i) in flat" :key="'place' in x ? 'p' + x.place : x.id">
         <f7-list-item v-if="'place' in x" :title="placeTitle(x.place)" class="key-row-place" :data-where="x.place"/>
         <f7-list-item v-else :title="ct(KEY_NAMES[x.id])" :data-key="x.id"/>
@@ -47,15 +47,12 @@ const sections = computed(() => [
   { where: 'right', title: ct('右側獨立按鈕（最多 2 顆）'), ids: keyLayout.value.right },
 ]);
 const flat = computed(() => flatLayout(keyLayout.value));
-// The list made again after each drag: Framework7's sortable list does not follow a reorder
-// of its items in place.
-const listKey = ref(0), refused = ref(false);
+const refused = ref(false);
 const placeTitle = (w) => sections.value.find((x) => x.where === w)?.title || '';
 // A key dragged anywhere in the row: the places are rows of the list, so a key lands in the
 // place above it. One that would put a third button at the right (a second at the left) or
 // above the first place is put back, and said.
 function dragged({ from, to }) {
-  refused.value = false;
   if (from === to) return;
   const next = [...flat.value], [moved] = next.splice(from, 1);
   if ('place' in moved) return;
@@ -63,8 +60,7 @@ function dragged({ from, to }) {
   // After Framework7 has finished with the drag: the list is changed, and made again, only then.
   setTimeout(() => {
     const ok = 'place' in next[0] && setFlatLayout(next);
-    listKey.value++;
-    if (!ok) refused.value = true;
+    refused.value = !ok;
   }, 60);
 }
 function moveMenu(id, from) {

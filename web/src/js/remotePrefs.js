@@ -14,7 +14,7 @@ export function setDeskWindows(on) {
 
 // The phone's key row (Settings › Remote › Key row): one round button at most at its left,
 // two at most at its right, and four pages of keys between, each key in one place only.
-// Kept on this device; a key a saved layout does not have (a new one) goes where it is by
+// Kept on the account (every device the same, below); a key a saved layout does not have (a new one) goes where it is by
 // default.
 export const KEY_NAMES = {
   dock: 'Dock', kb: '鍵盤', compose: '輸入文字',
