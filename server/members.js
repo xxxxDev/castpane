@@ -278,7 +278,7 @@ function item(x) {
   const d = x.desk && typeof x.desk === 'object' && !Array.isArray(x.desk) ? x.desk : {};
   return pick({
     kind: x.kind, id: x.id, title: str(x.title, 300) ?? '', app: str(x.app, 200) ?? '', bundle: str(x.bundle, 200),
-    width: int(x.width) ?? 0, height: int(x.height) ?? 0, here: bool(x.here), all: bool(x.all), dock: bool(x.dock),
+    width: int(x.width) ?? 0, height: int(x.height) ?? 0, here: bool(x.here), all: bool(x.all), dock: bool(x.dock), minimized: bool(x.minimized),
     thumb: typeof x.thumb === 'string' && x.thumb.length <= 512 * 1024 && THUMB.test(x.thumb) ? x.thumb : '',
     desk: pick({ id: int(d.id), number: int(d.number), display: int(d.display), fullscreen: bool(d.fullscreen), current: bool(d.current) }),
   });
@@ -286,12 +286,12 @@ function item(x) {
 const ICON = /^data:image\/png;base64,[A-Za-z0-9+/=]*$/;
 function app(x) {
   if (!x || typeof x !== 'object' || Array.isArray(x) || !str(x.bundle, 200)) return null;
-  return { bundle: x.bundle, name: str(x.name, 200) ?? '', running: bool(x.running) ?? false };
+  return pick({ bundle: x.bundle, name: str(x.name, 200) ?? '', running: bool(x.running) ?? false, kept: bool(x.kept) });
 }
 const SHAPES = {
   locked: (m) => ({ locked: bool(m.locked) ?? false }),
   unlocked: (m) => pick({ ok: bool(m.ok) ?? false, busy: bool(m.busy) }),
-  status: (m) => pick({ screen: bool(m.screen) ?? false, accessibility: bool(m.accessibility) ?? false, version: str(m.version, 64), host: str(m.host, 64) }),
+  status: (m) => pick({ screen: bool(m.screen) ?? false, accessibility: bool(m.accessibility) ?? false, version: str(m.version, 64), host: str(m.host, 64), windows: bool(m.windows) }),
   list: (m) => (Array.isArray(m.items) ? { items: m.items.slice(0, 500).map(item).filter(Boolean) } : null),
   started: (m) => (m.kind === 'display' || m.kind === 'window') && int(m.id) !== undefined ? pick({ kind: m.kind, id: m.id, width: int(m.width) ?? 0, height: int(m.height) ?? 0, fps: int(m.fps) }) : null,
   config: (m) => (str(m.codec, 64) ? pick({ codec: m.codec, width: int(m.width) ?? 0, height: int(m.height) ?? 0 }) : null),
@@ -307,6 +307,8 @@ const SHAPES = {
   icons: (m) => (m.icons && typeof m.icons === 'object' && !Array.isArray(m.icons)
     ? { icons: Object.fromEntries(Object.entries(m.icons).slice(0, 40).filter(([b, v]) => str(b, 200) && typeof v === 'string' && v.length <= 64 * 1024 && ICON.test(v))) } : null),
   launched: (m) => (str(m.bundle, 200) ? { bundle: m.bundle, ok: bool(m.ok) ?? false } : null),
+  quit: (m) => (str(m.bundle, 200) ? { bundle: m.bundle, ok: bool(m.ok) ?? false } : null),
+  dock: (m) => (Array.isArray(m.apps) ? { apps: m.apps.slice(0, 300).map(app).filter(Boolean) } : null),
   fitted: (m) => (int(m.id) !== undefined ? pick({ id: m.id, ok: bool(m.ok) ?? false, width: int(m.width), height: int(m.height) }) : null),
   'clipboard-busy': () => ({}),
 };

@@ -125,7 +125,7 @@ closing the session.
 
 | `t`       | Fields                                                                                                          | Meaning                                                                     |
 | --------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `status`  | `screen`, `accessibility`, `version`                                                                            | Which permissions it has. Sent after the hello.                             |
+| `status`  | `screen`, `accessibility`, `version`, `host`, `windows`                                                         | Which permissions it has, and with `windows: true` that it knows `minimize`, `quit` and `dock` (a page asks for them only then). Sent after the hello.                             |
 | `list`    | `items: [{kind, id, title, app, bundle, width, height, thumb, here, dock, minimized, desk: {id, number, display, fullscreen, current}}]` | Displays and windows, by desktop. With several displays, one more `display` item, `id` 0 and `all: true`: every display at once, side by side as arranged. |
 | `started` | `kind`, `id`, `width`, `height`, `fps`                                                                          | The picture started.                                                        |
 | `config`  | `codec` (`avc1.…` or `hvc1.…`), `width`, `height`                                                               | The decoder configuration, before the first key frame.                      |
@@ -138,7 +138,7 @@ closing the session.
 | `apps`          | `apps: [{bundle, name, running}]`                                                                         | Installed and running apps (at most 300).                                   |
 | `icons`         | `icons: {bundle: "data:image/png;base64,…"}`                                                              | The icons asked for, 64 × 64.                                               |
 | `launched`      | `bundle`, `ok`                                                                                            | The answer to `launch`; its window comes in the next `list`.                |
-| `quit`          | `bundle`, `ok`                                                                                            | The answer to `quit`; the next `list` follows.                              |
+| `quit`          | `bundle`, `ok`                                                                                            | The answer to `quit`: `ok` means the app was asked to quit (it may still ask on the Mac and stay); the next `list` follows. The Finder and Castpane are refused.                              |
 | `dock`          | `apps: [{bundle, name, running, kept}]`                                                                   | The apps kept in the Dock in its order (`kept`), then the others running; only apps `apps` would list. |
 | `fitted`        | `id`, `ok`, `width?`, `height?`                                                                           | The answer to `fit`: the size the window took (an app may keep a larger one).|
 | `locked`        | `locked`                                                                                                  | Sent when the Mac locks or unlocks (not at first while unlocked), so the page can ask for its password. |

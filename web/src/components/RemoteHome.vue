@@ -15,7 +15,7 @@
     <div class="remote-home-title">{{ ct('開著的 App') }}</div>
     <div v-if="!openApps.length" class="remote-home-empty">{{ ct('正在讀取…') }}</div>
     <div class="remote-home-open">
-      <button v-for="o in openApps" :key="o.key" type="button" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.count > 1 ? $emit('windows', o.bundle) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
+      <button v-for="o in openApps" :key="o.key" type="button" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
         <span class="remote-home-shot">
           <img v-if="o.window?.thumb" :src="o.window.thumb" alt=""/>
           <img v-else-if="icons[o.bundle]" class="remote-home-shot-icon" :src="icons[o.bundle]" alt=""/>

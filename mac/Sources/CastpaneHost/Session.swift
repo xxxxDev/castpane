@@ -337,7 +337,10 @@ actor Session {
 
     private static func status() -> [String: Any] {
         ["t": "status", "version": HostServer.version, "screen": CGPreflightScreenCaptureAccess(), "accessibility": AXIsProcessTrusted(),
-         "host": Host.current().localizedName ?? "Mac"]
+         "host": Host.current().localizedName ?? "Mac",
+         // minimize, quit and dock are known here: a page asks for them only then (a Mac from
+         // before ends the session on a request it does not know).
+         "windows": true]
     }
 
     private func route(_ request: Request) {
@@ -384,7 +387,7 @@ actor Session {
                 link.send(json: ["t": "quit", "bundle": bundle, "ok": Apps.quit(bundle)])
                 // Its windows go as it quits; one with unsaved documents asks on the Mac and stays.
                 try? await Task.sleep(nanoseconds: 800_000_000)
-                await self.route(.list)
+                if !link.isClosed { await self.route(.list) }
             }
         case .ack: video.ack()
         case .keyFrame: video.keyFrame()
@@ -630,7 +633,9 @@ actor Session {
         if fitted?.id == id { await unfit() }
         guard let pid = (try? await Catalog.content())?.windows.first(where: { $0.windowID == id })?.owningApplication?.processID,
               pid != ProcessInfo.processInfo.processIdentifier else { return }
-        await MainActor.run { if let w = Fit.axWindow(id, pid: pid) { Fit.minimize(w) } }
+        // A window in full screen (one put back there by unfit) cannot go in the Dock: macOS
+        // ignores it, and the list that follows shows it where it is.
+        await MainActor.run { if let w = Fit.axWindow(id, pid: pid), !Fit.isFullScreen(w) { Fit.minimize(w) } }
         try? await Task.sleep(nanoseconds: 500_000_000)
         route(.list)
     }

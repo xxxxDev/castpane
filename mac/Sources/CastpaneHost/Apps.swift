@@ -85,11 +85,17 @@ enum Apps {
         return out
     }
 
+    /// Apps never quit from the page: the Finder (nothing here starts it again).
+    static let neverQuit: Set<String> = ["com.apple.finder"]
+
     /// Quits the running app with this bundle id as ⌘Q would (it may ask on the Mac about
-    /// unsaved documents first); an app in the Dock only, never Castpane itself.
+    /// unsaved documents first); an app in the Dock only, never the Finder nor this process
+    /// (Castpane), whatever the id's spelling.
     @MainActor static func quit(_ bundle: String) -> Bool {
-        guard bundle != Bundle.main.bundleIdentifier else { return false }
-        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundle).filter { $0.activationPolicy == .regular }
+        guard !neverQuit.contains(bundle.lowercased()) else { return false }
+        let me = ProcessInfo.processInfo.processIdentifier
+        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundle)
+            .filter { $0.activationPolicy == .regular && $0.processIdentifier != me && !neverQuit.contains(($0.bundleIdentifier ?? "").lowercased()) }
         guard !apps.isEmpty else { return false }
         for app in apps { app.terminate() }
         return true
@@ -144,8 +150,9 @@ enum Fit {
         var v: CFTypeRef?
         return AXUIElementCopyAttributeValue(w, kAXMinimizedAttribute as CFString, &v) == .success && (v as? Bool) == true
     }
-    /// The windows of an app that are in the Dock, by window number (one Accessibility call
-    /// for the app, a second at most).
+    /// The windows of an app that are in the Dock, by window number: one Accessibility call for
+    /// the app's windows (a second at most) and one for each window's minimized state (a window
+    /// does not take the app's time limit, so a hung app can slow the list).
     static func minimizedIDs(pid: pid_t) -> Set<CGWindowID> {
         let app = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(app, 1)

@@ -87,9 +87,9 @@
         <div v-if="menuOpen" ref="menuEl" class="remote-menu" :style="menuMax ? {maxHeight: menuMax + 'px'} : null" @pointerdown.stop>
           <template v-if="appMode === 'app' && currentWindow">
             <button v-if="appWindowCount > 1" type="button" class="remote-menu-item other-windows" @click="menuOpen = false;showWindows(currentWindow.bundle)"><f7-icon f7="rectangle_on_rectangle" :size="18"/>{{ ct('其他視窗（{n}）').replace('{n}', () => appWindowCount - 1) }}</button>
-            <button type="button" class="remote-menu-item minimize" @click="menuOpen = false;minimizeWindow(currentWindow)"><f7-icon f7="arrow_down_right_square" :size="18"/>{{ ct('縮到 Dock') }}</button>
+            <button v-if="macWindows" type="button" class="remote-menu-item minimize" @click="menuOpen = false;minimizeWindow(currentWindow)"><f7-icon f7="arrow_down_right_square" :size="18"/>{{ ct('縮到 Dock') }}</button>
             <button type="button" class="remote-menu-item close-window" @click="menuOpen = false;closeWindow(currentWindow)"><f7-icon f7="xmark_square" :size="18"/>{{ ct('關閉視窗') }}</button>
-            <button v-if="currentWindow.bundle" type="button" class="remote-menu-item quit-app" @click="menuOpen = false;quitApp(currentWindow)"><f7-icon f7="power" :size="18"/>{{ ct('結束 App') }}</button>
+            <button v-if="mayQuit(currentWindow)" type="button" class="remote-menu-item quit-app" @click="menuOpen = false;quitApp(currentWindow)"><f7-icon f7="power" :size="18"/>{{ ct('結束 App') }}</button>
             <div class="remote-menu-sep"></div>
           </template>
           <template v-if="appMode === 'app'">
@@ -150,7 +150,7 @@
         <!-- An app's windows to choose from (its card's number, or More › Other windows). -->
         <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''"/>
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
-        <button v-if="labs && appMode !== 'home' && !dockOpen && !switcherOpen" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
+        <button v-if="labs && macWindows && appMode !== 'home' && !dockOpen && !switcherOpen" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @close="dockOpen = false"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
@@ -189,9 +189,9 @@
           <!-- A card held down: what else can be done with its window. -->
           <div v-if="cardMenu" class="remote-card-menu-layer" @pointerdown.self="cardMenu = null">
             <div class="remote-card-menu" :style="{left: cardMenu.x + 'px', top: cardMenu.y + 'px'}">
-              <button type="button" class="minimize" @click="minimizeWindow(cardMenu.w);cardMenu = null">{{ ct('縮到 Dock') }}</button>
+              <button v-if="macWindows" type="button" class="minimize" @click="minimizeWindow(cardMenu.w);cardMenu = null">{{ ct('縮到 Dock') }}</button>
               <button type="button" class="close-window" @click="closeWindow(cardMenu.w);cardMenu = null">{{ ct('關閉視窗') }}</button>
-              <button v-if="cardMenu.w.bundle" type="button" class="quit-app" @click="quitApp(cardMenu.w);cardMenu = null">{{ ct('結束 App') }}</button>
+              <button v-if="mayQuit(cardMenu.w)" type="button" class="quit-app" @click="quitApp(cardMenu.w);cardMenu = null">{{ ct('結束 App') }}</button>
             </div>
           </div>
         </div>
@@ -494,6 +494,7 @@ const tappedFieldNow = (msg) => (probeAnswer?.n === probeN && !!probeAnswer.edit
   || (msg?.editable && Array.isArray(msg.caret) && lastTap && Math.abs(msg.caret[0] + msg.caret[2] / 2 - lastTap.x) < 0.06 && Math.abs(msg.caret[1] + msg.caret[3] / 2 - lastTap.y) < 0.06);
 function onMessage(msg) {
   if (msg.t === 'status') {
+    macWindows.value = msg.windows === true;
     const missing = [!msg.screen && ct('螢幕與系統錄音'), !msg.accessibility && ct('輔助使用')].filter(Boolean);
     permission.value = missing.join('、');
     if (msg.screen) { list();if (appMode.value === 'home') link?.send({ t: 'apps' }); }
@@ -636,6 +637,7 @@ function disconnect() {
   saveShot();
   try { link?.send({ t: 'stop' }); } catch {}
   if (document.fullscreenElement) document.exitFullscreen();
+  closeWindowViews();
   link?.close();link = null;streaming.value = false;keyboardOpen.value = false;settingsOpen.value = false;menuOpen.value = false;held.clear();panel.value = false;compose.value = false;composeText.value = '';clipOpen.value = false;clipWait?.reject(new Error('closed'));
 }
 const headCollapsed = ref(localGet('castpane-remote-head') === 'folded');
@@ -1154,6 +1156,7 @@ const recentWindows = computed(() => orderedWindows.value.slice(0, 12));
 const appTitle = computed(() => { const w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);return w ? w.app || w.title : ''; });
 function startApps(m) {
   machineName.value = m.name || '';
+  closeWindowViews();macWindows.value = false;
   // Back after a while away: as it was (the whole screen, the home or an app's window).
   appMode.value = props.labs && resumeMode !== 'desktop' ? 'home' : 'desktop';resumeMode = null;
   apps.value = [];launching.value = '';switcherOpen.value = false;iconsAsked = new Set();iconsAll = false;
@@ -1203,6 +1206,13 @@ const appWindowCount = computed(() => { const b = currentWindow.value?.bundle;re
 function showWindows(bundle) { if (bundle) windowsOf.value = bundle; }
 // The Mac's Dock: asked for each time it opens; the windows in it from the list.
 const dockOpen = ref(false), dockApps = ref([]);
+// Whether the Mac knows minimize, quit and dock (its status says so): a Mac from before ends
+// the session on a request it does not know, so they are not offered there.
+const macWindows = ref(false);
+// The Finder is never quit from here: nothing on this page starts it again.
+const mayQuit = (w) => macWindows.value && !!w?.bundle && w.bundle.toLowerCase() !== 'com.apple.finder';
+// The windows' sheet, the Dock and a card's menu belong to one Mac and one moment.
+function closeWindowViews() { windowsOf.value = '';dockOpen.value = false;dockApps.value = [];cardMenu.value = null; }
 const dockWindows = computed(() => orderedWindows.value.filter((w) => w.minimized));
 function openDock() { dockOpen.value = true;link?.send({ t: 'dock' });list(); }
 // A window gone from here (closed, or put in the Dock): the one shown now goes back home.
@@ -1338,6 +1348,7 @@ async function openWindow(w, keepOrder = false, tried = new Set()) {
 }
 function goHome() {
   snapCurrent();
+  closeWindowViews();
   menuOpen.value = false;settingsOpen.value = false;switcherOpen.value = false;compose.value = false;panel.value = false;clipOpen.value = false;
   if (keyboardOpen.value) { keyboardOpen.value = false;typing.value?.blur(); }
   link?.send({ t: 'stop' });
@@ -1447,6 +1458,7 @@ let card = null;
 // Held half a second without moving: its menu (縮到 Dock, 關閉視窗, 結束 App) instead of a tap.
 let cardHold = 0;
 const cardMenu = ref(null);
+watch(switcherOpen, (open) => { if (!open) cardMenu.value = null; });
 function cardDown(e, w) {
   card = { id: w.id, x: e.clientX, y: e.clientY, moved: 0 };
   clearTimeout(cardHold);

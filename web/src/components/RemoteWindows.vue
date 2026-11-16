@@ -7,7 +7,7 @@
       <div class="remote-windows-head">
         <img v-if="icon" :src="icon" alt=""/>
         <b>{{ name }}</b>
-        <span>{{ ct('{n} 個視窗').replace('{n}', () => windows.length) }}</span>
+        <span>{{ windows.length === 1 ? ct('1 個視窗') : ct('{n} 個視窗').replace('{n}', () => windows.length) }}</span>
         <button type="button" class="remote-windows-close" :title="ct('關閉')" :aria-label="ct('關閉')" @click="$emit('close')"><f7-icon f7="xmark" :size="14"/></button>
       </div>
       <div class="remote-windows-list">
