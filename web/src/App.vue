@@ -504,11 +504,15 @@ const f7params = {
     black: '#000000',
   },
   routes,
+  // A notice comes in at the top centre, the same rounded pill on a phone and a computer,
+  // where it is seen: at the bottom of a phone and the bottom left of a computer it was
+  // easy to miss. styles/skin.css shapes it.
+  toast: { position: 'top', horizontalPosition: 'center' },
   // Framework7's lit, enlarged press on the composer is left out: it moved the text
   // and its caret away from where they are, and could stay on after the keyboard
   // opened. The rest keep it.
   touch: {
-    touchHighlightElements: '.toolbar-pane, .navbar .left, .navbar .right, .actions-group:not(.actions-grid .actions-group), .searchbar-input-wrap, .searchbar-disable-button, .subnavbar, .searchbar-input-wrap .autocomplete-dropdown, .notification, .toast, .fab > a',
+    touchHighlightElements: '.toolbar-pane, .navbar .left .link, .navbar .right .link, .actions-group:not(.actions-grid .actions-group), .searchbar-input-wrap, .searchbar-disable-button, .subnavbar, .searchbar-input-wrap .autocomplete-dropdown, .notification, .toast, .fab > a',
   },
 };
 </script>

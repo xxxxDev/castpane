@@ -61,7 +61,8 @@ body {
   --f7-page-bg-color: var(--cc-color-page);
   --f7-bars-bg-color: var(--cc-color-bars);
   /* Navbar geometry. */
-  --f7-navbar-large-title-height: 30px;
+  /* --f7-navbar-height: see "Navbar row as native iOS 26" below (58px without a safe area, 54px under one). */
+  /* --f7-navbar-large-title-height: also below (48px; 45px under a status bar, where the bar takes 3px). */
   --f7-tabbar-labels-height: var(--cc-size-tabbar);
   --f7-tabbar-label-font-size: var(--cc-font-label-sm);
   /* Search radius: the search field rounds at 24px; F7 v9 defaults the inline searchbar to 44px.
@@ -614,17 +615,16 @@ img[src$="/sources/anthropic-native.svg"] {
 
 .cc-app .navbar .navbar-bg {
   background-color: var(--f7-page-bg-color);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* The bar is opaque, so a blur under it only costs frames. */
+.cc-app .navbar .navbar-bg::before {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .cc-app .navbar .navbar-bg::after {
   display: none;
-}
-
-.cc-app .navbar-inner > .left,
-.cc-app .navbar-inner > .right {
-  transform: translateY(-9px);
 }
 
 .cc-app .navbar-inner > .left,
@@ -635,10 +635,15 @@ img[src$="/sources/anthropic-native.svg"] {
   box-shadow: none;
 }
 
+/* Each button on its own solid base: the glass fill laid over the page's colour, and no blur of
+   what is behind it. A blur reached whatever moved under the bar (the terminal's column while its
+   divider was dragged, a list scrolling) and the buttons flickered; the same look without it, on
+   every page. */
 .cc-app .navbar a.link {
-  background-color: var(--f7-list-bg-color);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
+  background-color: var(--f7-page-bg-color);
+  background-image: linear-gradient(var(--f7-list-bg-color), var(--f7-list-bg-color));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow:
     var(--cc-glass-ring) 2px 2px 2px -2px inset,
     var(--cc-glass-ring) -2px -2px 2px -2px inset,
@@ -667,6 +672,96 @@ img[src$="/sources/anthropic-native.svg"] {
   width: 44px;
   min-width: 44px;
   padding: 0; /* a 44x44 circle */
+}
+
+/* ---- Navbar row as native iOS 26 (measured against the Settings app) ----
+ * Under a status bar the 44px buttons start right at the safe-area top, as iOS's do, with 10px
+ * below them: a 54px bar (Settings' separator at 100.7pt under a 47pt status bar).
+ * Without a safe area (a computer, a browser tab, a landscape phone, the pushed popup's page)
+ * they keep 7px above and below: a 58px bar. The large title gives up the 3px the bar takes
+ * (48px to 45px), so it stays where it was. Declared on every level that can carry its own
+ * --f7-safe-area-top (the popup's .page sets it to 0), so each resolves its own inset; the large
+ * title, page content and side columns follow --f7-navbar-height as before. */
+.cc-app,
+.cc-app .framework7-root,
+.cc-app .view,
+.cc-app .page,
+.cc-app .navbar {
+  --cc-navbar-above: max(0px, calc(7px - var(--f7-safe-area-top)));
+  --cc-navbar-below: calc(10px - var(--cc-navbar-above) * 3 / 7);
+  --f7-navbar-height: calc(44px + var(--cc-navbar-above) + var(--cc-navbar-below));
+  --f7-navbar-large-title-height: calc(45px + var(--cc-navbar-above) * 3 / 7);
+}
+.cc-app .navbar .navbar-inner {
+  padding-top: calc(var(--f7-safe-area-top) + var(--cc-navbar-above));
+  padding-bottom: var(--cc-navbar-below);
+}
+/* The app installed on an iPhone home screen (status bar style "default") starts the page right
+ * under the status bar with no safe-area inset, so the rule above would keep 7px above the
+ * buttons and they would sit 7pt below Settings'. There the bar is the native 54px with the
+ * buttons at the page's top, in portrait; popups keep their own. */
+@media (display-mode: standalone) and (orientation: portrait) {
+  @supports (-webkit-touch-callout: none) {
+    .cc-app :is(.framework7-root, .view, .page, .navbar):not(.popup *) {
+      --cc-navbar-above: 0px;
+    }
+  }
+}
+/* A phone sheet pushed as an iOS card (popup push) has its grab handle 5px from its top, so the
+ * buttons and title start lower than a page's, as an iOS 26 sheet's do: 20px above (measured on the Photos picker), 8px below. */
+.cc-app {
+  --cc-sheet-navbar-above: 20px;
+  --cc-sheet-navbar-below: 8px;
+}
+.cc-app .popup.sheet-swipe :is(.page, .navbar) {
+  --cc-navbar-above: var(--cc-sheet-navbar-above);
+  --cc-navbar-below: var(--cc-sheet-navbar-below);
+}
+/* Every pushed sheet's grab handle (src/js/sheetSwipe.js), inside the navbar's top: above the
+ * view, which Framework7 lifts to z-index 5000. Framework7's push stands the sheet almost full
+ * height and steps the page behind back, as an iOS card does. */
+.cc-app .popup.sheet-swipe {
+  overflow: hidden;
+}
+.cc-app .sheet-grabber {
+  position: absolute;
+  top: calc(var(--f7-safe-area-top) + 5px);
+  left: 50%;
+  width: 36px;
+  height: 5px;
+  margin-left: -18px;
+  border-radius: var(--cc-radius-pill);
+  background: color-mix(in srgb, var(--cc-color-text-tertiary) 45%, transparent);
+  z-index: 5001;
+  pointer-events: none;
+}
+/* On a phone the outer buttons sit 20px in from each edge (iOS: 20pt on this width; F7 16px), and
+ * the back chevron is iOS's: about 1pt smaller (10.7x18.7pt) and 1.7pt left of the circle's
+ * centre. The page follows the buttons, as Settings does: the large title, inset lists, cards,
+ * blocks and their titles, and the Agents search row sit 20px in. A computer keeps 16px and
+ * F7's chevron. */
+@media (max-width: 767px) {
+  .cc-app,
+  .cc-app .framework7-root {
+    --f7-list-inset-side-margin: 20px;
+    --f7-card-margin-horizontal: 20px;
+    --f7-block-padding-horizontal: 20px;
+  }
+  .cc-app .navbar {
+    --f7-navbar-inner-padding-left: 20px;
+    --f7-navbar-inner-padding-right: 20px;
+    --f7-navbar-large-title-padding-left: 20px;
+    --f7-navbar-large-title-padding-right: 20px;
+  }
+  .cc-app .navbar .left .icon-back::after {
+    font-size: 18.7px;
+    transform: translateX(-1.7px);
+  }
+  /* The </> glyph's ink sits 1px below its box's centre (Safari and Chrome alike); the "⋯"
+   * beside it is within half a pixel already. */
+  .cc-app .navbar .right .view-toggle[aria-pressed='false'] i.icon {
+    transform: translateY(-1px);
+  }
 }
 
 /* The attachment dialog titles a file name, which may be one long unbroken word. */
@@ -698,6 +793,29 @@ body.col-resizing, body.col-resizing * {-webkit-user-select:none;user-select:non
 /* A toast at the bottom stays on the visible screen when an installed app's page is
    taller than it (src/js/tabbarViewport.js sets the shortfall). */
 html .ios .toast.toast-bottom {bottom:var(--viewport-overflow,0px);}
+
+/* Android phones redraw each stacked blur on every scroll frame and drop frames;
+ * iOS composites them cheaply and keeps them. Here the floating surfaces lose the
+ * blur and get a more opaque fill instead. */
+@media (pointer: coarse) {
+  @supports not (-webkit-touch-callout: none) {
+    .cc-app .searchbar .searchbar-input-wrap {
+      background: color-mix(in srgb, var(--cc-glass-fill-subtle), var(--cc-color-panel) 85%);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    .cc-app .toolbar-views__toolbar-sticky__bg {
+      background: color-mix(in srgb, var(--f7-page-bg-color) 85%, transparent);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    .cc-app .toolbar-views-ui__segmented-toolbar {
+      background-color: color-mix(in srgb, var(--cc-glass-dark-fill), var(--cc-color-bars) 85%);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+}
 
 /* The ant glyph is tall and narrow, so at the size of its neighbours it reads larger
  * than they do: drawn a little smaller wherever it is used. */
@@ -835,3 +953,53 @@ html .ios .toast.toast-bottom {bottom:var(--viewport-overflow,0px);}
   .cc-app .panel-left .menu-list .item-inner,
   .cc-app .sidebar-edge { transition: none !important; }
 }
+
+/* Notices at the top centre as one pill on every width (App.vue toast params): Framework7 draws
+ * a phone's as a full-width bar under the status bar and a computer's as a 568px bar. Here it
+ * sizes to its text, centred, just below the navbar row so it covers none of its buttons,
+ * sliding down from above. --cc-toast-anchor is the row it sits
+ * under; --cc-toast-floor keeps it under the recording badge; the slide starts 12px above the
+ * screen's top from wherever it lands. */
+html .ios .toast.toast-top {
+  --cc-toast-anchor: calc(var(--f7-safe-area-top) + var(--f7-navbar-height, 54px) + 8px);
+  --cc-toast-top: max(var(--cc-toast-anchor), var(--cc-toast-floor, 0px));
+  left: 50%;
+  right: auto;
+  width: max-content;
+  max-width: min(var(--f7-toast-max-width), calc(100vw - 32px));
+  margin: 0;
+  top: var(--cc-toast-top);
+  border-radius: var(--f7-toast-border-radius);
+  transform: translate3d(-50%, calc(-100% - var(--cc-toast-top) - 12px), 0);
+}
+/* Where something else holds buttons under the page's navbar row, the notice goes below that
+ * instead:
+ * - the recording badge (RecordingBadge.vue: 6px under the navbar row, 28px tall), 8px below it;
+ * - a phone's pushed sheet (Framework7's popup push: its card starts 10px below
+ *   --f7-popup-push-offset, its navbar the sheet rule's 44px row), 8px below the sheet's navbar;
+ * - the split view (SplitView.vue: its 52px bar and 1px line, then each cell's 36px bar),
+ *   8px below the cells' bars. */
+html:has(.recording-badge-layer) .ios .toast.toast-top {
+  --cc-toast-floor: calc(var(--f7-safe-area-top) + var(--f7-navbar-height, 54px) + 6px + 28px + 8px);
+}
+html:has(.popup-push-in) .ios .toast.toast-top {
+  --cc-toast-anchor: calc(var(--f7-popup-push-offset) + 10px + 44px + var(--cc-sheet-navbar-above) + var(--cc-sheet-navbar-below) + 8px);
+}
+html:has(.split-view) .ios .toast.toast-top {
+  --cc-toast-anchor: calc(52px + 1px + 36px + 8px);
+}
+/* A computer's popup stands centred (Framework7 tablet popup, 630px wide); on a short window its
+ * navbar is level with the notice, so the notice stays narrower than the space between the
+ * popup's side buttons: 16px in, up to 96px of button (保存 / Approve), 8px clear, each side. */
+@media (min-width: 630px) and (min-height: 630px) {
+  html:has(.popup.modal-in) .ios .toast.toast-top {
+    max-width: min(var(--f7-toast-max-width), calc(100vw - 32px), calc(var(--f7-popup-tablet-width) - 2 * (16px + 96px + 8px)));
+  }
+}
+html .ios .toast.toast-top.modal-in {
+  transform: translate3d(-50%, 0, 0);
+}
+html .ios .toast.toast-top .toast-content {
+  padding-top: var(--f7-toast-padding-vertical);
+}
+
