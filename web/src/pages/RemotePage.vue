@@ -161,7 +161,7 @@
           <button type="button" class="remote-home-launching-cancel" :title="ct('取消')" :aria-label="ct('取消')" @click="stopLaunch"><f7-icon f7="xmark" :size="13"/></button>
         </div>
         <!-- An app's windows to choose from (its card's number, or More › Other windows). -->
-        <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''"/>
+        <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''" :can-quit="mayQuit(windowsOfList[0])" @quit="() => { const w = windowsOfList[0];windowsOf = '';quitApp(w); }"/>
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
         <button v-if="labs && macWindows && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @close="dockOpen = false"/>
