@@ -61,8 +61,9 @@ let saving = 0;
 export function setKeyLayout(layout) {
   keepHere(layout);
   if (!currentUser.value) return;
-  saving++;
-  updateCurrentUser({keyLayout: layout ? keyLayout.value : null}).catch((e) => console.warn('key row not kept on the account:', e?.message)).finally(() => { saving--; });
+  saving++;let failed = false;
+  // Not kept (offline, refused): the account's row comes back, rather than one only here.
+  updateCurrentUser({keyLayout: layout ? keyLayout.value : null}).catch((e) => { console.warn('key row not kept on the account:', e?.message);failed = true; }).finally(() => { saving--;if (failed && !saving) rereadAccount(true); });
 }
 // The account's row, as each sign-in or reading of the account brings it.
 watch(() => (currentUser.value ? JSON.stringify(currentUser.value.keyLayout || null) : ''), (j) => { if (j && !saving) keepHere(JSON.parse(j)); }, {immediate: true});
