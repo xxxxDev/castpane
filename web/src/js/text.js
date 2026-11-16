@@ -239,6 +239,8 @@ const english = {
 "這個 App 打不開":"This app could not be opened",
 "這個 App 沒有開出視窗":"This app opened no window",
 "正在打開…":"Opening…",
+"正在打開「{name}」…":"Opening “{name}”…",
+"取消":"Cancel",
 "自動：目前":"Automatic, now:",
 "螢幕":"Screen",
 "螢幕與系統錄音":"Screen & System Audio Recording",

@@ -139,7 +139,7 @@
             </div>
           </div>
         </div>
-        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect"/>
+        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @cancel="stopLaunch"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
@@ -1181,6 +1181,8 @@ function openApp(a) {
   link?.send({ t: 'launch', bundle: a.bundle });
   waitForWindow(a.bundle);
 }
+// Opening an app given up on from the page: its window, if one comes, is not shown.
+function stopLaunch() { launching.value = '';launchSkip = null;clearInterval(launchTimer); }
 // A window of the app, other than one just gone, looked for each second for 15 seconds.
 let launchSkip = null;
 // None by then: giveUp, or a toast.
@@ -1192,7 +1194,7 @@ function waitForWindow(bundle, skip = null, giveUp = () => toast(ct('這個 App 
   if (skip) list();
 }
 // Waiting for the window after one gone is dropped once the person goes elsewhere.
-function stopFollowing() { if (launchSkip) { launching.value = '';launchSkip = null;clearInterval(launchTimer); } }
+function stopFollowing() { if (launchSkip) stopLaunch(); }
 onBeforeUnmount(() => { clearInterval(launchTimer);clearTimeout(fitTimer); });
 // The window made the shape of the area it fills here, in points as this page's pixels:
 // its text then comes out the size of this device's own. An app that cannot be that

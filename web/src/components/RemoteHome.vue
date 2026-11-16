@@ -40,13 +40,21 @@
       </div>
       <div v-if="pages.length > 1" class="remote-launchpad-dots"><span v-for="(pg, i) in pages" :key="i" :class="{on: i === page}"></span></div>
     </div>
+    <!-- An app starting takes the Mac a few seconds: said at the bottom, over every app too. -->
+    <div v-if="launching" class="remote-home-launching" role="status">
+      <img v-if="icons[launching]" :src="icons[launching]" alt=""/>
+      <span class="remote-home-launching-text">{{ ct('正在打開「{name}」…').replace('{name}', () => launchingName) }}</span>
+      <f7-preloader :size="18"/>
+      <button type="button" class="remote-home-launching-cancel" :title="ct('取消')" @click="$emit('cancel')"><f7-icon f7="xmark" :size="13"/></button>
+    </div>
   </div>
 </template>
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
 const props = defineProps({ name: { type: String, default: '' }, windows: { type: Array, default: () => [] }, apps: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, launching: { type: String, default: '' }, notice: { type: String, default: '' } });
-const emit = defineEmits(['open', 'app', 'desktop', 'leave', 'all']);
+const emit = defineEmits(['open', 'app', 'desktop', 'leave', 'all', 'cancel']);
+const launchingName = computed(() => props.apps.find((a) => a.bundle === props.launching)?.name || props.windows.find((w) => w.bundle === props.launching)?.app || props.launching);
 // One card an app with a window open, its window used last on top. Apps running with no
 // window (helpers in the background, menu-bar apps) are left to All apps.
 const openApps = computed(() => {
@@ -119,4 +127,8 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-launchpad-dots {display:flex;justify-content:center;gap:8px;padding-top:8px;}
 .remote-launchpad-dots span {width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.3);}
 .remote-launchpad-dots span.on {background:#fff;}
+.remote-home-launching {position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 44px);transform:translateX(-50%);z-index:21;display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);box-sizing:border-box;padding:8px 8px 8px 12px;border-radius:24px;background:rgba(44,44,46,.96);box-shadow:0 6px 24px rgba(0,0,0,.45);color:#fff;font-size:14px;}
+.remote-home-launching img {flex:0 0 auto;width:28px;height:28px;border-radius:7px;}
+.remote-home-launching-text {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.remote-stage .remote-home-launching-cancel {flex:0 0 auto;width:28px;height:28px;margin:0;padding:0;border:0;border-radius:14px;background:rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 </style>
