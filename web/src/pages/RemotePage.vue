@@ -166,7 +166,7 @@
         <!-- An app's windows to choose from (its card's number, or More › Other windows). -->
         <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''" :can-quit="mayQuit(windowsOfList[0])" @quit="() => { const w = windowsOfList[0];windowsOf = '';quitApp(w); }" @force-quit="() => { const w = windowsOfList[0];windowsOf = '';forceQuit(w); }"/>
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
-        <button v-if="macWindows && appMode !== 'home' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
+        <button v-if="!isTouch && macWindows && appMode !== 'home' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @close="dockOpen = false"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
@@ -229,6 +229,9 @@
              sideways, with the keyboard's own round button beside it; ⇧ ⌃ ⌥ ⌘ hold for the
              next key. Always there, so the keyboard can be called up from it. -->
         <div v-if="isTouch && appMode !== 'home'" class="remote-keys remote-keys-touch" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
+          <!-- The Mac's Dock, its own round button at the row's left (on a computer, the handle at
+               the left edge). -->
+          <button v-if="macWindows" type="button" class="remote-round dock-btn" :class="{on: dockOpen}" :aria-pressed="dockOpen" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.prevent @mousedown.prevent @click="dockOpen ? (dockOpen = false) : openDock()"><f7-icon f7="rectangle_dock" :size="18"/></button>
           <div class="remote-keys-box">
             <!-- Four pages, as CC Agent's terminal keys: a terminal's keys; the Mac's modifier
                  keys, its clipboard and the key panel; editing and moving keys; its desktops. -->
@@ -239,7 +242,7 @@
               <div class="remote-keys-page">
                 <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
                 <button type="button" class="remote-key tool clip-btn" :class="{on: clipOpen}" :title="ct('剪貼簿')" :aria-label="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="16"/></button>
-                <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :title="panel ? ct('鍵盤') : ct('按鍵面板')" :aria-label="panel ? ct('鍵盤') : ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon :f7="panel ? 'keyboard' : 'square_grid_2x2'" :size="16"/></button>
+                <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :aria-pressed="panel" :title="ct('按鍵面板')" :aria-label="ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon f7="square_grid_2x2" :size="16"/></button>
               </div>
               <div class="remote-keys-page">
                 <button v-for="k in EDIT_KEYS" :key="k.code" type="button" class="remote-key term" :data-key="k.name" :title="k.name" :aria-label="k.name" @pointerdown.prevent @click="press(k)"><f7-icon v-if="k.icon" :f7="k.icon" :size="16"/><template v-else>{{ k.label }}</template></button>
@@ -1851,7 +1854,7 @@ function keyUp(e) {
 /* Few keys: kept at the others' spacing from the left, not spread across the capsule. */
 .remote-keys-page.few {justify-content:flex-start;}
 .remote-stage .remote-keys-touch .remote-keys-page.few .remote-key {flex:0 0 44px;}
-.remote-stage .remote-round.compose-btn.on {background:rgba(255,255,255,.24);}
+.remote-stage .remote-round.compose-btn.on, .remote-stage .remote-round.dock-btn.on {background:rgba(255,255,255,.24);}
 .remote-stage .remote-keys-touch .remote-key:active {background:rgba(255,255,255,.18);}
 .remote-stage .remote-keys-touch .remote-key.on {background:#0a84ff;color:#fff;}
 .remote-keys-dots {position:absolute;left:12px;right:116px;bottom:3px;display:flex;justify-content:center;gap:5px;pointer-events:none;}
