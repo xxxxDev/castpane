@@ -151,7 +151,11 @@
             </div>
           </div>
         </div>
-        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows"/>
+        <!-- The home: the Mac's Dock kept open at its left, its open apps beside it. -->
+        <div v-if="appMode === 'home'" class="remote-home-row">
+        <RemoteDock v-if="labs && macWindows" docked :apps="dockApps" :windows="dockWindows" :icons="icons" @app="openApp" @window="openWindow"/>
+        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" @close-window="closeWindow" @minimize="minimizeWindow"/>
+        </div>
         <!-- An app starting takes the Mac a few seconds: said wherever it was started from (the
              home, All apps, the Dock over an app or the whole screen), with a way to cancel. -->
         <div v-if="launching" class="remote-home-launching" :class="{over: appMode !== 'home'}" role="status">
@@ -163,7 +167,7 @@
         <!-- An app's windows to choose from (its card's number, or More › Other windows). -->
         <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''" :can-quit="mayQuit(windowsOfList[0])" @quit="() => { const w = windowsOfList[0];windowsOf = '';quitApp(w); }"/>
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
-        <button v-if="labs && macWindows && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
+        <button v-if="labs && macWindows && appMode !== 'home' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @close="dockOpen = false"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
@@ -522,6 +526,7 @@ const tappedFieldNow = (msg) => (probeAnswer?.n === probeN && !!probeAnswer.edit
 function onMessage(msg) {
   if (msg.t === 'status') {
     macWindows.value = msg.windows === true;
+    if (macWindows.value && props.labs) link?.send({ t: 'dock' });
     const missing = [!msg.screen && ct('螢幕與系統錄音'), !msg.accessibility && ct('輔助使用')].filter(Boolean);
     permission.value = missing.join('、');
     if (msg.screen) { list();if (appMode.value === 'home') link?.send({ t: 'apps' }); }
@@ -1221,7 +1226,7 @@ function appsMessage(msg) {
     if (!msg.ok && launching.value === msg.bundle) { launching.value = '';toast(ct('這個 App 打不開')); }
   } else if (msg.t === 'fitted') { fitWait?.(msg); }
   else if (msg.t === 'dock') { dockApps.value = msg.apps || [];askIconsFor(dockApps.value.map((a) => a.bundle)); }
-  else if (msg.t === 'quit') { if (!msg.ok) { toast(ct('這個 App 沒有結束'));if (quitWatch?.bundle === msg.bundle) quitWatch = null; } }
+  else if (msg.t === 'quit') { if (macWindows.value) setTimeout(() => link?.send({ t: 'dock' }), 1200);if (!msg.ok) { toast(ct('這個 App 沒有結束'));if (quitWatch?.bundle === msg.bundle) quitWatch = null; } }
 }
 // Icons for these bundles that the page has not kept yet (the Dock's, which `apps` may not
 // have asked for).
@@ -1417,7 +1422,7 @@ function goHome() {
   stopFollowing();
   current.value = null;hasPicture.value = false;fitSize = null;
   appMode.value = 'home';
-  list();link?.send({ t: 'apps' });
+  list();link?.send({ t: 'apps' });if (macWindows.value) link?.send({ t: 'dock' });
 }
 function goDesktop() {
   appMode.value = 'desktop';switcherOpen.value = false;
@@ -1914,6 +1919,7 @@ function keyUp(e) {
 .remote-desktop-head {padding-bottom:0;}
 /* As wide as the back button, so the title stays centred. */
 .remote-desktop-head-end {flex:0 0 auto;width:64px;}
+.remote-home-row {flex:1;min-height:0;display:flex;}
 .remote-card-menu-layer {position:absolute;inset:0;z-index:6;}
 .remote-card-menu {position:absolute;width:220px;background:rgba(44,44,46,.98);border-radius:14px;padding:4px;box-shadow:0 10px 40px rgba(0,0,0,.6);}
 .remote-stage .remote-card-menu button {display:block;width:100%;height:auto;margin:0;padding:12px;border:0;border-radius:10px;background:none;color:#fff;font-size:16px;text-align:left;cursor:pointer;}
