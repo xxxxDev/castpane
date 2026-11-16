@@ -1154,8 +1154,8 @@ function toggleCompose() {
   compose.value = true;
   nextTick(() => composeField.value?.focus({ preventScroll: true }));
 }
-// Empty, Send is Return on the Mac: what was just put in its field goes too, without
-// leaving the pencil's field for the keyboard.
+// Send types the card's text where the Mac's cursor is and presses Return, as a message is
+// sent; empty, it is Return alone. The pencil's field keeps the keyboard.
 async function sendCompose() {
   const s = composeText.value;
   if (!s) { tap('Enter');composeField.value?.focus({ preventScroll: true });return; }
@@ -1163,6 +1163,9 @@ async function sendCompose() {
   // would be a Return the app acts on. Not pasted, they stay here to send again.
   if (/[\r\n]/.test(s)) { if (!(await pasteAtCursor(s, true))) { composeField.value?.focus({ preventScroll: true });return; } }
   else { const chars = [...s];for (let i = 0; i < chars.length; i += 1000) link?.send({ t: 'text', s: chars.slice(i, i + 1000).join('') }); }
+  // Sent as a message is: the text, then Return (a moment after a paste, so it lands first).
+  await new Promise((r) => setTimeout(r, 120));
+  link?.send({ t: 'key', code: 'Enter', down: true, mods: [] });link?.send({ t: 'key', code: 'Enter', down: false, mods: [] });
   if (composeText.value === s) composeText.value = '';
   releaseMods();
   nextTick(growCompose);
