@@ -127,6 +127,7 @@ const english = {
 "Castpane 帳號":"Castpane account",
 "已停用":"Disabled",
 "安全":"Security",
+"系統":"System",
 "這台裝置":"This device",
 "連到這台 Mac 用的帳號":"The account used to connect to this Mac",
 "信任後一段時間內開遠端不用再驗證":"Trusted, Remote opens without asking again for a while",

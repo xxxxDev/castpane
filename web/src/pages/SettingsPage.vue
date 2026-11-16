@@ -2,7 +2,7 @@
   <f7-page name="settings" class="page-large-static">
     <f7-navbar large :title="t('tabSettings')" />
 
-    <!-- Remote first, then the one Castpane account, its security, this device. -->
+    <!-- Remote, the Castpane account, its security, then the system. -->
     <f7-block-title>{{ ct('遠端') }}</f7-block-title>
     <f7-list inset class="cc-settings-list">
       <!-- The whole screen lists the Mac's desktops; its windows too only when this is on
@@ -22,21 +22,22 @@
       <f7-list-item link :title="t('changePassword')" @click.prevent="goChangePassword">
         <template #media><f7-icon f7="lock" /></template>
       </f7-list-item>
-      <f7-list-item link :title="ct('通行密鑰')" class="passkeys-row" @click.prevent="goPasskeys"><template #media><f7-icon f7="checkmark_shield" /></template></f7-list-item>
-      <f7-list-item link :title="ct('兩步驟驗證')" :after="currentUser?.twoStep ? ct('已開啟') : ct('未開啟')" class="two-step-row" @click.prevent="goTwoStep"><template #media><f7-icon f7="lock_shield" /></template></f7-list-item>
       <f7-list-item v-if="handheld" link :title="ct('掃碼登入')" class="scan-login-row" @click.prevent="goScanLogin"><template #media><f7-icon f7="qrcode_viewfinder" /></template></f7-list-item>
     </f7-list>
 
 
     <f7-block-title>{{ ct('安全') }}</f7-block-title>
     <f7-list inset class="cc-settings-list">
+      <f7-list-item link :title="ct('兩步驟驗證')" :after="currentUser?.twoStep ? ct('已開啟') : ct('未開啟')" class="two-step-row" @click.prevent="goTwoStep"><template #media><f7-icon f7="lock_shield" /></template></f7-list-item>
+      <f7-list-item link :title="ct('通行密鑰')" class="passkeys-row" @click.prevent="goPasskeys"><template #media><f7-icon f7="checkmark_shield" /></template></f7-list-item>
       <f7-list-item link :title="ct('裝置')" class="devices-row" @click.prevent="goDevices"><template #media><f7-icon f7="device_phone_portrait" /></template></f7-list-item>
       <f7-list-item v-if="currentUser?.role === 'admin'" link class="trusted-row" :title="ct('信任的裝置')" :footer="ct('信任後一段時間內開遠端不用再驗證')" @click.prevent="go('/trusted/')"><template #media><f7-icon f7="hand_thumbsup"/></template></f7-list-item>
+      <f7-list-item v-if="currentUser?.role === 'admin'" :title="ct('信任這台裝置')" :footer="trustFooter" class="trust-row"><template #media><f7-icon f7="hand_thumbsup"/></template><template #after><label class="toggle"><input type="checkbox" :aria-label="ct('信任這台裝置')" :checked="trust.trusted" :disabled="trustBusy" @change="onTrustToggle($event)"/><span class="toggle-icon"></span></label></template></f7-list-item>
       <f7-list-item v-if="currentUser?.role === 'admin'" link class="security-row" :title="ct('登入防禦')" :footer="ct('誰試過登入、從哪裡、哪些位址被擋')" @click.prevent="go('/security/')"><template #media><f7-icon f7="shield_lefthalf_fill"/></template></f7-list-item>
     </f7-list>
     <p class="settings-note">{{ ct('遠端連線的開始與結束，以及每次登入，也會列在這台 Mac 上 Castpane 設定的「活動」分頁。') }}</p>
 
-    <f7-block-title>{{ ct('這台裝置') }}</f7-block-title>
+    <f7-block-title>{{ ct('系統') }}</f7-block-title>
     <f7-list inset class="cc-settings-list">
       <!-- Notifications; while they are on, a small test button sits left of the switch
            inside the same row, so the switch keeps the other rows' line. -->
@@ -61,8 +62,6 @@
           </div>
         </div>
       </li>
-      <!-- This device trusted to open Remote without asking each time (js/trust.js). -->
-      <f7-list-item v-if="currentUser?.role === 'admin'" :title="ct('信任這台裝置')" :footer="trustFooter" class="trust-row"><template #media><f7-icon f7="hand_thumbsup"/></template><template #after><label class="toggle"><input type="checkbox" :aria-label="ct('信任這台裝置')" :checked="trust.trusted" :disabled="trustBusy" @change="onTrustToggle($event)"/><span class="toggle-icon"></span></label></template></f7-list-item>
       <f7-list-item link no-chevron :title="t('panelLanguage')" :after="language==='zh-TW'?'中文':'English'" @click.prevent="openDropdown($event)"><template #media><f7-icon f7="globe"/></template></f7-list-item>
       <f7-list-item :title="ct('深色模式')">
         <template #media><f7-icon f7="moon_fill"/></template><template #after><label class="toggle"><input type="checkbox" :aria-label="ct('深色模式')" :checked="theme==='dark'" @change="setTheme($event.target.checked?'dark':'light')"/><span class="toggle-icon"></span></label></template>
