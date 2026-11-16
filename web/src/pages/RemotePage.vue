@@ -34,12 +34,16 @@
         <!-- The Mac's desktops first, then the windows on the one picked: whole
              screens, each desktop, full-screen apps, the Dock. -->
         <div v-if="appMode !== 'home'" class="remote-head" :class="{collapsed: headFolded && appMode === 'desktop'}">
+        <!-- Labs: back to the apps at the top left, the size and place an app's own bar has it. -->
+        <div v-if="labs && appMode === 'desktop'" class="remote-apphead remote-desktop-head">
+          <button type="button" class="remote-apphead-back remote-desktop-back" @click="goHome"><f7-icon f7="chevron_left" :size="17"/>{{ ct('首頁') }}</button>
+          <div class="remote-apphead-title">{{ ct('整個螢幕') }}</div>
+          <span class="remote-desktop-head-end" aria-hidden="true"></span>
+        </div>
         <div v-if="appMode === 'desktop' && groups.length > 1 && !headFolded" class="remote-desks" role="tablist">
           <button v-for="g in groups" :key="g.key" type="button" class="remote-desk" :class="{active: g.key === groupKey, current: g.current}" @click="groupKey = g.key">{{ g.label }}<span class="remote-desk-count">{{ g.items.length }}</span></button>
         </div>
         <div v-if="appMode === 'desktop'" class="remote-bar">
-          <!-- Labs: back to the apps, where an app's own bar has it (a grid icon at the right was missed). -->
-          <button v-if="labs" type="button" class="remote-apphead-back remote-desktop-back" @click="goHome"><f7-icon f7="chevron_left" :size="17"/>{{ ct('首頁') }}</button>
           <div v-if="!headFolded" class="remote-thumbs" role="tablist">
             <button v-for="w in shownItems" :key="w.kind + w.id" type="button" class="remote-thumb" :class="{active: current && current.kind === w.kind && current.id === w.id}" :title="w.app ? w.app + ' · ' + w.title : w.title" @click="show(w)">
               <img v-if="w.thumb" :src="w.thumb" alt=""/><f7-icon v-else :f7="w.kind === 'display' ? 'desktopcomputer' : 'macwindow'" :size="20"/>
@@ -1266,6 +1270,7 @@ function quitApp(w) {
     text: ct('像在 Mac 上按 ⌘Q，這個 App 的所有視窗都會關閉。有沒存的文件時，Mac 上會先問要不要存。'),
     buttons: [{ text: ct('取消') }, { text: ct('結束'), bold: true, color: 'red', onClick: () => {
       link?.send({ t: 'quit', bundle: w.bundle });
+      quitWatch = { bundle: w.bundle, name, at: Date.now() };setTimeout(list, 3000);
       const gone = new Set(items.value.filter((x) => x.kind === 'window' && x.bundle === w.bundle).map((x) => x.id));
       items.value = items.value.filter((x) => !gone.has(x.id));switcherCards.value = switcherCards.value.filter((x) => !gone.has(x.id));
       if (current.value?.kind === 'window' && gone.has(current.value.id)) goHome();
@@ -1273,7 +1278,18 @@ function quitApp(w) {
   }).open();
 }
 // The list came: a window of the app being opened, or the one to come back to.
+// An app asked to quit that still has its windows a few seconds on: it asks something on the Mac
+// (unsaved documents, or its own "Quit?"), which the page cannot see from here.
+let quitWatch = null;
+function quitStillOpen() {
+  if (!quitWatch || Date.now() - quitWatch.at < 2500) return;
+  const w = quitWatch;quitWatch = null;
+  if (Date.now() - w.at > 15000 || !items.value.some((x) => x.kind === 'window' && x.bundle === w.bundle)) return;
+  f7.dialog.create({ title: ct('「{name}」還沒結束').replace('{name}', () => w.name), text: ct('它可能正在 Mac 上詢問（例如要不要存檔），可以到整個螢幕回答。'),
+    buttons: [{ text: ct('好') }, { text: ct('整個螢幕'), bold: true, onClick: () => goDesktop() }] }).open();
+}
 function appsListed() {
+  quitStillOpen();
   if (launching.value) {
     const w = items.value.find((x) => x.kind === 'window' && x.bundle === launching.value && x.id !== launchSkip);
     if (w) { launching.value = '';clearInterval(launchTimer);openWindow(w); }
@@ -1879,7 +1895,9 @@ function keyUp(e) {
 /* Over an app or the whole screen: above the keys and the bar at the bottom, clear of the
    head, whose height changes with the desktops and windows rows. */
 .remote-home-launching.over {bottom:calc(env(safe-area-inset-bottom) + 100px);}
-.remote-stage .remote-desktop-back {padding-left:0;}
+.remote-desktop-head {padding-bottom:0;}
+/* As wide as the back button, so the title stays centred. */
+.remote-desktop-head-end {flex:0 0 auto;width:64px;}
 .remote-card-menu-layer {position:absolute;inset:0;z-index:6;}
 .remote-card-menu {position:absolute;width:220px;background:rgba(44,44,46,.98);border-radius:14px;padding:4px;box-shadow:0 10px 40px rgba(0,0,0,.6);}
 .remote-stage .remote-card-menu button {display:block;width:100%;height:auto;margin:0;padding:12px;border:0;border-radius:10px;background:none;color:#fff;font-size:16px;text-align:left;cursor:pointer;}
