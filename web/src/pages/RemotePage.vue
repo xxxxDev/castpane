@@ -94,6 +94,7 @@
             <button v-if="macWindows" type="button" class="remote-menu-item minimize" @click="menuOpen = false;minimizeWindow(currentWindow)"><f7-icon f7="arrow_down_right_square" :size="18"/>{{ ct('縮到 Dock') }}</button>
             <button type="button" class="remote-menu-item close-window" @click="menuOpen = false;closeWindow(currentWindow)"><f7-icon f7="xmark_square" :size="18"/>{{ ct('關閉視窗') }}</button>
             <button v-if="mayQuit(currentWindow)" type="button" class="remote-menu-item quit-app" @click="menuOpen = false;quitApp(currentWindow)"><f7-icon f7="power" :size="18"/>{{ ct('結束 App') }}</button>
+            <button v-if="mayQuit(currentWindow)" type="button" class="remote-menu-item force-quit" @click="menuOpen = false;forceQuit(currentWindow)"><f7-icon f7="exclamationmark_octagon" :size="18"/>{{ ct('強制結束') }}</button>
             <div class="remote-menu-sep"></div>
           </template>
           <template v-if="appMode === 'app'">
@@ -163,7 +164,7 @@
           <button type="button" class="remote-home-launching-cancel" :title="ct('取消')" :aria-label="ct('取消')" @click="stopLaunch"><f7-icon f7="xmark" :size="13"/></button>
         </div>
         <!-- An app's windows to choose from (its card's number, or More › Other windows). -->
-        <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''" :can-quit="mayQuit(windowsOfList[0])" @quit="() => { const w = windowsOfList[0];windowsOf = '';quitApp(w); }"/>
+        <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''" :can-quit="mayQuit(windowsOfList[0])" @quit="() => { const w = windowsOfList[0];windowsOf = '';quitApp(w); }" @force-quit="() => { const w = windowsOfList[0];windowsOf = '';forceQuit(w); }"/>
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
         <button v-if="macWindows && appMode !== 'home' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @close="dockOpen = false"/>
@@ -206,6 +207,7 @@
               <button v-if="macWindows" type="button" class="minimize" @click="minimizeWindow(cardMenu.w);cardMenu = null">{{ ct('縮到 Dock') }}</button>
               <button type="button" class="close-window" @click="closeWindow(cardMenu.w);cardMenu = null">{{ ct('關閉視窗') }}</button>
               <button v-if="mayQuit(cardMenu.w)" type="button" class="quit-app" @click="quitApp(cardMenu.w);cardMenu = null">{{ ct('結束 App') }}</button>
+              <button v-if="mayQuit(cardMenu.w)" type="button" class="force-quit" @click="forceQuit(cardMenu.w);cardMenu = null">{{ ct('強制結束') }}</button>
             </div>
           </div>
         </div>
@@ -1292,13 +1294,14 @@ function quitStillOpen() {
   if (!quitWatch || Date.now() - quitWatch.at < 2500) return;
   const w = quitWatch;quitWatch = null;
   if (Date.now() - w.at > 15000 || !items.value.some((x) => x.kind === 'window' && x.bundle === w.bundle)) return;
-  f7.dialog.create({ title: ct('「{name}」還沒結束').replace('{name}', () => w.name), text: ct('它可能正在 Mac 上詢問（例如要不要存檔），可以到整個螢幕回答，或強制結束。'), verticalButtons: true,
-    buttons: [{ text: ct('整個螢幕'), bold: true, onClick: () => goDesktop() }, { text: ct('強制結束'), color: 'red', onClick: () => forceQuit(w) }, { text: ct('取消') }] }).open();
+  f7.dialog.create({ title: ct('「{name}」還沒結束').replace('{name}', () => w.name), text: ct('它可能正在 Mac 上詢問（例如要不要存檔），可以到整個螢幕回答。'),
+    buttons: [{ text: ct('好') }, { text: ct('整個螢幕'), bold: true, onClick: () => goDesktop() }] }).open();
 }
 // As the Mac's Force Quit: no question asked, nothing saved. Asked once more here.
 function forceQuit(w) {
+  w = { ...w, name: w.name || w.app || apps.value.find((a) => a.bundle === w.bundle)?.name || w.bundle };
   const on = machine;
-  f7.dialog.create({ title: ct('強制結束「{name}」？').replace('{name}', () => w.name), text: ct('它不會先存檔或詢問：沒存的內容、正在跑的指令都會直接中斷。'),
+  f7.dialog.create({ title: ct('強制結束「{name}」？').replace('{name}', () => w.name), text: ct('這是強制結束：App 會直接關掉，不會先存檔或詢問，沒存的內容和它正在做的事都可能不見。'),
     buttons: [{ text: ct('取消') }, { text: ct('強制結束'), bold: true, color: 'red', onClick: () => {
       // Only to the Mac it was asked about: the page may have gone to another since.
       if (machine !== on || !link) return;

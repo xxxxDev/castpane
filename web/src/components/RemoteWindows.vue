@@ -21,14 +21,17 @@
         </button>
       </div>
       <!-- The whole app, all its windows: asked first, as from its menu. -->
-      <button v-if="canQuit" type="button" class="remote-windows-quit" @click="$emit('quit')"><f7-icon f7="power" :size="17"/>{{ ct('結束 App') }}</button>
+      <div v-if="canQuit" class="remote-windows-quits">
+        <button type="button" class="remote-windows-quit" @click="$emit('quit')"><f7-icon f7="power" :size="17"/>{{ ct('結束 App') }}</button>
+        <button type="button" class="remote-windows-quit force" @click="$emit('forceQuit')"><f7-icon f7="exclamationmark_octagon" :size="17"/>{{ ct('強制結束') }}</button>
+      </div>
     </div>
   </div>
 </template>
 <script setup>
 import { ct } from '../js/text.js';
 defineProps({ name: { type: String, default: '' }, icon: { type: String, default: '' }, windows: { type: Array, default: () => [] }, currentId: { type: Number, default: null }, canQuit: { type: Boolean, default: false } });
-defineEmits(['pick', 'close', 'quit']);
+defineEmits(['pick', 'close', 'quit', 'forceQuit']);
 function where(w) {
   if (w.minimized) return ct('在 Dock 裡');
   if (w.desk?.fullscreen) return ct('全螢幕');
@@ -48,7 +51,8 @@ function where(w) {
 .remote-windows-row.now {outline:2px solid #0a84ff;}
 .remote-windows-row img, .remote-windows-blank {flex:0 0 auto;width:104px;height:72px;object-fit:cover;object-position:top;border-radius:8px;background:#000;}
 .remote-windows-text {min-width:0;}
-.remote-stage .remote-windows-quit {flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;margin:4px 0 0;padding:0;border:0;border-radius:12px;background:#2c2c2e;color:#ff6961;font-size:16px;cursor:pointer;}
+.remote-windows-quits {flex:0 0 auto;display:flex;gap:10px;}
+.remote-stage .remote-windows-quit {flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;margin:4px 0 0;padding:0;border:0;border-radius:12px;background:#2c2c2e;color:#ff6961;font-size:16px;cursor:pointer;}
 .remote-windows-text b {display:block;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-windows-text i {display:block;font-style:normal;font-size:12px;color:#999;margin-top:3px;}
 </style>

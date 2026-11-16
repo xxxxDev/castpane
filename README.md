@@ -63,10 +63,11 @@ back, with touch modes made for a small screen.
 </p>
 
 - **The Mac's apps, as a phone's.** The Remote tab opens on the apps open on the Mac, one card
-  each, all of them, those on a desktop or those in the Dock, two a row or one. The Mac's Dock
-  stays open at the left: its apps (a dot under those running) and the windows put in it. Each
-  card has a Mac window's red and yellow buttons, to close its window or put it in the Dock,
-  and the number of its windows; a card with several asks which one.
+  each. Three filters pick all of them, those on a desktop, or those in the Dock; on a phone
+  the cards sit two a row or one. The Mac's Dock stays open at the left: its apps (a dot beside
+  those running) and the windows put in it. Each card has a Mac window's red and yellow
+  buttons, to close its window or put it in the Dock, and the number of its windows; a card
+  with several asks which one, with Quit app and Force quit at the foot.
 - **Every app.** All apps lists every app on the Mac as Launchpad shows them, with a search
   field; one not running starts, says so while it does, and its window opens as soon as it has
   one.
@@ -80,14 +81,17 @@ back, with touch modes made for a small screen.
 - **Moving between apps as on a phone.** Slide the bar at the bottom sideways for the app used
   before or after, up for the open windows as cards (tap one to open it, slide one up to close
   that window on the Mac, hold one for more), or slide in from the left edge for the home.
-- **Windows, the Dock and quitting.** An app's menu puts its window in the Dock, closes it, or
+- **Windows, the Dock and quitting.** An app's menu puts its window in the Dock, closes it,
   quits the app as ⌘Q does (asked first; an app that stays, asking something on the Mac, is
-  said so, with the whole screen a tap away, or a force quit, asked once more).
+  said so, with the whole screen a tap away), or forces it to quit at once, warned first that
+  nothing unsaved is kept. The Dock, the yellow button, Minimize and the quitting need the Mac
+  app from this version on; an older Mac shows the rest.
 - **The whole screen too.** One button at the top of the home shows a whole display, or all of
-  them side by side. Settings can list the desktops (Spaces), full-screen apps and every window
-  there as well, grouped by desktop with thumbnails. A window on another desktop, or one its
-  app keeps closed in the background, comes up as a click on its Dock icon brings it; when you
-  leave or turn to another, it goes back out of sight as it was.
+  them side by side. **Settings › System › Whole screen lists app windows too** lists the
+  desktops (Spaces), full-screen apps and every window there as well, grouped by desktop with
+  thumbnails. A window on another desktop, or one its app keeps closed in the background, comes
+  up as a click on its Dock icon brings it; when you leave or turn to another, it goes back out
+  of sight as it was.
 - **Asleep or locked.** Connecting wakes the Mac's display, and it stays on while you watch.
   A locked Mac asks for its password in a small window and unlocks; it locks again when you
   leave, or when the phone drops off the network.

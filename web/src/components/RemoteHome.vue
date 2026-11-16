@@ -19,7 +19,7 @@
     <div class="remote-home-title">
       <!-- Which apps: those with a window on a desktop, those put in the Dock, or both. -->
       <span class="remote-home-filter" role="tablist" :aria-label="ct('開著的 App')">
-        <button v-for="f in FILTERS" :key="f.id" type="button" role="tab" :class="['filter-' + f.id, {on: filter === f.id}]" :aria-selected="filter === f.id" @click="setFilter(f.id)">{{ ct(f.label) }}</button>
+        <button v-for="f in FILTERS.filter((x) => canMinimize || x.id === 'all')" :key="f.id" type="button" role="tab" :class="['filter-' + f.id, {on: filter === f.id}]" :aria-selected="filter === f.id" @click="setFilter(f.id)">{{ ct(f.label) }}</button>
       </span>
       <!-- Two a row or one: kept on this device. -->
       <span class="remote-home-cols" role="group" :aria-label="ct('排列')">
@@ -27,9 +27,10 @@
         <button type="button" class="cols-1" :class="{on: cols === 1}" :title="ct('一列一個')" :aria-label="ct('一列一個')" :aria-pressed="cols === 1" @click="setCols(1)"><f7-icon f7="rectangle_grid_1x2" :size="15"/></button>
       </span>
     </div>
-    <div v-if="!openApps.length" class="remote-home-empty">{{ ct('正在讀取…') }}</div>
+    <div v-if="!windows.length" class="remote-home-empty">{{ ct('正在讀取…') }}</div>
+    <div v-else-if="!openApps.length" class="remote-home-empty">{{ ct('這裡沒有 App') }}</div>
     <div class="remote-home-open" :class="{one: cols === 1}">
-      <button v-for="o in openApps" :key="o.key" type="button" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
+      <div v-for="o in openApps" :key="o.key" role="button" tabindex="0" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.enter.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.space.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
         <span class="remote-home-shot">
           <!-- A Mac window's buttons, as big as the bar's: red at the top left closes the window
                on top, yellow at the top right puts it in the Dock; the number of windows at the
@@ -41,7 +42,7 @@
           <span v-if="o.count > 1" class="remote-home-count">{{ o.count }}</span>
         </span>
         <span class="remote-home-label">{{ o.name }}</span>
-      </button>
+      </div>
     </div>
 
     </div>
@@ -82,7 +83,9 @@ const filter = ref((() => { try { const f = localStorage.getItem(FILTER_KEY);ret
 function setFilter(f) { filter.value = f;try { localStorage.setItem(FILTER_KEY, f); } catch { /* this time only */ } }
 const openApps = computed(() => {
   const seen = new Map();
-  const wanted = (w) => filter.value === 'all' || (filter.value === 'dock' ? !!w.minimized : !w.minimized);
+  // A Mac that cannot say which windows are in the Dock shows all of them.
+  const f = props.canMinimize ? filter.value : 'all';
+  const wanted = (w) => f === 'all' || (f === 'dock' ? !!w.minimized : !w.minimized);
   for (const w of props.windows.filter(wanted)) {
     const key = w.bundle || w.app || String(w.id);
     if (seen.has(key)) seen.get(key).count++;
