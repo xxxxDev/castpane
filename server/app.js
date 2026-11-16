@@ -10,7 +10,7 @@ const authRoutes = require('./routes/authRoutes');
 const pushRoutes = require('./routes/pushRoutes');
 const { security } = require('./services/securityLog');
 const { resolveClientIp } = require('./services/clientIp');
-const { audit } = require('./services/audit');
+const { audit, auditRefused } = require('./services/audit');
 const { verifyToken } = require('./middlewares/authMiddleware');
 const {
   isAllowedOrigin,
@@ -122,7 +122,8 @@ function createApp({ remoteRoutes = null, localRoutes = null } = {}) {
   app.use('/api', (req, res, next) => {
     const started = Date.now();
     res.on('finish', () => {
-      audit({
+      // A request from someone not signed in is budgeted: anyone can send those.
+      (!req.username ? auditRefused : audit)({
         method: req.method,
         path: req.originalUrl,
         status: res.statusCode,
