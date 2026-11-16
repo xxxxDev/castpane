@@ -65,8 +65,8 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   (recovery codes still work). Every sign-in step has its own rate limit.
 - Changes are limited per address too. That table keeps at most 5,000 addresses at a time,
   the oldest let go first, so filling it does not lock new visitors out; past 16 IPv6 /64s
-  under one /48, the rest of that /48 shares one bucket. Someone with more addresses than
-  that can get past the per-address limit; the per-account sign-in lockout still holds.
+  under one /48, the rest of that /48 shares one bucket. Someone with more than 5,000
+  addresses can get past the per-address limit; the per-account sign-in lockout still holds.
 - Admins see what was tried, from where, and which addresses are blocked, and can block or
   unblock an address (but not their own).
 - Passkeys are bound to the public HTTPS address. A key cannot be used from another origin, and
