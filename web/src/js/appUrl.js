@@ -16,6 +16,7 @@ const SETTINGS_PAGES = [
   {route: '/scan-login/', path: '/settings/scan-login', parent: '/settings/'},
   {route: '/devices/', path: '/settings/devices', parent: '/settings/'},
   {route: '/no-fit/', path: '/settings/no-fit', parent: '/settings/'},
+  {route: '/key-row/', path: '/settings/key-row', parent: '/settings/'},
   {route: '/security/', path: '/settings/security', parent: '/settings/', admin: true},
   {route: '/trusted/', path: '/settings/trusted', parent: '/settings/', admin: true},
 ];

@@ -229,36 +229,18 @@
              sideways, with the keyboard's own round button beside it; ⇧ ⌃ ⌥ ⌘ hold for the
              next key. Always there, so the keyboard can be called up from it. -->
         <div v-if="isTouch && appMode !== 'home'" class="remote-keys remote-keys-touch" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
-          <!-- The Mac's Dock, its own round button at the row's left (on a computer, the handle at
-               the left edge). -->
-          <button v-if="macWindows" type="button" class="remote-round dock-btn" :class="{on: dockOpen}" :aria-pressed="dockOpen" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.prevent @mousedown.prevent @click="dockOpen ? (dockOpen = false) : openDock()"><f7-icon f7="rectangle_dock" :size="18"/></button>
-          <div class="remote-keys-box">
-            <!-- Four pages, as CC Agent's terminal keys: a terminal's keys; the Mac's modifier
-                 keys, its clipboard and the key panel; editing and moving keys; its desktops. -->
+          <!-- As set in Settings › Remote › Key row (js/remotePrefs.js): a round button at most at
+               the left, two at the right, four pages of keys between; any key in any of them. -->
+          <template v-for="id in rowKeys.left" :key="'l' + id"><button v-if="keyDef(id)" type="button" :class="['remote-round', keyDef(id).cls, {on: keyDef(id).on}]" :data-key="id" :aria-pressed="keyDef(id).pressed" :title="keyDef(id).title" :aria-label="keyDef(id).title" @pointerdown.prevent @mousedown.prevent @click="keyDef(id).act()"><f7-icon :f7="keyDef(id).icon" :size="18"/></button></template>
+          <div v-if="rowKeys.pages.length" class="remote-keys-box">
             <div ref="keyTrack" class="remote-keys-track" @scroll.passive="keyPaged">
-              <div class="remote-keys-page">
-                <button v-for="k in TERM_KEYS" :key="k.name" type="button" class="remote-key term" :data-key="k.name" :title="k.name" :aria-label="k.name" @pointerdown.prevent @click="press(k)"><f7-icon v-if="k.icon" :f7="k.icon" :size="15"/><template v-else><span v-if="k.shift" class="remote-key-mod">⇧</span>{{ k.label }}</template></button>
-              </div>
-              <div class="remote-keys-page">
-                <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
-                <button type="button" class="remote-key tool clip-btn" :class="{on: clipOpen}" :title="ct('剪貼簿')" :aria-label="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="16"/></button>
-                <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :aria-pressed="panel" :title="ct('按鍵面板')" :aria-label="ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon f7="square_grid_2x2" :size="16"/></button>
-              </div>
-              <div class="remote-keys-page">
-                <button v-for="k in EDIT_KEYS" :key="k.code" type="button" class="remote-key term" :data-key="k.name" :title="k.name" :aria-label="k.name" @pointerdown.prevent @click="press(k)"><f7-icon v-if="k.icon" :f7="k.icon" :size="16"/><template v-else>{{ k.label }}</template></button>
-              </div>
-              <div class="remote-keys-page few">
-                <button type="button" class="remote-key tool mission" :title="ct('指揮中心')" :aria-label="ct('指揮中心')" @pointerdown.prevent @click="space('ArrowUp')"><f7-icon f7="rectangle_3_offgrid" :size="16"/></button>
-                <button type="button" class="remote-key tool space-left" :title="ct('上一個桌面')" :aria-label="ct('上一個桌面')" @pointerdown.prevent @click="space('ArrowLeft')"><f7-icon f7="arrow_left_square" :size="16"/></button>
-                <button type="button" class="remote-key tool space-right" :title="ct('下一個桌面')" :aria-label="ct('下一個桌面')" @pointerdown.prevent @click="space('ArrowRight')"><f7-icon f7="arrow_right_square" :size="16"/></button>
+              <div v-for="(pg, i) in rowKeys.pages" :key="i" class="remote-keys-page" :class="{few: pg.length <= 4}">
+                <template v-for="id in pg" :key="id"><button v-if="keyDef(id)" type="button" :class="['remote-key', keyDef(id).cls, {on: keyDef(id).on}]" :data-key="id" :aria-pressed="keyDef(id).pressed" :title="keyDef(id).title" :aria-label="keyDef(id).title" @pointerdown.prevent @mousedown.prevent @click="keyDef(id).act()"><f7-icon v-if="keyDef(id).icon" :f7="keyDef(id).icon" :size="16"/><template v-else><span v-if="keyDef(id).shift" class="remote-key-mod">⇧</span>{{ keyDef(id).label }}</template></button></template>
               </div>
             </div>
           </div>
-          <div class="remote-keys-dots" aria-hidden="true"><span v-for="i in 4" :key="i" :class="{on: i - 1 === keyPage}"></span></div>
-          <!-- Follows whether the keyboard is really up (the page's height), not the field's
-               focus: on an iPhone a focused field does not mean a keyboard came up. -->
-          <button type="button" class="remote-round kb-btn" :title="kbShown ? ct('收起鍵盤') : ct('叫出鍵盤')" :aria-label="kbShown ? ct('收起鍵盤') : ct('叫出鍵盤')" @pointerdown.prevent @mousedown.prevent @click="kbButton"><f7-icon :f7="kbShown ? 'keyboard_chevron_compact_down' : 'keyboard'" :size="18"/></button>
-          <button type="button" class="remote-round compose-btn" :class="{on: compose}" :aria-pressed="compose" :title="ct('輸入文字')" :aria-label="ct('輸入文字')" @pointerdown.prevent @mousedown.prevent @click="toggleCompose"><f7-icon :f7="compose ? 'square_pencil_fill' : 'square_pencil'" :size="18"/></button>
+          <div v-if="rowKeys.pages.length > 1" class="remote-keys-dots" aria-hidden="true"><span v-for="i in rowKeys.pages.length" :key="i" :class="{on: i - 1 === keyPage}"></span></div>
+          <template v-for="id in rowKeys.right" :key="'r' + id"><button v-if="keyDef(id)" type="button" :class="['remote-round', keyDef(id).cls, {on: keyDef(id).on}]" :data-key="id" :aria-pressed="keyDef(id).pressed" :title="keyDef(id).title" :aria-label="keyDef(id).title" @pointerdown.prevent @mousedown.prevent @click="keyDef(id).act()"><f7-icon :f7="keyDef(id).icon" :size="18"/></button></template>
         </div>
         <div v-if="!isTouch && keyboardOpen" class="remote-keys" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
           <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
@@ -293,7 +275,7 @@ import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
 import RemoteHome from '../components/RemoteHome.vue';
-import { deskWindows } from '../js/remotePrefs.js';
+import { deskWindows, keyLayout } from '../js/remotePrefs.js';
 import RemoteWindows from '../components/RemoteWindows.vue';
 import RemoteDock from '../components/RemoteDock.vue';
 import { trustedPass } from '../js/trust.js';
@@ -331,6 +313,32 @@ const EDIT_KEYS = [{ code: 'Backspace', icon: 'delete_left', name: 'delete' }, {
 const LAST_KEYS = [{ code: 'Backspace', label: '⌫', icon: 'delete_left', name: 'delete' }, { code: 'Enter', label: '⏎', icon: 'return', name: 'return' }, { code: 'ArrowLeft', label: '←', icon: 'arrow_left', name: '←' }, { code: 'ArrowUp', label: '↑', icon: 'arrow_up', name: '↑' }, { code: 'ArrowDown', label: '↓', icon: 'arrow_down', name: '↓' }, { code: 'ArrowRight', label: '→', icon: 'arrow_right', name: '→' }];
 // The phone's capsule: which page of keys shows.
 const keyTrack = ref(null), keyPage = ref(0);
+// The row as set (js/remotePrefs.js), without the Dock on a Mac that cannot list it and
+// without empty pages.
+const rowKeys = computed(() => {
+  const l = keyLayout.value, ok = (id) => id !== 'dock' || macWindows.value;
+  return { left: l.left.filter(ok), right: l.right.filter(ok), pages: l.pages.map((p) => p.filter(ok)).filter((p) => p.length) };
+});
+// What a key in the row is and does, wherever it is put. The keyboard's follows whether it is
+// really up (the page's height), not the field's focus: on an iPhone a focused field does not
+// mean a keyboard came up.
+function keyDef(id) {
+  const k = TERM_KEYS.find((x) => x.name === id) || EDIT_KEYS.find((x) => x.name === id);
+  if (k) return { cls: 'term', icon: k.icon, label: k.label, shift: k.shift, title: k.name, act: () => press(k) };
+  const m = MODS.find((x) => x.id === id);
+  if (m) return { cls: 'mod', label: m.label, on: held.has(id), title: m.label, act: () => toggleMod(id) };
+  switch (id) {
+    case 'dock': return { cls: 'tool dock-btn', icon: 'rectangle_dock', on: dockOpen.value, pressed: dockOpen.value, title: ct('Dock'), act: () => (dockOpen.value ? (dockOpen.value = false) : openDock()) };
+    case 'kb': return { cls: 'tool kb-btn', icon: kbShown.value ? 'keyboard_chevron_compact_down' : 'keyboard', title: kbShown.value ? ct('收起鍵盤') : ct('叫出鍵盤'), act: kbButton };
+    case 'compose': return { cls: 'tool compose-btn', icon: compose.value ? 'square_pencil_fill' : 'square_pencil', on: compose.value, pressed: compose.value, title: ct('輸入文字'), act: toggleCompose };
+    case 'clip': return { cls: 'tool clip-btn', icon: 'doc_on_clipboard', on: clipOpen.value, title: ct('剪貼簿'), act: () => { clipOpen.value = !clipOpen.value; } };
+    case 'panel': return { cls: 'tool panel-btn', icon: 'square_grid_2x2', on: panel.value, pressed: panel.value, title: ct('按鍵面板'), act: togglePanel };
+    case 'mission': return { cls: 'tool mission', icon: 'rectangle_3_offgrid', title: ct('指揮中心'), act: () => space('ArrowUp') };
+    case 'space-left': return { cls: 'tool space-left', icon: 'arrow_left_square', title: ct('上一個桌面'), act: () => space('ArrowLeft') };
+    case 'space-right': return { cls: 'tool space-right', icon: 'arrow_right_square', title: ct('下一個桌面'), act: () => space('ArrowRight') };
+  }
+  return null;
+}
 function keyPaged() { const el = keyTrack.value;if (el?.clientWidth) keyPage.value = Math.round(el.scrollLeft / el.clientWidth); }
 // Whether a keyboard really covers the page now (fitViewport), for the round button.
 const kbShown = ref(false);
@@ -1848,7 +1856,9 @@ function keyUp(e) {
 .remote-keys-page {flex:0 0 100%;display:flex;align-items:center;padding:0 4px;box-sizing:border-box;scroll-snap-align:start;}
 .remote-stage .remote-keys-touch .remote-key {flex:1 1 0;min-width:0;height:34px;padding:0;border-radius:999px;background:transparent;color:rgba(255,255,255,.88);font:14px/1 -apple-system,system-ui,sans-serif;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
 .remote-stage .remote-keys-touch .remote-key.mod {font-size:16px;font-weight:600;}
-.remote-stage .remote-keys-touch .remote-key.term {flex:1 0 auto;min-width:24px;padding:0 2px;font:13px/1 Menlo,monospace;}
+.remote-stage .remote-keys-touch .remote-key.term {flex:1 1 auto;min-width:24px;padding:0 2px;font:13px/1 Menlo,monospace;}
+/* A key moved onto a page (the Dock, the keyboard, the pencil…) keeps room for its icon. */
+.remote-stage .remote-keys-touch .remote-key.tool {min-width:28px;}
 /* ⇧ in the system face: Menlo's is a thin outline set low. */
 .remote-key-mod {font:600 14px/1 -apple-system,system-ui,sans-serif;margin-right:1px;position:relative;top:-1px;}
 /* Few keys: kept at the others' spacing from the left, not spread across the capsule. */

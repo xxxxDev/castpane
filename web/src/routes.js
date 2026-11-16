@@ -8,6 +8,7 @@ import PasskeysPage from './pages/PasskeysPage.vue';
 import SecurityPage from './pages/SecurityPage.vue';
 import TrustedDevicesPage from './pages/TrustedDevicesPage.vue';
 import NoFitPage from './pages/NoFitPage.vue';
+import KeyRowPage from './pages/KeyRowPage.vue';
 
 // Tab-view roots. Each F7 view owns its own router stack and resolves its url here.
 export default [
@@ -22,6 +23,7 @@ export default [
   { path: '/devices/', component: DevicesPage },
   // The apps whose windows are left at their own size.
   { path: '/no-fit/', component: NoFitPage },
+  { path: '/key-row/', component: KeyRowPage },
   // Two-step sign-in and passkeys for this account.
   { path: '/two-step/', component: TwoStepPage },
   { path: '/passkeys/', component: PasskeysPage },
