@@ -25,7 +25,7 @@ export const KEY_NAMES = {
 export const KEY_LIMITS = {left: 1, right: 2};
 export const DEFAULT_LAYOUT = Object.freeze({
   left: ['dock'],
-  pages: [['esc', 'tab', '⇧tab', '↑', '↓', '←', '→', '⌃C'], ['shift', 'ctrl', 'alt', 'meta', 'clip', 'panel'], ['delete', 'return', 'home', 'end', 'page up', 'page down'], ['mission', 'space-left', 'space-right']],
+  pages: [['esc', 'mission', 'space-left', 'space-right', 'panel', 'clip'], ['shift', 'ctrl', 'alt', 'meta', '⌃C', 'return'], ['delete', 'home', 'end', 'page up', 'page down'], ['↑', '↓', '←', '→', 'tab', '⇧tab']],
   right: ['kb', 'compose'],
 });
 const LAYOUT_KEY = PRODUCT.storageKeys.keyLayout;
@@ -62,4 +62,21 @@ export function moveKey(id, to) {
 export function reorderKeys(where, from, to) {
   const l = copy(keyLayout.value), list = where === 'left' ? l.left : where === 'right' ? l.right : l.pages[where];
   list.splice(to, 0, list.splice(from, 1)[0]);setKeyLayout(l);
+}
+// The whole row as one list, its places as markers between the keys (Settings › Remote › Key
+// row drags a key across them). Answers false, the layout kept, when a place would be over
+// its limit.
+export const PLACES = ['left', 0, 1, 2, 3, 'right'];
+export function flatLayout(l = keyLayout.value) {
+  return PLACES.flatMap((w) => [{place: w}, ...(w === 'left' || w === 'right' ? l[w] : l.pages[w]).map((id) => ({id}))]);
+}
+export function setFlatLayout(flat) {
+  const l = {left: [], pages: [[], [], [], []], right: []};
+  let at = 'left';
+  for (const x of flat) {
+    if ('place' in x) { at = x.place;continue; }
+    (at === 'left' || at === 'right' ? l[at] : l.pages[at]).push(x.id);
+  }
+  if (l.left.length > KEY_LIMITS.left || l.right.length > KEY_LIMITS.right) return false;
+  setKeyLayout(l);return true;
 }
