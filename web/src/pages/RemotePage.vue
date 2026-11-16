@@ -1252,7 +1252,9 @@ function appsMessage(msg) {
     dockApps.value = msg.apps || [];dockOthers.value = Array.isArray(msg.others) ? msg.others : [];dockTrash.value = msg.trash === true;
     askIconsFor(dockApps.value.map((a) => a.bundle));
   } else if (msg.t === 'dock-opened') {
-    if (!msg.ok && launching.value === FINDER) { stopLaunch();toast(ct('這個項目打不開')); }
+    const file = fileOpening;fileOpening = '';
+    if (!msg.ok && (launching.value === FINDER || file)) { stopLaunch();toast(ct('這個項目打不開，Dock 可能已經變了')); }
+    else if (msg.ok && file) toast(ct('已在 Mac 上打開「{name}」').replace('{name}', () => file));
   }
   else if (msg.t === 'quit') { if (macWindows.value) setTimeout(() => link?.send({ t: 'dock' }), 1200);if (!msg.ok) { toast(ct('這個 App 沒有結束'));if (quitWatch?.bundle === msg.bundle) quitWatch = null; } }
 }
@@ -1292,18 +1294,20 @@ const FINDER = 'com.apple.finder';
 // A folder already open in the Finder is brought forward there, not opened again: its window
 // (titled with the folder's name) is shown at once. A file opens in its own app: said, as
 // there is no Finder window to wait for.
+let fileOpening = '';
 function openFromDock(request, name, kind = 'folder') {
   const finder = items.value.filter((x) => x.kind === 'window' && x.bundle === FINDER);
   link?.send({ t: 'dock-open', ...request });
   const open = kind === 'folder' && finder.find((x) => x.title === name);
   if (open) { openWindow(open);return; }
-  if (kind === 'file') { toast(ct('已在 Mac 上打開「{name}」').replace('{name}', () => name));return; }
+  // A file: said once the Mac says it opened (dock-opened below).
+  if (kind === 'file') { fileOpening = name;return; }
   waitForWindow(FINDER, new Set(finder.map((x) => x.id)), () => {
     const now = items.value.find((x) => x.kind === 'window' && x.bundle === FINDER && x.title === name);
     if (now) openWindow(now);else noWindow();
   }, name);
 }
-function openDockOther(index, o) { const item = o || dockOthers.value[index];openFromDock({ index }, item?.name || '', item?.kind === 'file' ? 'file' : 'folder'); }
+function openDockOther(index, o) { const item = o || dockOthers.value[index];if (item?.name) openFromDock({ index, name: item.name }, item.name, item.kind === 'file' ? 'file' : 'folder'); }
 function openDockTrash() { openFromDock({ trash: true }, ct('垃圾桶')); }
 // A window gone from here (closed, or put in the Dock): the one shown now goes back home.
 function leaveIfShown(w) { if (current.value?.kind === 'window' && current.value.id === w.id) goHome(); }

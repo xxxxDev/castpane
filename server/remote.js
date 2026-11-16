@@ -92,7 +92,9 @@ const MESSAGES = {
   // exactly one of the two, never a path (other fields dropped, as for every message).
   'dock-open'(m) {
     if (m.index !== undefined && m.trash !== undefined) return null;
-    if (m.index !== undefined) return int(m.index, 0, 63) ? { index: m.index } : null;
+    // With the name it had in the dock answer: the capture core opens it only if it is still
+    // the one at that place.
+    if (m.index !== undefined) return int(m.index, 0, 63) && typeof m.name === 'string' && m.name.length >= 1 && m.name.length <= 200 ? { index: m.index, name: m.name } : null;
     return m.trash === true ? { trash: true } : null;
   },
   icons: (m) => (Array.isArray(m.bundles) && m.bundles.length <= 40 && m.bundles.every((b) => typeof b === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(b)) ? { bundles: m.bundles } : null),

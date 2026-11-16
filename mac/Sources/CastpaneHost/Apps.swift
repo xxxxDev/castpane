@@ -4,7 +4,9 @@ import ApplicationServices
 
 // The Mac's apps for the page's home: those installed in the usual folders and those
 // running, each with a small icon, and an app started on request. Only an app found
-// this way can be started: the page names it by its bundle id, never by a path.
+// this way can be started by the page, which names it by its bundle id, never by a path;
+// the one other way is an item kept at the right of the Dock, opened as a click there would
+// (dockOthers, openDockOther), named by its place and name in the Dock.
 enum Apps {
     static let iconSize = 64
     private static let folders = ["/Applications", "/Applications/Utilities", "/System/Applications", "/System/Applications/Utilities",
@@ -110,10 +112,12 @@ enum Apps {
     }
 
     /// Opens the Dock's folder or file at this place, as `dockOthers` lists them now (the
-    /// Finder shows a folder, a file opens in its app).
-    @MainActor static func openDockOther(_ index: Int) -> Bool {
+    /// Finder shows a folder, a file opens in its app, as a double click would: an app or a
+    /// script kept there runs). Only if it is still the one the page saw there, by its name:
+    /// the Dock may have changed since, or a disk gone, and another item be at that place.
+    @MainActor static func openDockOther(_ index: Int, name: String) -> Bool {
         let others = dockOthers()
-        guard others.indices.contains(index) else { return false }
+        guard others.indices.contains(index), others[index].name == name else { return false }
         return NSWorkspace.shared.open(others[index].url)
     }
 

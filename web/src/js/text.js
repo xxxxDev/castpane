@@ -274,7 +274,7 @@ const english = {
 "視窗配合這台裝置：開":"Window fits this device: on",
 "視窗配合這台裝置：關":"Window fits this device: off",
 "這個 App 打不開":"This app could not be opened",
-"這個項目打不開":"This item could not be opened",
+"這個項目打不開，Dock 可能已經變了":"This item could not be opened: the Dock may have changed",
 "垃圾桶":"Trash",
 "這個 App 沒有開出視窗":"This app opened no window",
 "正在打開…":"Opening…",

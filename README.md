@@ -65,7 +65,9 @@ back, with touch modes made for a small screen.
 - **The Mac's apps, as a phone's.** The Remote tab opens on the apps open on the Mac, one card
   each. Three filters pick all of them, those on a desktop, or those in the Dock; on a phone
   the cards sit two a row or one. The Mac's Dock stays open at the left: its apps (a dot beside
-  those running) and the windows put in it. A card shows the number of its windows at the top
+  those running), the windows put in it, then the folders and files kept there and the Trash,
+  opened in the Finder (a file as a double click would open it, so an app or a script kept
+  there runs); the Mac's Apps or Launchpad opens All apps. A card shows the number of its windows at the top
   right; held, it offers to put its window in the Dock or close it; a card with several asks
   which one, with Quit app and Force quit at the foot. A window an app keeps hidden gets no
   card.
@@ -109,8 +111,9 @@ back, with touch modes made for a small screen.
   writes several lines, input method and all:
   Send types it where the Mac's cursor is and presses Return, as a message is sent (several
   lines go as a paste, so they replace what the Mac's clipboard held). There is a key panel in
-  the keyboard's place (editing keys, the Mac's shortcuts, a number pad, F1 to F12). Held
-  sideways, the tabs move to a rail on the right.
+  the keyboard's place (editing keys, the Mac's shortcuts, a number pad, F1 to F12). A phone
+  or a tablet has no tab bar: Remote's gear at its top right opens Settings, which has a way
+  back; a computer has its sidebar.
 - **At a computer too.** Pinch on a trackpad, Ctrl or ⌘ with the wheel, or the sizes in the top
   bar zoom the picture, which then follows your pointer; the wheel alone keeps scrolling the Mac. On a Windows or Linux keyboard, Ctrl is the Mac's ⌘,
   the Windows key is ⌃, and F5 reloads; Ctrl+← →, Ctrl+Backspace, Home, End and Ctrl+Y work as on Windows, and the full-screen button lets Chrome and Edge pass on Ctrl+W, Ctrl+T and the like. The keyboard button opens a row of keys under the picture, the same keys as the phone's row in one line, for shortcuts your browser keeps for itself.

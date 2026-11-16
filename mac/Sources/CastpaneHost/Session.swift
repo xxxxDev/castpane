@@ -386,9 +386,9 @@ actor Session {
                 let others = Apps.dockOthers().map { ["name": $0.name, "kind": $0.folder ? "folder" : "file"] }
                 link.send(json: ["t": "dock", "apps": Apps.dock(), "others": others, "trash": true])
             }
-        case let .dockOpen(index):
+        case let .dockOpen(index, name):
             let link = self.link
-            Task { @MainActor in link.send(json: ["t": "dock-opened", "ok": Apps.openDockOther(index)]) }
+            Task { @MainActor in link.send(json: ["t": "dock-opened", "ok": Apps.openDockOther(index, name: name)]) }
         case .dockOpenTrash:
             let link = self.link
             Task { @MainActor in link.send(json: ["t": "dock-opened", "ok": Apps.openTrash()]) }
