@@ -548,9 +548,9 @@ function onMessage(msg) {
   } else if (msg.t === 'clipboard-busy') {
     clipWait?.reject(new Error('busy'));
     // A second ⌘V within the second: the text put there a moment ago is still there.
-    if (clipSetWait) clipSetWait();else toast(ct('太快了，請等一秒再試'));
+    if (clipSetWait) clipSetWait('busy');else toast(ct('太快了，請等一秒再試'));
   } else if (msg.t === 'clipboard-set') {
-    if (clipSetWait) clipSetWait();else toast(ct('已放到 Mac 的剪貼簿'));
+    if (clipSetWait) clipSetWait('set');else toast(ct('已放到 Mac 的剪貼簿'));
   } else if (msg.t === 'focus') {
     // After a click: a text field has the focus, and the keyboard comes up (the hidden
     // field is already focused from the tap); out of one, it goes down again if it came
@@ -1139,14 +1139,15 @@ function toggleCompose() {
 }
 // Empty, Send is Return on the Mac: what was just put in its field goes too, without
 // leaving the pencil's field for the keyboard.
-function sendCompose() {
+async function sendCompose() {
   const s = composeText.value;
   if (!s) { tap('Enter');composeField.value?.focus({ preventScroll: true });return; }
   // Several lines go through the Mac's clipboard and ⌘V, as a paste: typed, each line break
-  // would be a Return the app acts on.
-  if (/[\r\n]/.test(s)) pasteAtCursor(s, true);
+  // would be a Return the app acts on. Not pasted, they stay here to send again.
+  if (/[\r\n]/.test(s)) { if (!(await pasteAtCursor(s, true))) { composeField.value?.focus({ preventScroll: true });return; } }
   else { const chars = [...s];for (let i = 0; i < chars.length; i += 1000) link?.send({ t: 'text', s: chars.slice(i, i + 1000).join('') }); }
-  composeText.value = '';releaseMods();
+  if (composeText.value === s) composeText.value = '';
+  releaseMods();
   nextTick(growCompose);
   composeField.value?.focus({ preventScroll: true });
 }
@@ -1567,17 +1568,23 @@ async function pasteToMac() {
   if (s === null) return f7.dialog.prompt(ct('貼上要送到 Mac 游標位置的文字。'), ct('貼到 Mac 游標'), (v) => pasteAtCursor(v));
   pasteAtCursor(s);
 }
+// True once ⌘V went: only after the Mac said the text is on its clipboard. Otherwise ⌘V
+// would paste whatever was there before, into a terminal perhaps, where it runs.
 async function pasteAtCursor(v, quiet = false) {
-  if (!v) return quiet ? undefined : toast(ct('這台裝置的剪貼簿裡沒有文字'));
-  if (v.length > 100000) return toast(ct('文字太長，最多 100 000 字'));
+  if (!v) { if (!quiet) toast(ct('這台裝置的剪貼簿裡沒有文字'));return false; }
+  if (v.length > 100000) { toast(ct('文字太長，最多 100 000 字'));return false; }
   if (!v.isWellFormed()) v = v.toWellFormed();
-  await putOnMac(v);
+  const how = await putOnMac(v);
+  if (how !== 'set') { toast(how === 'busy' ? ct('太快了，請等一秒再試') : ct('Mac 沒有回應，沒有貼上')); return false; }
   pasteKey(['meta']);
+  return true;
 }
 // The Mac says when the text is on its clipboard; ⌘V waits for that (at most 2 s).
+// Resolves to 'set' (it is there), 'busy' (refused: a second within the second) or
+// 'timeout' (no answer in 2 s).
 function putOnMac(s) {
   return new Promise((resolve) => {
-    const done = () => { clearTimeout(timer);clipSetWait = null;resolve(); };
+    const done = (how = 'timeout') => { clearTimeout(timer);clipSetWait = null;resolve(how); };
     const timer = setTimeout(done, 2000);
     clipSetWait = done;
     link?.send({ t: 'clipboard-set', s });

@@ -67,14 +67,15 @@ back, with touch modes made for a small screen.
   leave, or when the phone drops off the network.
 - **Made for a phone.** Three touch modes: tap where you want (direct), a trackpad, or a
   pointer you drag by a ring below it, so your finger never hides what it points at. Pinch to
-  zoom, or pick a size in the menu; when you tap a text field the keyboard comes up and the field is zoomed into view. The
-  keys a phone lacks sit in one capsule you slide sideways, four pages of them: a terminal's
-  (esc, tab, ⇧tab, arrows, ^C), ⌘ ⌥ ⌃ ⇧ with the clipboard and the key panel, editing and
-  moving (delete, return, home, end, page up and down), then the Mac's desktops and Mission
-  Control (a tablet fits them all at once). Beside it, round buttons call up or hide the keyboard and open a card to write in,
-  several lines, input method and all, sent to the Mac's cursor. There is a key panel in the
-  keyboard's place (editing keys, the Mac's shortcuts, a number pad, F1 to F12). Held sideways, the tabs move to a
-  rail on the right.
+  zoom, or pick a size in the menu; when you tap a text field the keyboard comes up and the
+  field is zoomed into view. The keys a phone lacks sit in one capsule you slide sideways, four
+  pages of them: a terminal's (esc, tab, ⇧tab, arrows, ^C), ⌘ ⌥ ⌃ ⇧ with the clipboard and the
+  key panel, editing and moving (delete, return, home, end, page up and down), then the Mac's
+  desktops and Mission Control (a tablet fits them all at once). Beside it, round buttons call
+  up or hide the keyboard and open a card to write in, several lines, input method and all,
+  sent to the Mac's cursor (several lines go as a paste, so they replace what the Mac's
+  clipboard held). There is a key panel in the keyboard's place (editing keys, the Mac's
+  shortcuts, a number pad, F1 to F12). Held sideways, the tabs move to a rail on the right.
 - **At a computer too.** Pinch on a trackpad, Ctrl or ⌘ with the wheel, or the sizes in the top
   bar zoom the picture, which then follows your pointer; the wheel alone keeps scrolling the Mac. On a Windows or Linux keyboard, Ctrl is the Mac's ⌘,
   the Windows key is ⌃, and F5 reloads; Ctrl+← →, Ctrl+Backspace, Home, End and Ctrl+Y work as on Windows, and the full-screen button lets Chrome and Edge pass on Ctrl+W, Ctrl+T and the like. The keyboard button opens a row of keys under the picture (esc, ⌘ ⌥ ⌃ ⇧, Mission Control, the Mac's desktops, arrows) for shortcuts your browser keeps for itself.

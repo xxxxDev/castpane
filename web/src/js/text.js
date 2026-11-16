@@ -374,6 +374,7 @@ const english = {
 "已拷貝 Mac 的剪貼簿":"Copied the Mac’s clipboard",
 "已拷貝 Mac 的剪貼簿（太長，只拷了前面 100 000 字）":"Copied the Mac’s clipboard (too long: only its first 100,000 characters)",
 "Mac 沒有回應，請再試一次":"The Mac did not answer; try again",
+"Mac 沒有回應，沒有貼上":"The Mac did not answer; nothing was pasted",
 "Mac 剪貼簿裡是密碼工具標為隱藏的內容，不會傳出":"The Mac’s clipboard holds something a password manager marked hidden; it is not sent",
 "Mac 的剪貼簿裡沒有文字":"There is no text on the Mac’s clipboard",
 "Mac 的剪貼簿":"The Mac’s clipboard",
