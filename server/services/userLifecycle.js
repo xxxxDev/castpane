@@ -41,6 +41,15 @@ function isActiveUser(user) {
   }
 }
 
+// The stored accounts that count as accounts: not disabled, not deleted. A row with no
+// lifecycleStatus is an active one from before the field (effectiveLifecycleStatus).
+// /api/local/status counts by it and the first admin is made only when it finds none
+// (localApi.js, authController.createFirstAdmin): one rule, so the setup assistant the
+// Mac app opens on 0 is never refused.
+function activeUserQuery() {
+  return { lifecycleStatus: { $nin: [LIFECYCLE_STATUS.DISABLED, LIFECYCLE_STATUS.DELETED_TOMBSTONE] } };
+}
+
 function databaseCall(database, method, ...args) {
   return new Promise((resolve, reject) => {
     database[method](...args, (error, value) => (error ? reject(error) : resolve(value)));
@@ -178,16 +187,44 @@ function createUserLifecycleService({
     return findPendingLifecycleTransition(transitionsDB, userId);
   }
 
+  // A deletion wins over a disable or enable left pending (by an older version, which
+  // could start them; nothing finishes them now). The pending journal row is turned into
+  // the deletion's in one write, never completed or removed first: until the deletion
+  // itself completes there is always a pending row, so sign-in and push stay shut
+  // (livePrincipal.js, pushStore.js) and a retry of the delete carries on from it. What it
+  // replaced is kept on the row as `superseded`.
+  const DELETE_WINS_OVER = new Set(['disable', 'enable']);
+  const inProgress = (pending) => lifecycleError(409, 'USER_LIFECYCLE_TRANSITION_IN_PROGRESS', 'Another lifecycle transition is pending', {
+    transitionId: pending?.transitionId || null, action: pending?.action || null,
+  });
+  async function adoptPending(pending, { userId, action, actor, reason, timestamp }) {
+    if (pending.action === action) return pending;
+    if (action !== 'delete' || !DELETE_WINS_OVER.has(pending.action)) throw inProgress(pending);
+    await ready;
+    await databaseCall(
+      transitionsDB, 'update',
+      { transitionId: pending.transitionId, status: 'pending', action: pending.action },
+      { $set: {
+        action,
+        reason,
+        actor: actorSnapshot(actor),
+        step: 'created',
+        startedAt: timestamp,
+        updatedAt: timestamp,
+        superseded: {
+          action: pending.action, actor: pending.actor || null, reason: pending.reason || null,
+          startedAt: pending.startedAt || null, step: pending.step || null,
+        },
+      } }, {},
+    );
+    const adopted = await findPending(userId);
+    if (!adopted || adopted.action !== action) throw inProgress(adopted);
+    return adopted;
+  }
+
   async function beginTransition({ userId, action, actor, reason, timestamp }) {
     const pending = await findPending(userId);
-    if (pending) {
-      if (pending.action !== action) {
-        throw lifecycleError(409, 'USER_LIFECYCLE_TRANSITION_IN_PROGRESS', 'Another lifecycle transition is pending', {
-          transitionId: pending.transitionId, action: pending.action,
-        });
-      }
-      return pending;
-    }
+    if (pending) return adoptPending(pending, { userId, action, actor, reason, timestamp });
     const transition = {
       transitionId: String(createId()),
       userId: String(userId),
@@ -209,12 +246,8 @@ function createUserLifecycleService({
     } catch (error) {
       if (!/unique constraint/i.test(String(error?.message || ''))) throw error;
       const winner = await findPending(userId);
-      if (!winner || winner.action !== action) {
-        throw lifecycleError(409, 'USER_LIFECYCLE_TRANSITION_IN_PROGRESS', 'Another lifecycle transition is pending', {
-          transitionId: winner?.transitionId || null, action: winner?.action || null,
-        });
-      }
-      return winner;
+      if (!winner) throw inProgress(null);
+      return adoptPending(winner, { userId, action, actor, reason, timestamp });
     }
   }
 
@@ -327,11 +360,8 @@ function createUserLifecycleService({
     let user = await findUser(userId);
     const current = effectiveLifecycleStatus(user);
     const pendingAtStart = await findPending(userId);
-    if (pendingAtStart && pendingAtStart.action !== action) {
-      throw lifecycleError(409, 'USER_LIFECYCLE_TRANSITION_IN_PROGRESS', 'Another lifecycle transition is pending', {
-        transitionId: pendingAtStart.transitionId, action: pendingAtStart.action,
-      });
-    }
+    const deleteWins = action === 'delete' && DELETE_WINS_OVER.has(pendingAtStart?.action);
+    if (pendingAtStart && pendingAtStart.action !== action && !deleteWins) throw inProgress(pendingAtStart);
     if (action === 'delete' && current === LIFECYCLE_STATUS.DELETED_TOMBSTONE) {
       if (pendingAtStart) {
         await updateTransition(pendingAtStart.transitionId, {
@@ -460,6 +490,7 @@ module.exports = {
   normalizeUsername,
   effectiveLifecycleStatus,
   isActiveUser,
+  activeUserQuery,
   publicLifecycleUser,
   findPendingLifecycleTransition,
   createUserLifecycleService,

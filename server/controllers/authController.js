@@ -17,13 +17,13 @@ const TRUST = require('../services/trustedDevices');
 // A device trusted to open Remote goes with the account's other credentials (a new password,
 // the account disabled, deleted or reset): every loginDevices.removeAll here removes these too.
 const trustedDevices = () => TRUST.sharedTrustedDevices();
-const { defaultUserOrder } = require('../services/userOrder');
 const {
   LIFECYCLE_STATUS,
   effectiveLifecycleStatus,
   isActiveUser,
   normalizeUsername,
   findPendingLifecycleTransition,
+  activeUserQuery,
 } = require('../services/userLifecycle');
 
 // Session model: a sliding 15-day idle window. The JWT + cookie carry
@@ -81,13 +81,6 @@ function activeUserMutationQuery(userId) {
       { lifecycleStatus: LIFECYCLE_STATUS.ACTIVE },
       { lifecycleStatus: { $exists: false } },
     ],
-  };
-}
-
-function nonTombstoneUserMutationQuery(userId) {
-  return {
-    _id: userId,
-    lifecycleStatus: { $ne: LIFECYCLE_STATUS.DELETED_TOMBSTONE },
   };
 }
 
@@ -171,11 +164,13 @@ function ensureSecret() {
 
 // The way back in for an only admin nothing else lets in (authenticator, recovery
 // codes and bound phone all gone, or the account under protection with no known
-// address left): scripts/sign-in-rescue.mjs, run on this machine, leaves a note
-// naming the account, and the next start turns its two-step sign-in off or lifts
-// its protection. Only someone with the machine's files can leave that note.
+// address left): a note, sign-in-rescue.json in the database folder (DB_DIR), written
+// by hand on this machine as {"what": "two-step" | "protection" | "block", "username":
+// "<account name, or the address for a block>"}. The next start reads and removes it
+// and turns that account's two-step sign-in off, lifts its protection, or lifts the
+// address block. No script in this repository writes it. Only someone with the
+// machine's files can leave that note.
 const RESCUE_NOTE_MS = 24 * 3600_000;
-const CLEANUP_INCOMPLETE = { message: 'The account was changed, but its sign-ins were not all removed. Try again.', code: 'CREDENTIAL_CLEANUP_INCOMPLETE' };
 function applySignInRescue() {
   const file = path.join(process.env.DB_DIR || path.join(__dirname, '..', 'db'), 'sign-in-rescue.json');
   let note, age;
@@ -563,32 +558,6 @@ exports.twoStepDisable = async (req, res) => {
     res.json({ enabled: false });
   } catch (e) { console.error('two-step disable:', e.message); res.status(500).json({ message: 'Error' }); }
 };
-// POST /api/auth/users/:id/reset-two-step {adminPassword, adminCode}: an admin turns it off for
-// an account whose authenticator and recovery codes are gone. Resetting a password
-// does not do this: it would make a reset the way round the second step. The
-// admin's own password again, and never the admin's own account, so a stolen
-// admin session cannot take its own second step away. The
-// admin's own code too when theirs is on, like the other confirmed actions: a
-// session and a password alone must not strip another administrator's second
-// step.
-exports.resetUserTwoStep = (req, res) => inTurn(async (req, res) => {
-  try {
-    if (String(req.params.id) === String(req.userId)) return res.status(409).json({ message: 'Turn your own two-step sign-in off in Settings', code: 'OWN_ACCOUNT' });
-    const user = await findUser({ _id: req.params.id });
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    // Nothing to reset is said so, and costs the admin no code.
-    if (!user.twoStep && !user.twoStepPending) return res.status(409).json({ message: 'Two-step sign-in is not on for this account', code: 'NO_TWO_STEP' });
-    if (!(await adminAgain(req, res, 'reset-two-step', user._id))) return;
-    // A write that fails may still have happened: the admin's code stays spent (adminKept).
-    await updateUser({ _id: user._id }, { $unset: { twoStep: true, twoStepPending: true } }).catch((e) => { adminKept(req); throw e; });
-    adminGranted(req, user._id);
-    twoStepTickets.revokeUser(user._id);
-    compactQuietly(usersDB, 'two-step: users');
-    audit({ source: 'two-step', action: 'reset', userId: user._id, by: req.username });
-    security.twoStep({ action: 'reset', userId: user._id, by: req.username, ip: resolveClientIp(req), place: placeOf(req) });
-    res.json({ message: 'Two-step sign-in reset' });
-  } catch (e) { console.error('two-step reset:', e.message); res.status(500).json({ message: 'Error' }); }
-})(req, res);
 exports._twoStepTickets = twoStepTickets;
 
 // Passkeys (services/passkeys.js). Signing in
@@ -958,11 +927,10 @@ exports.listUsers = (req, res) => {
   usersDB.find({}, (err, users) => {
     if (err) return res.status(500).json({ message: 'Error reading users' });
     const now = Date.now();
-    // In the order the admins dragged them into (services/userOrder.js).
-    let ordered = users, orderVersion = null;
-    try { ordered = defaultUserOrder().sort(users, (u) => u._id); orderVersion = defaultUserOrder().version(); } catch (e) { console.error('user order:', e.message); }
+    // By name, then id: the same order every time.
+    const key = (u) => String(u.username || '').toLowerCase();
+    const ordered = [...users].sort((a, b) => key(a).localeCompare(key(b)) || String(a._id).localeCompare(String(b._id)));
     res.json({
-      orderVersion,
       users: ordered.map((u) => ({
         ...publicUser(u),
         lastSeen: u.lastSeen || null,
@@ -972,14 +940,10 @@ exports.listUsers = (req, res) => {
   });
 };
 
-// Making an administrator (a new admin account, or an account raised to admin) takes
-// the acting admin's own password again, and the two-step code when theirs is on.
-// An admin's session alone could otherwise make a
-// second admin and use it to reset the first one's password and two-step.
-// The same again for what would get round it: resetting anyone's password, enabling an administrator
-// that was disabled, renaming an administrator. A session alone could otherwise
-// take over an administrator that exists instead of making one.
-// how: create, promote, demote, reset-password, reset-two-step, enable, disable, delete, purge, rename.
+// The acting admin's own password again, and the two-step code when theirs is on, or a
+// passkey: for deleting an account (deleteUser) and for Remote (server/remote.js). A
+// session alone must not be enough for either.
+// how: what is confirmed ('delete', or Remote's own), written to the audit line.
 // purpose: the kind of action ('admin' for account management, 'remote' for Remote), which
 // a passkey's challenge must have been issued for.
 async function adminAgain(req, res, how, target, { purpose = 'admin' } = {}) {
@@ -1049,11 +1013,8 @@ function adminRefused(req) {
   req.adminGrant = null;
   return giveRecoveryBack(grant?.me, grant?.claimed);
 }
-// What an administrator does to accounts is done one request at a time, each reading
-// the account as the one before left it. Side by side, several renames each moved
-// the counts from the name they had read, a delete forgot the counts of a name the
-// account no longer had, an account promoted meanwhile was treated as the member it
-// had been, and two accounts were made under one name.
+// What an administrator does to accounts (now only deleting one left from before) is
+// done one request at a time, each reading the account as the one before left it.
 // The turn ends when the handler itself answers, not when the connection closes: a
 // client that goes away must neither free the turn under a handler still at work
 // nor get its code back for an action that then happens. One that never answers
@@ -1087,96 +1048,18 @@ const inTurn = (handler) => (req, res) => {
     }).catch((e) => { console.error('admin action:', e.message); try { if (!res.headersSent) res.status(500).json({ message: 'Error' }); } finally { answered(); } });
   }));
 };
-// Two names that are one name once folded (a Kelvin sign for k, ß for ẞ) would share
-// everything the security log counts by name while being two accounts to the user
-// list: deleting or renaming the one would clear the other's counts. Such a twin is refused where a name is given or changed.
+// Two names that are one name once folded (a Kelvin sign for k, ß for ẞ), or that the
+// security log counts under one key (accountKey), would share its counts while being two
+// accounts.
 const nameFold = (v) => String(v || '').normalize('NFKC').trim().toLowerCase();
-async function nameTwin(name, exceptId = '') {
-  const want = nameFold(name);
-  if (!want) return null;
-  const all = await new Promise((ok, no) => usersDB.find({}, (e, rows) => (e ? no(e) : ok(rows))));
-  // And the key the security log counts under, which is cut at eighty characters:
-  // two long names of letters that grow in lower case shared it.
-  return all.find((u) => String(u._id) !== String(exceptId) && (nameFold(u.username) === want || accountKey(u.username) === accountKey(name))) || null;
-}
-// Said once at start-up when accounts already stored share a name this way; nothing is changed.
-usersDB.find({}, (e, rows) => {
-  if (e || !rows) return;
-  const seen = new Map();
-  for (const u of rows) for (const k of new Set([`f:${nameFold(u.username)}`, `k:${accountKey(u.username)}`])) seen.set(k, (seen.get(k) || 0) + 1);
-  const shared = [...seen.values()].filter((n) => n > 1).length;
-  if (shared) console.warn(`users: ${shared} name(s) are shared by more than one stored account once folded; rename one of each pair`);
-});
-// The role an account is given: 'admin' or 'user'; anything else is refused. The role
-// names an earlier build kept (roleId) are gone: a stored
-// one is never read, and goes when the account's role is next set.
-function placeRole(role) {
-  if (role === 'admin' || role === 'user') return { role };
-  return null;
-}
-exports.createUser = inTurn(async (req, res) => {
-  try {
-    // A role that is not there is refused before the admin's code is asked for and spent.
-    const asRole = (req.body || {}).role;
-    if (asRole !== undefined && asRole !== null && !placeRole(asRole)) return res.status(400).json({ message: 'Unsupported role' });
-    if (typeof (req.body || {}).username === 'string' && await nameTwin(req.body.username)) return res.status(400).json({ message: 'User already exists' });
-    // A name already taken is refused before the admin's code is asked for and spent.
-    const wanted = String((req.body || {}).username || '').trim();
-    // A name or password that will be refused is refused by the making itself, unasked.
-    const asked = (req.body || {}).password;
-    if (typeof asked !== 'string') return res.status(400).json({ message: 'Username and password are required' });
-    if (!wanted || textProblem(wanted, USERNAME_MAX_LENGTH, 'Username') || asked.length < MIN_PASSWORD_LENGTH) return createUserNow(req, res);
-    if ((req.body || {}).role === 'admin' && wanted && await findUser(usernameQuery(wanted))) return res.status(400).json({ message: 'User already exists' });
-    if ((req.body || {}).role === 'admin' && !(await adminAgain(req, res, 'create', String((req.body || {}).username || '').slice(0, 64)))) return;
-  } catch (e) { console.error('admin grant:', e.message); return res.status(500).json({ message: 'Error' }); }
-  return createUserNow(req, res);
-});
-function createUserNow(req, res) {
-  const { username, password, role } = req.body || {};
-  const name = (username || '').trim();
-  if (!name || !password) {
-    return res.status(400).json({ message: 'Username and password are required' });
-  }
-  const usernameProblem = textProblem(name, USERNAME_MAX_LENGTH, 'Username');
-  if (usernameProblem) return res.status(400).json({ message: usernameProblem });
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return res
-      .status(400)
-      .json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
-  }
-  const placed = role === undefined || role === null ? { role: 'user' } : placeRole(role);
-  if (!placed) return res.status(400).json({ message: 'Unsupported role' });
-
-  usersDB.findOne(usernameQuery(name), (err, existing) => {
-    if (err) return res.status(500).json({ message: 'Error reading users' });
-    if (existing) return res.status(400).json({ message: 'User already exists' });
-
-    bcrypt.hash(password, 10, (hashErr, hashedPassword) => {
-      if (hashErr) return res.status(500).json({ message: 'Error hashing password' });
-      usersDB.insert(
-        {
-          username: name,
-          normalizedUsername: normalizeUsername(name),
-          password: hashedPassword,
-          role: placed.role,
-          language: 'en',
-          lifecycleStatus: LIFECYCLE_STATUS.ACTIVE,
-          lifecycleSchemaVersion: 1,
-        },
-        (insertErr, user) => {
-          if (insertErr) { adminKept(req); return res.status(500).json({ message: 'Error creating user' }); }
-          compactQuietly(usersDB, 'users');
-          adminGranted(req, user._id);
-          res.status(201).json({ user: publicUser(user) });
-        },
-      );
-    });
-  });
-}
+const sameName = (a, b) => nameFold(a) === nameFold(b) || accountKey(a) === accountKey(b);
 
 // The first administrator, made by Castpane.app's setup wizard (server/localApi.js)
-// when there is no account at all. One at a time: a second call while the first is
-// writing finds the first account and is refused like any later one.
+// while there is no active account: the rule /api/local/status counts by
+// (activeUserQuery), so the wizard the app opens on 0 is never refused. Accounts left
+// disabled or deleted by a version that had several do not count. One at a time: a
+// second call while the first is writing finds the first account and is refused like
+// any later one.
 let firstAdminTurn = Promise.resolve();
 exports.createFirstAdmin = ({ username, password } = {}) => {
   const run = firstAdminTurn.catch(() => {}).then(async () => {
@@ -1186,8 +1069,14 @@ exports.createFirstAdmin = ({ username, password } = {}) => {
     if (problem) throw Object.assign(new Error(problem), { status: 400 });
     if (password.length < MIN_PASSWORD_LENGTH) throw Object.assign(new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`), { status: 400 });
     if (password.length > 1024) throw Object.assign(new Error('Password is too long'), { status: 400 });
-    const count = await new Promise((ok, no) => usersDB.count({}, (e, n) => (e ? no(e) : ok(n))));
-    if (count > 0) throw Object.assign(new Error('An account already exists'), { status: 409, code: 'ALREADY_SET_UP' });
+    const rows = await new Promise((ok, no) => usersDB.find({}, (e, r) => (e ? no(e) : ok(r))));
+    const active = await new Promise((ok, no) => usersDB.count(activeUserQuery(), (e, n) => (e ? no(e) : ok(n))));
+    if (active > 0) throw Object.assign(new Error('An account already exists'), { status: 409, code: 'ALREADY_SET_UP' });
+    // An old account keeps its name (a deleted one too, as its record): sign-in finds
+    // accounts by name, and the security log counts by it.
+    if (rows.some((u) => sameName(u.username, name) || u.normalizedUsername === normalizeUsername(name))) {
+      throw Object.assign(new Error('This name is taken by an old account kept from an earlier version. Choose another name.'), { status: 409, code: 'NAME_TAKEN_BY_OLD_ACCOUNT' });
+    }
     const hashed = await bcrypt.hash(password, 10);
     const user = await new Promise((ok, no) => usersDB.insert({ username: name, normalizedUsername: normalizeUsername(name), password: hashed, role: 'admin', language: 'en', lifecycleStatus: LIFECYCLE_STATUS.ACTIVE, lifecycleSchemaVersion: 1 }, (e, u) => (e ? no(e) : ok(u))));
     compactQuietly(usersDB, 'users');
@@ -1198,153 +1087,9 @@ exports.createFirstAdmin = ({ username, password } = {}) => {
   return run;
 };
 
-exports.updateUser = inTurn(async (req, res) => {
-  try {
-    // A name that cannot be had is refused before the admin's code is asked for and
-    // spent, whatever else the request carries.
-    const renamed = typeof (req.body || {}).username === 'string' && (req.body.username.trim());
-    if (renamed && textProblem(renamed, USERNAME_MAX_LENGTH, 'Username')) return res.status(400).json({ message: textProblem(renamed, USERNAME_MAX_LENGTH, 'Username') });
-    if (renamed && await nameTwin(renamed, req.params.id)) return res.status(400).json({ message: 'Username already taken' });
-    const holder = renamed ? await findUser(usernameQuery(renamed)) : null;
-    if (holder && String(holder._id) !== String(req.params.id)) return res.status(400).json({ message: 'Username already taken' });
-    const asRole = (req.body || {}).role;
-    if (typeof asRole === 'string' && !placeRole(asRole)) return res.status(400).json({ message: 'Unsupported role' });
-    if (asRole === 'admin') {
-      const target = await findUser({ _id: req.params.id });
-      // Already an admin: nothing is being granted, nothing more is asked.
-      if (target && target.role !== 'admin' && !(await adminAgain(req, res, 'promote', String(target._id)))) return;
-    }
-    // Taking an administrator down is confirmed like making one: a session alone could otherwise demote the other admin
-    // and then do to that account everything a member's account allows.
-    if (typeof asRole === 'string' && asRole !== 'admin' && String(req.params.id) !== String(req.userId)) {
-      const target = await findUser({ _id: req.params.id });
-      if (target && target.role === 'admin' && !(await adminAgain(req, res, 'demote', String(target._id)))) return;
-    }
-    if (renamed && !req.adminGrant) {
-      const target = await findUser({ _id: req.params.id });
-      // A rename is any name that is not the stored one letter for letter. Compared
-      // in lower case, a letter that only looks the same (U+212A for k) passed as no
-      // change and took no confirmation.
-      const differs = target && target.role === 'admin' && renamed !== target.username;
-      if (differs && !(await adminAgain(req, res, 'rename', String(target._id)))) return;
-    }
-  } catch (e) { console.error('admin grant:', e.message); return res.status(500).json({ message: 'Error' }); }
-  return updateUserNow(req, res);
-});
-function updateUserNow(req, res) {
-  const { id } = req.params;
-  const { name, username, role } = req.body || {};
-  const update = {};
-  const unset = {};
-
-  if (typeof name === 'string' && name.trim()) update.name = name.trim();
-  const problem = (update.name && textProblem(update.name, NAME_MAX_LENGTH, 'Name'))
-    || (typeof username === 'string' && username.trim() && textProblem(username.trim(), USERNAME_MAX_LENGTH, 'Username'));
-  if (problem) return res.status(400).json({ message: problem });
-  if (typeof role === 'string') {
-    const placed = placeRole(role);
-    if (!placed) {
-      return res.status(400).json({ message: 'Unsupported role' });
-    }
-    if (id === req.userId && placed.role !== 'admin') {
-      return res.status(400).json({ message: 'You cannot demote your own account' });
-    }
-    update.role = placed.role;
-    unset.roleId = true;
-  }
-
-  const apply = () => {
-    usersDB.findOne({ _id: id }, (findErr, existingUser) => {
-      if (findErr) return res.status(500).json({ message: 'Error reading user' });
-      if (!existingUser) return res.status(404).json({ message: 'User not found' });
-      if (effectiveLifecycleStatus(existingUser) === LIFECYCLE_STATUS.DELETED_TOMBSTONE) {
-        return res.status(409).json({ message: 'Deleted users cannot be edited', code: 'USER_TOMBSTONE_TERMINAL' });
-      }
-      // 'admin' with no grant made means the check found an administrator already.
-      // Held to that at the write: one demoted in between is not raised again by a
-      // request that was let through as "nothing is being granted".
-      const stillAdmin = update.role === 'admin' && req.adminGrant?.how !== 'promote';
-      if (stillAdmin && existingUser.role !== 'admin') return res.status(409).json({ message: 'This account is no longer an administrator; try again', code: 'ROLE_CHANGED' });
-      // The sign-ins carry the role and the name: they end only when one of them changes.
-      // The name as it already is, which the re-prompt lets through, is no change.
-      if (update.username === existingUser.username) { delete update.username; delete update.normalizedUsername; }
-      const signInsChange = Boolean(update.username) || (update.role !== undefined && update.role !== existingUser.role);
-      // Written with the change and cleared when the sign-ins are gone: "the same request
-      // again finishes it" holds though that request now changes nothing.
-      const endSignIns = signInsChange || existingUser.signInsCleanupDue === true;
-      if (signInsChange) update.signInsCleanupDue = true;
-      usersDB.update({ ...nonTombstoneUserMutationQuery(id), ...(stillAdmin ? { role: 'admin' } : {}) }, { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) }, {}, (err, updated) => {
-        if (err) { adminKept(req); return res.status(500).json({ message: 'Error updating user' }); }
-        if (!updated) {
-          return res.status(409).json(stillAdmin ? { message: 'This account is no longer an administrator; try again', code: 'ROLE_CHANGED' } : { message: 'Deleted users cannot be edited', code: 'USER_TOMBSTONE_TERMINAL' });
-        }
-        compactQuietly(usersDB, 'users');
-        // The counts follow the account to its new name.
-        if (update.username && update.username !== existingUser.username) security.renamed(existingUser.username, update.username);
-        adminGranted(req, id);
-        // role/username changes invalidate the user's sessions (JWT carries both)
-        // With them go what was waiting on those sessions: a QR request approved
-        // and not collected, a two-step ticket, the bound phones.
-        // Waited for, and said when it did not all go: the same request again
-        // finishes it.
-        // What only waits on memory goes at once, before anything is awaited.
-        if (endSignIns) { qrRequests.revokeUser(id);twoStepTickets.revokeUser(id);endPasskeyChallenges(id); }
-        // admin→user demotion: what a member may not keep goes (server/productAccountHooks.js).
-        if (update.role === 'user') {
-          try { require('../productAccountHooks').onDemoted(id); } catch (error) { console.error(`full-access cleanup failed: ${error.message}`); }
-        }
-        const signInsGone = !endSignIns ? Promise.resolve()
-          : Promise.all([removeSessionsOrFail({ userId: id }), loginDevices.removeAll(id), trustedDevices().removeAll(id)]).then(() => new Promise((done, failed) => usersDB.update({ _id: id }, { $unset: { signInsCleanupDue: true } }, {}, (e) => (e ? failed(e) : done()))));
-        signInsGone.then(() => {
-        usersDB.findOne({ _id: id }, (readErr, user) => {
-          if (readErr || !user) return res.status(404).json({ message: 'User not found' });
-          res.json({ user: publicUser(user) });
-        });
-        }, (e) => { console.error('update: sign-ins not all removed:', e.message); res.status(500).json(CLEANUP_INCOMPLETE); });
-      });
-    });
-  };
-
-  if (typeof username === 'string' && username.trim()) {
-    const newUsername = username.trim();
-    usersDB.findOne(usernameQuery(newUsername), (err, existing) => {
-      if (err) return res.status(500).json({ message: 'Error reading users' });
-      if (existing && existing._id !== id) {
-        return res.status(400).json({ message: 'Username already taken' });
-      }
-      update.username = newUsername;
-      update.normalizedUsername = normalizeUsername(newUsername);
-      apply();
-    });
-    return;
-  }
-
-  if (!Object.keys(update).length) {
-    return res.status(400).json({ message: 'Nothing to update' });
-  }
-  apply();
-}
-
-// The order of the accounts, as an admin drags them.
-// Only the order changes; a list that changed meanwhile is refused.
-function orderRefused(res, e) {
-  if (e?.status) return res.status(e.status).json({ message: e.message, code: e.code });
-  console.error('user order:', e?.message);
-  return res.status(500).json({ message: 'Error' });
-}
-exports.reorderUsers = inTurn(async (req, res) => {
-  try {
-    const known = await new Promise((ok, no) => usersDB.find({}, { _id: 1 }, (e, rows) => (e ? no(e) : ok(rows.map((u) => String(u._id))))));
-    const ids = defaultUserOrder().set((req.body || {}).ids, known, (req.body || {}).version);
-    audit({ source: 'users', action: 'user-reorder', by: req.username, count: ids.length });
-    res.json({ ids, orderVersion: defaultUserOrder().version() });
-  } catch (e) { orderRefused(res, e); }
-});
-
 // What a disabled or deleted account runs stops (server/productAccountHooks.js; nothing
 // in Castpane, whose remote viewer is cut by the relay's own re-check). Only for an
-// account read back as not active: one not found is left alone. Enabling it
-// again starts nothing; its owner does.
+// account read back as not active: one not found is left alone.
 // What could not be stopped is handed back for the response, so the admin is told which
 // things to stop by hand: agentsNotStopped lists them
 // by id and name; agentsStopUnchecked says the stop itself could not be done or checked.
@@ -1360,199 +1105,50 @@ async function stopAgentsIfOff(id) {
   } catch (e) { console.error('account off: its agents not all stopped:', e.message); return { agentsStopUnchecked: true }; }
 }
 
-async function lifecycleAction(req, res, action, successMessage) {
+// DELETE /api/auth/users/:id: an account left from a version that had several. Always
+// confirmed with the acting admin's own password (and code when two-step is on) or a
+// passkey, member or administrator alike: a session alone must not be able to remove
+// accounts. What would be refused anyway (one's own account, one not there) is refused
+// before the code is asked for and spent. A deletion wins over a disable or enable left
+// pending by an older version (services/userLifecycle.js), which nothing else can finish.
+exports.deleteUser = inTurn(async (req, res) => {
+  const id = String(req.params.id || '');
   try {
-    // Read to know whether an administrator is being brought back: not guessed when it cannot be read.
-    const before = await findUser({ _id: req.params.id });
-    if (action === 'enable' && before?.role === 'admin' && !(await adminAgain(req, res, 'enable', String(before._id)))) return;
-    // Disabling or deleting another administrator is confirmed too.
-    if ((action === 'disable' || action === 'delete') && before?.role === 'admin' && String(before._id) !== String(req.userId) && !(await adminAgain(req, res, action, String(before._id)))) return;
-    // An account comes back with none of the ways in it had: what a disable could not
-    // remove is removed here, or the account is not enabled.
-    // Only for one that is off: enabling an account that is already on (a stale list,
-    // a second click) must not strip its passkeys and phones.
-    // Read again for this: the admin's password and code took a while, and a disable
-    // may have landed meanwhile.
-    const now = action === 'enable' ? await findUser({ _id: req.params.id }) : null;
-    if (action === 'enable' && now && !isActiveUser(now)) {
-      try { await Promise.all([loginDevices.removeAll(req.params.id), trustedDevices().removeAll(req.params.id), passkeyStore.removeAll(req.params.id)]); } catch (e) { console.error('enable: old passkeys or phones not removed:', e.message); return res.status(500).json({ message: 'Not enabled: its old passkeys or bound phones could not be removed first. Try again.', code: 'CREDENTIAL_CLEANUP_INCOMPLETE' }); }
-    }
-    const result = await lifecycleService()[`${action}User`]({
-      targetUserId: req.params.id,
+    if (id === String(req.userId)) return res.status(400).json({ message: 'You cannot delete your own account', code: 'USER_LIFECYCLE_SELF_ACTION' });
+    const before = await findUser({ _id: id });
+    if (!before) return res.status(404).json({ message: 'User not found', code: 'USER_NOT_FOUND' });
+    if (!(await adminAgain(req, res, 'delete', id))) return;
+    const result = await lifecycleService().deleteUser({
+      targetUserId: id,
       actor: req.principal,
       reason: req.body?.reason,
     });
-    // A disabled or deleted account keeps no login-key phone, nor anything they approved.
-    // Said when they did not all go: they open nothing while the account is off, and
-    // enabling it removes them again before it is on.
+    // A deleted account keeps no login-key phone, nor anything they approved. Said when
+    // they did not all go: they open nothing while the account is off.
     let left = null;
-    if (action === 'disable' || action === 'delete') {
-      qrRequests.revokeUser(req.params.id);twoStepTickets.revokeUser(req.params.id);endPasskeyChallenges(req.params.id);
-      try { await Promise.all([loginDevices.removeAll(req.params.id), trustedDevices().removeAll(req.params.id), passkeyStore.removeAll(req.params.id)]); } catch (e) { left = e; console.error(`${action}: passkeys or bound phones not removed:`, e.message); }
-      // A disable keeps what the security log holds for the account, its protection
-      // and its counts: off and on again must not be a way round them. A delete forgets it all.
-      if (action === 'delete') security.forgetUser(req.params.id, before?.username);
-    }
-    adminGranted(req, req.params.id);
-    const agentsLeft = action === 'disable' || action === 'delete' ? await stopAgentsIfOff(req.params.id) : {};
-    if (left) return res.status(500).json({ message: `${successMessage}, but its passkeys or bound phones could not all be removed. ${action === 'delete' ? 'Delete it again to remove them.' : 'They are removed before it is enabled again.'}`, code: 'CREDENTIAL_CLEANUP_INCOMPLETE', ...result, ...agentsLeft });
-    res.json({ message: successMessage, ...result, ...agentsLeft });
+    qrRequests.revokeUser(id);twoStepTickets.revokeUser(id);endPasskeyChallenges(id);
+    try { await Promise.all([loginDevices.removeAll(id), trustedDevices().removeAll(id), passkeyStore.removeAll(id)]); } catch (e) { left = e; console.error('delete: passkeys or bound phones not removed:', e.message); }
+    // A delete forgets what the security log holds for the account.
+    security.forgetUser(id, before.username);
+    adminGranted(req, id);
+    const agentsLeft = await stopAgentsIfOff(id);
+    if (left) return res.status(500).json({ message: 'User deleted, but its passkeys or bound phones could not all be removed. Delete it again to remove them.', code: 'CREDENTIAL_CLEANUP_INCOMPLETE', ...result, ...agentsLeft });
+    res.json({ message: 'User deleted', ...result, ...agentsLeft });
   } catch (error) {
     // Stopped part-way, the account is already changed: the confirmation was used,
     // its code stays spent and the line is written.
     let agentsLeft = {};
-    if (error?.code === 'USER_LIFECYCLE_PARTIAL') { adminGranted(req, req.params.id); if (action === 'disable' || action === 'delete') agentsLeft = await stopAgentsIfOff(req.params.id); }
+    if (error?.code === 'USER_LIFECYCLE_PARTIAL') { adminGranted(req, id); agentsLeft = await stopAgentsIfOff(id); }
     // Any other failure that is not a refusal (a 4xx said before anything was written)
     // may have written something, a pending transition among it: the code stays spent.
     else if (!(error?.status >= 400 && error.status < 500)) adminKept(req);
     sendLifecycleError(res, error, agentsLeft);
   }
-}
-
-exports.disableUser = inTurn((req, res) => lifecycleAction(req, res, 'disable', 'User disabled'));
-exports.enableUser = inTurn((req, res) => lifecycleAction(req, res, 'enable', 'User enabled'));
-exports.deleteUser = inTurn((req, res) => lifecycleAction(req, res, 'delete', 'User deleted'));
+});
 
 exports._setUserLifecycleServiceForTests = (service) => {
   injectedLifecycleService = service || null;
 };
-
-// Retryable footprint cleanup for a purged user: remove their push subscription and
-// preference rows, and whatever the product keeps for them. Every cleanup is attempted,
-// but any failure keeps the tombstone row as the retry anchor. push-deliveries
-// history is intentionally left untouched.
-async function purgeUserFootprint(userId) {
-  const id = String(userId);
-  const outcomes = await Promise.allSettled([
-    require('../services/pushStore').getDefaultPushStore().purgeUser(id),
-    // What the product keeps for them (server/productAccountHooks.js; nothing in
-    // Castpane). Without it,
-    // deleting an account would leave every message on disk for ever, reachable by nobody.
-    Promise.resolve().then(() => require('../productAccountHooks').onPurge(id)),
-    loginDevices.removeAll(id), trustedDevices().removeAll(id),
-    passkeyStore.removeAll(id),
-    Promise.resolve().then(() => { qrRequests.revokeUser(id); twoStepTickets.revokeUser(id);endPasskeyChallenges(id); }),
-  ]);
-  const failures = outcomes.filter((outcome) => outcome.status === 'rejected');
-  if (failures.length) {
-    const error = new Error(`user purge cleanup incomplete (${failures.length} step(s) failed)`);
-    error.code = 'USER_PURGE_CLEANUP_INCOMPLETE';
-    error.causes = failures.map((outcome) => outcome.reason);
-    throw error;
-  }
-}
-
-// DELETE /api/auth/users/:id/purge — permanently remove a tombstone account.
-// Admin-only (restrictTo in the route; the internal role check mirrors updateMe
-// and keeps the endpoint self-guarding). The target must already be a
-// deleted_tombstone; anything else is refused with 409 USER_NOT_TOMBSTONE.
-// What is left of an administrator is removed for good with the acting admin's own
-// password again, as deleting one is.
-exports.purgeUser = inTurn(async (req, res) => {
-  if (req.role !== 'admin') {
-    return res.status(403).json({ message: 'Forbidden' });
-  }
-  try {
-    const gone = await findUser({ _id: req.params.id });
-    let tombstone = false;
-    try { tombstone = Boolean(gone) && effectiveLifecycleStatus(gone) === LIFECYCLE_STATUS.DELETED_TOMBSTONE; } catch (_error) { tombstone = false; }
-    if (tombstone && gone.role === 'admin' && !(await adminAgain(req, res, 'purge', String(gone._id)))) return;
-  } catch (e) { console.error('purge:', e.message); return res.status(500).json({ message: 'Error' }); }
-  return purgeUserNow(req, res);
-});
-function purgeUserNow(req, res) {
-  const { id } = req.params;
-  usersDB.findOne({ _id: id }, (err, user) => {
-    if (err) return res.status(500).json({ message: 'Error reading user' });
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    let status = null;
-    try {
-      status = effectiveLifecycleStatus(user);
-    } catch (_error) {
-      status = null;
-    }
-    if (status !== LIFECYCLE_STATUS.DELETED_TOMBSTONE) {
-      return res.status(409).json({
-        message: 'Only a deleted user can be permanently removed',
-        code: 'USER_NOT_TOMBSTONE',
-      });
-    }
-    purgeUserFootprint(id)
-      .then(() => {
-        security.forgetUser(id, user.username);
-        // Remove the tombstone last. If this write fails, the already-idempotent
-        // footprint cleanup can safely run again while the row remains.
-        usersDB.remove({ _id: id }, {}, (removeErr, removed) => {
-          if (removeErr) { adminKept(req); return res.status(500).json({ message: 'Error removing user' }); }
-          if (!removed) return res.status(404).json({ message: 'User not found' });
-          compactQuietly(usersDB, 'users');
-          adminGranted(req, id);
-          return res.json({ message: 'User purged', id });
-        });
-      })
-      .catch((cleanupErr) => {
-        // Part of it is gone for good: the confirmation was used.
-        adminGranted(req, id);
-        console.error(`purge cleanup failed for ${id}: ${cleanupErr.message}`);
-        return res.status(500).json({
-          message: 'User footprint cleanup is incomplete; retry the purge',
-          code: 'USER_PURGE_CLEANUP_INCOMPLETE',
-        });
-      });
-  });
-}
-
-exports.resetUserPassword = inTurn(async (req, res) => {
-  // What would be refused anyway is refused before the admin's code is asked for and
-  // spent on it.
-  // One's own password is changed with the old one, on the change-password page: this door asks for neither.
-  if (String(req.params.id) === String(req.userId)) return res.status(409).json({ message: 'Change your own password from Settings', code: 'OWN_ACCOUNT' });
-  const asked = (req.body || {}).newPassword;
-  if (!asked || asked.length < MIN_PASSWORD_LENGTH) return res.status(400).json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
-  try { if (!(await adminAgain(req, res, 'reset-password', String(req.params.id)))) return; } catch (e) { console.error('reset password:', e.message); return res.status(500).json({ message: 'Error' }); }
-  return resetUserPasswordNow(req, res);
-});
-exports._resetUserPasswordNow = (req, res) => resetUserPasswordNow(req, res);
-function resetUserPasswordNow(req, res) {
-  const { id } = req.params;
-  const { newPassword } = req.body || {};
-  if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) {
-    return res
-      .status(400)
-      .json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
-  }
-  usersDB.findOne({ _id: id }, (err, user) => {
-    if (err) return res.status(500).json({ message: 'Error reading user' });
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    if (effectiveLifecycleStatus(user) === LIFECYCLE_STATUS.DELETED_TOMBSTONE) {
-      return res.status(409).json({ message: 'Deleted users have no credentials', code: 'USER_TOMBSTONE_TERMINAL' });
-    }
-    bcrypt.hash(newPassword, 10, (hashErr, hashedPassword) => {
-      if (hashErr) return res.status(500).json({ message: 'Error hashing password' });
-      usersDB.update(
-        nonTombstoneUserMutationQuery(id),
-        { $set: { password: hashedPassword } },
-        {},
-        (updateErr, updated) => {
-          if (updateErr) { adminKept(req); return res.status(500).json({ message: 'Error updating password' }); }
-          if (!updated) {
-            return res.status(409).json({
-              message: 'Deleted users have no credentials', code: 'USER_TOMBSTONE_TERMINAL',
-            });
-          }
-          qrRequests.revokeUser(id);twoStepTickets.revokeUser(id);endPasskeyChallenges(id);
-          // Waited for: the password is new, and the old ways in are gone before the
-          // admin is told so; the same request again finishes what did not go.
-          adminGranted(req, id);
-          Promise.all([removeSessionsOrFail({ userId: id }), loginDevices.removeAll(id), trustedDevices().removeAll(id), passkeyStore.removeAll(id)]).then(() => {
-            compactQuietly(usersDB, 'users');
-            res.json({ message: 'Password reset' });
-          }, (e) => { console.error('reset: sign-ins not all removed:', e.message); res.status(500).json(CLEANUP_INCOMPLETE); });
-        },
-      );
-    });
-  });
-}
 
 // QR sign-in (services/qrLogin.js).
 const qrRequests = qrLogin.createRequests();

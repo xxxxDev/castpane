@@ -196,7 +196,10 @@ struct LocalAPI {
         do {
             _ = try await request("POST", "setup", body: ["username": username, "password": password])
             return .created
-        } catch Failure.status(409, _) {
+        } catch Failure.status(409, let message) {
+            // A name an old account from an earlier version keeps is said, not taken for
+            // an account already made (NAME_TAKEN_BY_OLD_ACCOUNT, docs/protocol.md).
+            if message?.contains("old account") == true { throw Failure.status(409, message) }
             return .alreadyExists
         }
     }

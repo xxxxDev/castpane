@@ -14,6 +14,7 @@ const crypto = require('node:crypto');
 const express = require('express');
 const { isLoopback } = require('./services/clientIp');
 const { AUDIT_LOG } = require('./services/audit');
+const { activeUserQuery } = require('./services/userLifecycle');
 
 const FORWARDED = ['cf-connecting-ip', 'cf-ray', 'cdn-loop', 'cf-ipcountry', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'forwarded', 'x-real-ip', 'tailscale-user-login', 'origin', 'cookie'];
 const sameToken = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
@@ -86,7 +87,8 @@ function createLocalRoutes({ home, remote, version, memberLink = null, auth = re
   });
   router.use(express.json({ limit: '8kb' }));
   const count = (db, q) => new Promise((ok, no) => db.count(q, (e, n) => (e ? no(e) : ok(n))));
-  const active = { lifecycleStatus: { $nin: ['disabled', 'deleted_tombstone'] } };
+  // Active accounts only, by the rule createFirstAdmin is held to (services/userLifecycle.js).
+  const active = activeUserQuery();
   router.get('/status', async (req, res, next) => {
     try {
       const [users, admins, sessions] = await Promise.all([count(usersDB, active), count(usersDB, { ...active, role: 'admin' }), count(sessionsDB, { expiresAt: { $gt: new Date() } })]);
