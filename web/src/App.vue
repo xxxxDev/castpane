@@ -86,7 +86,7 @@
         <!-- A phone held sideways: a rail of its own on the right, with the same tabs; the
              bottom bar below stays exactly as it is, only hidden there, so turning upright
              gives it back untouched. -->
-        <nav ref="railRef" class="landscape-rail" @pointerdown="railDown" @pointermove="railMove" @pointerup="railUp" @pointercancel="railCancel">
+        <nav v-if="desktop" ref="railRef" class="landscape-rail" @pointerdown="railDown" @pointermove="railMove" @pointerup="railUp" @pointercancel="railCancel">
           <a v-for="tb in tabs" :key="tb.id" class="landscape-rail-tab" :class="{ active: (railHover || active) === tb.id }" :data-rail-tab="tb.id" href="#" :aria-label="t(tb.labelKey)" @click.prevent>
             <i class="icon" :class="tb.iconClass">{{ tb.icon }}</i>
           </a>
@@ -389,6 +389,9 @@ const DESKTOP = '(min-width: 1024px)';
 const desktopQuery = typeof window !== 'undefined' ? window.matchMedia?.(DESKTOP) : null;
 const desktop = ref(!!desktopQuery?.matches);
 desktopQuery?.addEventListener?.('change', () => { desktop.value = !!desktopQuery?.matches; });
+// Short of a computer's width there is no tab bar (nor the rail held sideways): Remote's
+// page has Settings at its top right, and Settings a way back (styles/skin.css, no-tabbar).
+watch(desktop, (d) => document.documentElement.classList.toggle('no-tabbar', !d), { immediate: true });
 // The folded sidebar: the page keeps the rail's room (sidebar-rail), the sidebar shows
 // icons only (sidebar-narrow); classes on <html>, read by styles/skin.css.
 watch([sidebarRail, sidebarNarrow], ([rail, narrow]) => {

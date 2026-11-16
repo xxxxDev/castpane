@@ -1,6 +1,9 @@
 <template>
   <f7-page name="settings" class="page-large-static">
-    <f7-navbar large :title="t('tabSettings')" />
+    <f7-navbar large :title="t('tabSettings')">
+      <!-- Without a tab bar: back to Remote. -->
+      <f7-nav-left v-if="currentUser?.role === 'admin'"><f7-link class="settings-back-link" icon-f7="chevron_left" :aria-label="ct('遠端')" :title="ct('遠端')" @click="setActiveTab('view-remote')"/></f7-nav-left>
+    </f7-navbar>
 
     <!-- Remote, the Castpane account, its security, then the system. -->
     <f7-block-title>{{ ct('遠端') }}</f7-block-title>
@@ -100,6 +103,7 @@
 </template>
 
 <script setup>
+import { setActiveTab } from '../js/tab-session.js';
 import {ct} from '../js/text.js';
 import { PRODUCT } from '../js/productConfig.js';
 import {useTheme} from '../theme.js';

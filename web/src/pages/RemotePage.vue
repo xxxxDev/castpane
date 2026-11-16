@@ -2,7 +2,10 @@
   <!-- Remote (server/remote.js; first made after Sill): this Mac's
        screen or one of its windows, live, with clicks, scrolls and keys sent back. -->
   <f7-page name="remote" class="page-large-static remote-page" @page:afterin="load">
-    <f7-navbar :title="ct('遠端')" large></f7-navbar>
+    <f7-navbar :title="ct('遠端')" large>
+      <!-- Without a tab bar (a phone, a tablet): Settings from here. -->
+      <f7-nav-right><f7-link class="remote-settings-link" icon-f7="gear_alt" :aria-label="ct('設定')" :title="ct('設定')" @click="setActiveTab('view-settings')"/></f7-nav-right>
+    </f7-navbar>
     <p class="remote-note">{{ ct('把 Mac 上開著的 App 當成這台裝置的 App 來用，或看整個螢幕。開始前要再驗證一次（有通行密鑰就用密鑰，沒有就輸入密碼），8 小時內不用再驗證。') }}</p>
     <f7-block v-if="!supported" class="remote-error" role="alert">{{ ct('這個瀏覽器不支援影片解碼（WebCodecs），請改用新版的 Edge、Chrome 或 Safari。') }}</f7-block>
     <f7-block v-if="error" class="remote-error" role="alert">{{ error }}</f7-block>
@@ -263,6 +266,7 @@
   </f7-page>
 </template>
 <script setup>
+import { setActiveTab } from '../js/tab-session.js';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, nextTick, watch } from 'vue';
 import { f7 } from 'framework7-vue';
 import { ct } from '../js/text.js';
@@ -409,7 +413,7 @@ function sessionSet(k, v) { try { if (v == null) sessionStorage.removeItem(k); e
 async function load() {
   try {
     const r = await api('/remote/machines');
-    machines.value = r.machines;canAdd.value = !!r.canAdd;error.value = '';
+    machines.value = Array.isArray(r?.machines) ? r.machines : [];canAdd.value = !!r.canAdd;error.value = '';
     for (const m of r.machines) if (!(m.id in shots)) shots[m.id] = localGet(shotKey(m.id)) || '';
   } catch (e) { error.value = e.message; }
 }

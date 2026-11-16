@@ -601,6 +601,15 @@ img[src$="/sources/anthropic-native.svg"] {
   }
 }
 
+/* No tab bar short of a computer's width (App.vue): neither the bar nor the rail held
+   sideways, and the page keeps no room for them. Remote's page has Settings at its top
+   right and Settings a way back; on a computer those two stay hidden. */
+html.no-tabbar .cc-app .toolbar-layout-wrapper,
+html.no-tabbar .cc-app .landscape-rail { display: none !important; }
+html.no-tabbar .cc-app .page-content { padding-bottom: calc(16px + var(--f7-safe-area-bottom, 0px)); }
+html:not(.no-tabbar) .remote-settings-link,
+html:not(.no-tabbar) .settings-back-link { display: none !important; }
+
 /* ---- Navbar glass ----
  * Pages decide only the left/title/right slot content; the transparent expanded background,
  * top-row geometry, and the glass link capsules live here. F7 v9.1 also paints a glass capsule
