@@ -105,9 +105,11 @@ function register({ id, clientDataJSON, authenticatorData, publicKey, alg }, { c
 // A sign-in answer: its challenge is taken first, whichever key it names, so the
 // answer does not tell whether a key is known here.
 // userId: a challenge issued for one account only (an admin confirming an action).
-function answer({ clientDataJSON }, { challenges, isAllowedOrigin, userId = '' }) {
+// note: what the challenge was issued for, when it was given one (one action's kind).
+function answer({ clientDataJSON }, { challenges, isAllowedOrigin, userId = '', note = '' }) {
   const client = readClient(clientDataJSON, 'webauthn.get', isAllowedOrigin);
-  if (!challenges.take(client.challenge, 'get', userId)) refuse('challenge');
+  const taken = challenges.take(client.challenge, 'get', userId);
+  if (!taken || (note && taken !== note)) refuse('challenge');
   return client;
 }
 // That answer's signature from a kept passkey: the counter to keep, or it throws.
@@ -146,12 +148,10 @@ function createStore(db) {
   return { add, byCredential, used, list, ids, remove, removeAll };
 }
 
-// Only a key added with the password, and with the code when two-step is on, may stand
-// for them when an admin confirms an action: one added before two-step was turned on
-// never had the code asked. Adding one has always taken both here, so a key kept before
-// this mark was written counts as added with the code when it was made after two-step
-// was turned on.
-const confirmsAdmin = (doc, user) => (doc?.addedWith ?? 'password') === 'password'
-  && (!user?.twoStep || doc.withCode === true || (doc.withCode === undefined && typeof user.twoStep.enabledAt === 'string' && typeof doc.createdAt === 'string' && doc.createdAt >= user.twoStep.enabledAt));
+// Only a key marked as added with the password, and with the code when two-step is on, may
+// stand for them when an admin confirms an action: one added while two-step was off never
+// had the code asked. A key kept before the mark was written never counts; it is added
+// again (with the password and code) to stand for them.
+const confirmsAdmin = (doc, user) => doc?.addedWith === 'password' && (!user?.twoStep || doc.withCode === true);
 
 module.exports = { confirmsAdmin, createChallenges, createStore, register, answer, assert, b64u, ALGS, CHALLENGE_MS, MAX_PASSKEYS };

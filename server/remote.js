@@ -161,7 +161,7 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
   // it was refused (the answer is sent).
   async function againOrRefused(req, res, purpose) {
     if (req.body?.passkey) {
-      try { await auth.adminPasskeyAgain(req, req.body.passkey); return true; } catch { res.status(400).json({ message: 'Passkey not accepted', code: 'PASSKEY_REFUSED' }); return false; }
+      try { await auth.adminPasskeyAgain(req, res, req.body.passkey, 'remote'); return true; } catch (e) { res.status(e.status === 429 ? 429 : 400).json({ message: 'Passkey not accepted', code: 'PASSKEY_REFUSED' }); return false; }
     }
     if (!(await auth.adminAgain(req, res, purpose, 'remote'))) return false;
     auth.adminGranted(req, 'remote');
@@ -193,7 +193,7 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
     });
   }
   // The admin's own passkey instead of the password and code, when they have one.
-  app.post('/api/remote/pass/passkey', ...chain, async (req, res, next) => { try { res.json((await auth.adminPasskeyStart(req)) || { challenge: null }); } catch (e) { next(e); } });
+  app.post('/api/remote/pass/passkey', ...chain, async (req, res, next) => { try { res.json((await auth.adminPasskeyStart(req, 'remote')) || { challenge: null }); } catch (e) { next(e); } });
   // A pass to open the stream: the admin's passkey, or their password and two-step code,
   // or a device this admin trusts (its cookie), which stays in date for the days set.
   app.post('/api/remote/pass', ...chain, async (req, res, next) => {
@@ -207,7 +207,7 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
         return res.json(issued);
       }
       if (req.body?.passkey) {
-        try { await auth.adminPasskeyAgain(req, req.body.passkey); } catch (e) { return res.status(e.status || 400).json({ message: 'Passkey not accepted', code: 'PASSKEY_REFUSED' }); }
+        try { await auth.adminPasskeyAgain(req, res, req.body.passkey, 'remote'); } catch (e) { return res.status(e.status || 400).json({ message: 'Passkey not accepted', code: 'PASSKEY_REFUSED' }); }
       } else {
         if (!(await auth.adminAgain(req, res, 'remote-open', 'remote'))) return;
         auth.adminGranted(req, 'remote');
@@ -232,7 +232,7 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
       await t.forget(trustCookie(req));
       const made = await t.trust(req.userId, req.headers['user-agent']);
       setTrustCookie(req, res, made.cookie, made.expiresAt);
-      audit({ source: 'remote', action: 'trust', username: req.username, ip: resolveClientIp(req) });
+      audit({ source: 'remote', action: 'trust', username: req.username, via: req.body?.passkey ? 'passkey' : 'password', ip: resolveClientIp(req) });
       res.json({ trusted: true, expiresAt: new Date(made.expiresAt).toISOString(), days: await t.days() });
     } catch (e) { try { auth.adminKept(req); } catch { /* nothing granted */ } next(e); }
   });

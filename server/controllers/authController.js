@@ -705,23 +705,29 @@ exports._passkeyChallenges = passkeyChallenges;
 // owner (UV), the key is this admin's own, and the challenge came from a pool of its
 // own, so a login page's challenge is never accepted here.
 const againChallenges = passkeys.createChallenges();
-exports.adminPasskeyStart = async (req) => {
+// purpose: 'remote' (opening Remote, trusting a device for it) or 'admin' (account
+// management). A challenge answers only an action of its own purpose.
+const AGAIN_PURPOSES = new Set(['remote', 'admin']);
+exports.adminPasskeyStart = async (req, purpose) => {
+  if (!AGAIN_PURPOSES.has(purpose)) throw new Error(`unknown purpose ${purpose}`);
   const me = await activeAccount(req.userId);
   if (!me || me.role !== 'admin') return null;
   const ids = await passkeyStore.ids(req.userId, (d) => passkeys.confirmsAdmin(d, me));
   if (!ids.length) return null;
-  return { challenge: againChallenges.issue('get', req.userId, `again:${req.userId}`), allow: ids };
+  return { challenge: againChallenges.issue('get', req.userId, `again:${req.userId}`, purpose), allow: ids };
 };
 // Throws (400) unless the answer is this admin's passkey, one that may stand for the
-// password and code, signed just now. Refused answers count as the wrong password does,
-// and a blocked address is refused (429) before the answer is looked at.
-exports.adminPasskeyAgain = async (req, body = {}) => {
+// password and code, signed just now, to a challenge issued for this purpose. Refused
+// answers count as the wrong password does; a blocked address, or one with an attempt
+// still being checked, is refused (429) before the answer is looked at.
+exports.adminPasskeyAgain = async (req, res, body = {}, purpose) => {
+  if (!AGAIN_PURPOSES.has(purpose)) throw new Error(`unknown purpose ${purpose}`);
   const ip = resolveClientIp(req);
-  if (loginBlocked(ip, req, req.username || '', 'admin-grant')) throw Object.assign(new Error('Too many attempts'), { status: 429 });
+  if (loginBlocked(ip, req, req.username || '', 'admin-grant') || !held(ip, res)) throw Object.assign(new Error('Too many attempts'), { status: 429 });
   const me = await activeAccount(req.userId);
   if (!me || me.role !== 'admin') throw Object.assign(new Error('Account is not active'), { status: 403 });
   try {
-    const answer = passkeys.answer(body, { challenges: againChallenges, isAllowedOrigin: isPasskeyOrigin, userId: me._id });
+    const answer = passkeys.answer(body, { challenges: againChallenges, isAllowedOrigin: isPasskeyOrigin, userId: me._id, note: purpose });
     const kept = await passkeyStore.byCredential(body.id);
     if (!kept || String(kept.userId) !== String(me._id)) throw Object.assign(new Error('Passkey not accepted'), { status: 400 });
     if (!passkeys.confirmsAdmin(kept, me)) throw Object.assign(new Error('Passkey not accepted'), { status: 400 });
@@ -739,7 +745,7 @@ exports.adminPasskeyAgain = async (req, body = {}) => {
 exports.passkeyAgain = async (req, res) => {
   try {
     if (req.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
-    res.json((await exports.adminPasskeyStart(req)) || { challenge: null, allow: [] });
+    res.json((await exports.adminPasskeyStart(req, 'admin')) || { challenge: null, allow: [] });
   } catch (e) { sendPasskeyError(res, e); }
 };
 exports._applySignInRescue = applySignInRescue;
@@ -970,7 +976,7 @@ async function adminAgain(req, res, how, target) {
   // challenge, one action.
   if (adminPasskey && typeof adminPasskey === 'object' && !Array.isArray(adminPasskey)) {
     let me;
-    try { me = await exports.adminPasskeyAgain(req, adminPasskey); }
+    try { me = await exports.adminPasskeyAgain(req, res, adminPasskey, 'admin'); }
     catch (e) {
       if (e.status === 429) res.status(429).json(TOO_MANY);
       else if (e.status === 403) res.status(403).json({ message: 'Account is not active' });
@@ -1012,7 +1018,7 @@ function adminGranted(req, userId) {
   const grant = req.adminGrant;
   if (!grant) return;
   req.adminGrant = null;
-  audit({ source: 'users', action: grant.how === 'create' || grant.how === 'promote' ? 'admin-grant' : 'admin-again', how: grant.how, by: req.username, target: String(userId || grant.target) });
+  audit({ source: 'users', action: grant.how === 'create' || grant.how === 'promote' ? 'admin-grant' : 'admin-again', how: grant.how, by: req.username, with: grant.by || 'password', target: String(userId || grant.target) });
 }
 // It may have happened: a store write reported as failed can have been made all the
 // same (NeDB changes its rows in memory before it saves them), or the action stopped

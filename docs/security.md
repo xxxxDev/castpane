@@ -75,9 +75,11 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   (`PASSKEY_ORIGIN`). QR sign-in needs a phone already bound as a login
   key and a matching number chosen on it.
 - Where an admin is asked again (opening Remote, making an administrator, resetting a
-  password), a passkey stands for the password and code, one answer for one action. With
-  two-step on, only a key added after it was turned on counts: one added before never had the
-  code asked. Refused answers count as wrong passwords do.
+  password), a passkey stands for the password and code, one answer for one action, and a
+  Remote challenge answers only Remote. With two-step on, only a key added while it was on
+  counts (the code was asked when it was added); a key added while it was off does not, nor
+  one kept from before this rule: add it again. Refused answers count as wrong
+  passwords do.
 
 **Remote**
 
