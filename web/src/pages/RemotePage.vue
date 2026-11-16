@@ -1295,6 +1295,9 @@ function forceQuit(w) {
     buttons: [{ text: ct('取消') }, { text: ct('強制結束'), bold: true, color: 'red', onClick: () => {
       // Only to the Mac it was asked about: the page may have gone to another since.
       if (machine !== on || !link) return;
+      // Its window, if it is the one shown, goes with it: home, rather than "the picture
+      // stopped" over a window no longer there.
+      if (currentWindow.value?.bundle === w.bundle) goHome();
       link.send({ t: 'quit', bundle: w.bundle, force: true });
       const gone = new Set(items.value.filter((x) => x.kind === 'window' && x.bundle === w.bundle).map((x) => x.id));
       items.value = items.value.filter((x) => !gone.has(x.id));
