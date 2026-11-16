@@ -32,8 +32,8 @@
     <div class="remote-home-open" :class="{one: cols === 1}">
       <div v-for="o in openApps" :key="o.key" role="button" tabindex="0" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.enter.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.space.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
         <span class="remote-home-shot">
-          <!-- A Mac window's buttons, as big as the two-or-one switch's: × at the top left closes the window
-               on top, − at the top right puts it in the Dock; the number of windows at the
+          <!-- A Mac window's buttons, as macOS draws them: red at the top left closes the window
+               on top, yellow at the top right puts it in the Dock; the number of windows at the
                bottom right. -->
           <button v-if="o.window" type="button" class="light close" :title="ct('關閉視窗')" :aria-label="ct('關閉視窗')" @click.stop="$emit('closeWindow', o.window)"><f7-icon f7="xmark" :size="13"/></button>
           <button v-if="o.window && canMinimize && !o.window.minimized" type="button" class="light minimize" :title="ct('縮到 Dock')" :aria-label="ct('縮到 Dock')" @click.stop="$emit('minimize', o.window)"><f7-icon f7="minus" :size="13"/></button>
@@ -141,12 +141,15 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-stage .remote-home-cols button.on {background:rgba(255,255,255,.22);color:#fff;}
 .remote-home-open.one {grid-template-columns:1fr;}
 .remote-home-open.one .remote-home-shot {aspect-ratio:16/10;}
-/* The Mac's window buttons, the size of the two-or-one switch's buttons above: clear glass,
-   no colour, darker so they read over any window. */
-.remote-stage .remote-home-shot .light {position:absolute;top:6px;z-index:1;width:34px;height:26px;margin:0;padding:0;border:0;border-radius:100px;display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;background:rgba(30,30,32,.45);-webkit-backdrop-filter:saturate(180%) blur(12px);backdrop-filter:saturate(180%) blur(12px);box-shadow:rgba(255,255,255,.5) 0 0 1px 0 inset,rgba(255,255,255,.35) 1px 1px 2px -1px inset,rgba(0,0,0,.35) 0 2px 8px;}
-.remote-stage .remote-home-shot .light .icon {font-weight:700;}
-.remote-stage .remote-home-shot .light.close {left:6px;}
-.remote-stage .remote-home-shot .light.minimize {right:6px;}
+/* The Mac's window buttons, as macOS draws them: a red and a yellow dot, no sign on them, in a
+   finger-sized area that shows nothing itself. */
+.remote-stage .remote-home-shot .light {position:absolute;top:2px;z-index:1;width:36px;height:36px;margin:0;padding:0;border:0;border-radius:18px;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.remote-stage .remote-home-shot .light::before {content:'';width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.25),0 1px 3px rgba(0,0,0,.45);}
+.remote-stage .remote-home-shot .light .icon {display:none;}
+.remote-stage .remote-home-shot .light.close {left:2px;}
+.remote-stage .remote-home-shot .light.close::before {background:radial-gradient(circle at 50% 35%, #ff7b74, #ec5a52 70%);}
+.remote-stage .remote-home-shot .light.minimize {right:2px;}
+.remote-stage .remote-home-shot .light.minimize::before {background:radial-gradient(circle at 50% 35%, #ffd34d, #f5b81c 70%);}
 .remote-home-empty {font-size:14px;color:#888;}
 .remote-home-open {display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:14px 12px;}
 /* A tablet or a computer: as many as fit, two at the least. */
