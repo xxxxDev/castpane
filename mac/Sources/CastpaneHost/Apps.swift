@@ -65,6 +65,35 @@ enum Apps {
         NSWorkspace.shared.openApplication(at: url, configuration: config)
         return true
     }
+
+    /// The Mac's Dock as it shows its apps: those kept there, in its order, then the others
+    /// running, each one `found` gives (so the page can only start what it could anyway).
+    @MainActor static func dock() -> [[String: Any]] {
+        let all = found()
+        let byID = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let kept = (CFPreferencesCopyAppValue("persistent-apps" as CFString, "com.apple.dock" as CFString) as? [[String: Any]] ?? [])
+            .compactMap { ($0["tile-data"] as? [String: Any])?["bundle-identifier"] as? String }
+        var seen = Set<String>(), out: [[String: Any]] = []
+        for id in kept where !seen.contains(id) {
+            guard let a = byID[id] else { continue }
+            seen.insert(id)
+            out.append(["bundle": id, "name": a.name, "running": a.running, "kept": true])
+        }
+        for a in all where a.running && !seen.contains(a.id) {
+            out.append(["bundle": a.id, "name": a.name, "running": true, "kept": false])
+        }
+        return out
+    }
+
+    /// Quits the running app with this bundle id as ⌘Q would (it may ask on the Mac about
+    /// unsaved documents first); an app in the Dock only, never Castpane itself.
+    @MainActor static func quit(_ bundle: String) -> Bool {
+        guard bundle != Bundle.main.bundleIdentifier else { return false }
+        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundle).filter { $0.activationPolicy == .regular }
+        guard !apps.isEmpty else { return false }
+        for app in apps { app.terminate() }
+        return true
+    }
 }
 
 // A window made the shape of the device it is used from (a phone's tall and narrow), so
@@ -114,6 +143,20 @@ enum Fit {
     static func isMinimized(_ w: AXUIElement) -> Bool {
         var v: CFTypeRef?
         return AXUIElementCopyAttributeValue(w, kAXMinimizedAttribute as CFString, &v) == .success && (v as? Bool) == true
+    }
+    /// The windows of an app that are in the Dock, by window number (one Accessibility call
+    /// for the app, a second at most).
+    static func minimizedIDs(pid: pid_t) -> Set<CGWindowID> {
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 1)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success, let list = value as? [AXUIElement] else { return [] }
+        var out = Set<CGWindowID>()
+        for w in list where isMinimized(w) {
+            var wid: CGWindowID = 0
+            if _AXUIElementGetWindow(w, &wid) == .success { out.insert(wid) }
+        }
+        return out
     }
     static func minimize(_ w: AXUIElement) {
         AXUIElementSetAttributeValue(w, kAXMinimizedAttribute as CFString, kCFBooleanTrue)

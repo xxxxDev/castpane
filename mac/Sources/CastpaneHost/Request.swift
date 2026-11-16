@@ -49,6 +49,12 @@ enum Request: Equatable, Sendable {
     case unfit
     /// A window closed on the Mac, as its close button would (the switcher's swipe up).
     case close(id: Int)
+    /// A window put in the Dock, as its yellow button would.
+    case minimize(id: Int)
+    /// An app quit as ⌘Q would: it may ask about unsaved documents on the Mac first.
+    case quit(String)
+    /// The apps kept in the Mac's Dock, in its order.
+    case dock
     /// The Mac's password typed into its lock screen; never kept or logged.
     case unlock(String)
     /// A known request with a field out of shape; `t` is what it was, for an error answer.
@@ -56,6 +62,13 @@ enum Request: Equatable, Sendable {
 
     /// Display and window ids are 32-bit (CGDirectDisplayID, CGWindowID).
     static let ids = 0...Int(UInt32.max)
+
+    /// A bundle id as the page may name one: letters, digits, dots, dashes, underscores.
+    static func bundleID(_ v: Any?) -> String? {
+        guard let b = v as? String, b.utf8.count <= 200, !b.isEmpty,
+              b.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == "_") }) else { return nil }
+        return b
+    }
 
     /// The request in `msg`, `.invalid` when a field is wrong, nil for an unknown `t`.
     static func parse(_ msg: [String: Any]) -> Request? {
@@ -79,18 +92,24 @@ enum Request: Equatable, Sendable {
             guard let s = msg["s"] as? String, !s.isEmpty, s.utf16.count <= Clipboard.maxLength else { return .invalid(t) }
             return .clipboardSet(s)
         case "apps": return .apps
+        case "dock": return .dock
         case "unfit": return .unfit
         case "close":
             guard let id = Field.exactInt(msg["id"], in: ids) else { return .invalid(t) }
             return .close(id: id)
+        case "minimize":
+            guard let id = Field.exactInt(msg["id"], in: ids) else { return .invalid(t) }
+            return .minimize(id: id)
         case "icons":
             guard let list = msg["bundles"] as? [Any], list.count <= 40 else { return .invalid(t) }
             let bundles = list.compactMap { $0 as? String }.filter { $0.utf8.count <= 200 }
             return .icons(bundles)
         case "launch":
-            guard let b = msg["bundle"] as? String, b.utf8.count <= 200, !b.isEmpty,
-                  b.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == "_") }) else { return .invalid(t) }
+            guard let b = bundleID(msg["bundle"]) else { return .invalid(t) }
             return .launch(b)
+        case "quit":
+            guard let b = bundleID(msg["bundle"]) else { return .invalid(t) }
+            return .quit(b)
         case "fit":
             guard let id = Field.exactInt(msg["id"], in: ids), let w = Field.clampedInt(msg["width"], 240...8000, default: 0),
                   let h = Field.clampedInt(msg["height"], 240...8000, default: 0), w > 0, h > 0 else { return .invalid(t) }

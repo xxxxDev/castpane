@@ -82,6 +82,10 @@ const MESSAGES = {
   // the capture core starts only when it is one it lists; a window made the device's shape.
   apps: none, unfit: none,
   close: (m) => (int(m.id, 0, 0xffffffff) ? { id: m.id } : null),
+  // A window put in the Dock; an app quit as ⌘Q would; the apps in the Mac's Dock.
+  minimize: (m) => (int(m.id, 0, 0xffffffff) ? { id: m.id } : null),
+  quit: (m) => (typeof m.bundle === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(m.bundle) ? { bundle: m.bundle } : null),
+  dock: none,
   icons: (m) => (Array.isArray(m.bundles) && m.bundles.length <= 40 && m.bundles.every((b) => typeof b === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(b)) ? { bundles: m.bundles } : null),
   launch: (m) => (typeof m.bundle === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(m.bundle) ? { bundle: m.bundle } : null),
   fit: (m) => (int(m.id, 0, 0xffffffff) && int(m.width, 240, 8000) && int(m.height, 240, 8000) ? { id: m.id, width: m.width, height: m.height } : null),

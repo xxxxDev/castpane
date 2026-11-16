@@ -374,6 +374,18 @@ actor Session {
         case let .fit(id, width, height): queued { await self.fit(CGWindowID(id), CGSize(width: width, height: height)) }
         case .unfit: queued { await self.unfit() }
         case let .close(id): queued { await self.close(CGWindowID(id)) }
+        case let .minimize(id): queued { await self.minimize(CGWindowID(id)) }
+        case .dock:
+            let link = self.link
+            Task { @MainActor in link.send(json: ["t": "dock", "apps": Apps.dock()]) }
+        case let .quit(bundle):
+            let link = self.link
+            Task { @MainActor in
+                link.send(json: ["t": "quit", "bundle": bundle, "ok": Apps.quit(bundle)])
+                // Its windows go as it quits; one with unsaved documents asks on the Mac and stays.
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                await self.route(.list)
+            }
         case .ack: video.ack()
         case .keyFrame: video.keyFrame()
         case let .move(x, y):
@@ -610,6 +622,16 @@ actor Session {
               pid != ProcessInfo.processInfo.processIdentifier else { return }
         await MainActor.run { if let w = Fit.axWindow(id, pid: pid) { Fit.close(w) } }
         try? await Task.sleep(nanoseconds: 300_000_000)
+        route(.list)
+    }
+
+    /// Puts a window in the Dock (the yellow button); the list follows.
+    private func minimize(_ id: CGWindowID) async {
+        if fitted?.id == id { await unfit() }
+        guard let pid = (try? await Catalog.content())?.windows.first(where: { $0.windowID == id })?.owningApplication?.processID,
+              pid != ProcessInfo.processInfo.processIdentifier else { return }
+        await MainActor.run { if let w = Fit.axWindow(id, pid: pid) { Fit.minimize(w) } }
+        try? await Task.sleep(nanoseconds: 500_000_000)
         route(.list)
     }
 

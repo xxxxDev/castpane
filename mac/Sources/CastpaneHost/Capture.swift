@@ -95,6 +95,8 @@ enum Catalog {
                           "thumb": await thumbAll(content.displays, union, thumbWidth) ?? ""])
         }
         let desks = Spaces.desks()
+        // Which windows are in the Dock: asked once for each app that has a window here.
+        var minimized: [pid_t: Set<CGWindowID>] = [:]
         for w in windows(content) {
             let filter = SCContentFilter(desktopIndependentWindow: w)
             // Its desktop: number (per display), full screen, the one shown now; none in the Dock.
@@ -105,8 +107,13 @@ enum Catalog {
             // An app in the Dock (an ordinary one), not a menu-bar helper or a background
             // agent that keeps a window it never shows: Labs lists only these.
             let regular = w.owningApplication.flatMap { NSRunningApplication(processIdentifier: $0.processID) }?.activationPolicy == .regular
+            var inDock = false
+            if regular, let pid = w.owningApplication?.processID {
+                if minimized[pid] == nil { minimized[pid] = Fit.minimizedIDs(pid: pid) }
+                inDock = minimized[pid]?.contains(w.windowID) == true
+            }
             items.append(["kind": "window", "id": Int(w.windowID), "title": w.title ?? "", "app": w.owningApplication?.applicationName ?? "",
-                          "here": w.isOnScreen, "desk": desk, "dock": regular,
+                          "here": w.isOnScreen, "desk": desk, "dock": regular, "minimized": inDock,
                           "bundle": w.owningApplication?.bundleIdentifier ?? "",
                           "width": Int(w.frame.width), "height": Int(w.frame.height),
                           "thumb": await thumb(filter, w.frame.size, thumbWidth) ?? ""])
