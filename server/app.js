@@ -6,6 +6,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const compression = require('compression');
 const authRoutes = require('./routes/authRoutes');
 const pushRoutes = require('./routes/pushRoutes');
 const { security } = require('./services/securityLog');
@@ -86,6 +87,8 @@ function createApp({ remoteRoutes = null, localRoutes = null } = {}) {
     if (isHttpsHost(req.headers.host)) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
     next();
   });
+  // Responses are compressed (the tunnel carries less); WebSocket upgrades are not responses.
+  app.use(compression());
 
   // The app's own channel (server/localApi.js): 127.0.0.1 and its bearer token only,
   // before anything that expects a browser (Origin, CSRF, cookies). Never audited with
