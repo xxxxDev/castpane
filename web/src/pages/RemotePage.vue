@@ -198,8 +198,10 @@
         <!-- The pencil's field: text written on the phone, input method and all, and sent
              to where the Mac's cursor is in one go. -->
         <div v-if="compose" class="remote-compose" @pointerdown.stop>
-          <input ref="composeField" v-model="composeText" class="remote-compose-field" type="text" enterkeyhint="send" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" :placeholder="ct('打好字，送到 Mac 的游標位置')" @keydown="composeKey">
-          <button type="button" class="remote-compose-send" @pointerdown.prevent @mousedown.prevent @click="sendCompose">{{ ct('送出') }}</button>
+          <!-- A card as CC Agent's composer: several lines, growing; the round button at its
+               bottom right sends (Return makes a new line here). -->
+          <textarea ref="composeField" v-model="composeText" class="remote-compose-field" rows="1" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" :placeholder="ct('打好字，送到 Mac 的游標位置')" @input="growCompose" @keydown="composeKey"></textarea>
+          <button type="button" class="remote-compose-send" :title="ct('送出')" :aria-label="ct('送出')" @pointerdown.prevent @mousedown.prevent @click="sendCompose"><f7-icon f7="arrow_up" :size="17"/></button>
         </div>
         <!-- The clipboard both ways. -->
         <div v-if="clipOpen" class="remote-clip" @pointerdown.stop>
@@ -212,26 +214,32 @@
              next key. Always there, so the keyboard can be called up from it. -->
         <div v-if="isTouch && appMode !== 'home'" class="remote-keys remote-keys-touch" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
           <div class="remote-keys-box">
+            <!-- Four pages, as CC Agent's terminal keys: a terminal's keys; the Mac's modifier
+                 keys, its clipboard and the key panel; editing and moving keys; its desktops. -->
             <div ref="keyTrack" class="remote-keys-track" @scroll.passive="keyPaged">
               <div class="remote-keys-page">
-                <button type="button" class="remote-key tool compose-btn" :class="{on: compose}" :title="ct('輸入文字')" :aria-label="ct('輸入文字')" @pointerdown.prevent @mousedown.prevent @click="toggleCompose"><f7-icon f7="pencil" :size="16"/></button>
-                <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :title="panel ? ct('鍵盤') : ct('按鍵面板')" :aria-label="panel ? ct('鍵盤') : ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon :f7="panel ? 'keyboard' : 'square_grid_2x2'" :size="16"/></button>
-                <button type="button" class="remote-key tool clip-btn" :class="{on: clipOpen}" :title="ct('剪貼簿')" :aria-label="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="16"/></button>
-                <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
-                <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
+                <button v-for="k in TERM_KEYS" :key="k.name" type="button" class="remote-key term" :data-key="k.name" :title="k.name" :aria-label="k.name" @pointerdown.prevent @click="press(k)"><f7-icon v-if="k.icon" :f7="k.icon" :size="15"/><template v-else><span v-if="k.shift" class="remote-key-mod">⇧</span>{{ k.label }}</template></button>
               </div>
               <div class="remote-keys-page">
-                <button v-for="k in LAST_KEYS" :key="k.code" type="button" class="remote-key" :title="k.name" :aria-label="k.name" @pointerdown.prevent @click="tap(k.code)"><f7-icon :f7="k.icon" :size="16"/></button>
+                <button v-for="m in MODS" :key="m.id" type="button" class="remote-key mod" :class="{on: held.has(m.id)}" @pointerdown.prevent @click="toggleMod(m.id)">{{ m.label }}</button>
+                <button type="button" class="remote-key tool clip-btn" :class="{on: clipOpen}" :title="ct('剪貼簿')" :aria-label="ct('剪貼簿')" @pointerdown.prevent @mousedown.prevent @click="clipOpen = !clipOpen"><f7-icon f7="doc_on_clipboard" :size="16"/></button>
+                <button type="button" class="remote-key tool panel-btn" :class="{on: panel}" :title="panel ? ct('鍵盤') : ct('按鍵面板')" :aria-label="panel ? ct('鍵盤') : ct('按鍵面板')" @pointerdown.prevent @mousedown.prevent @click="togglePanel"><f7-icon :f7="panel ? 'keyboard' : 'square_grid_2x2'" :size="16"/></button>
+              </div>
+              <div class="remote-keys-page">
+                <button v-for="k in EDIT_KEYS" :key="k.code" type="button" class="remote-key term" :data-key="k.name" :title="k.name" :aria-label="k.name" @pointerdown.prevent @click="press(k)"><f7-icon v-if="k.icon" :f7="k.icon" :size="16"/><template v-else>{{ k.label }}</template></button>
+              </div>
+              <div class="remote-keys-page few">
                 <button type="button" class="remote-key tool mission" :title="ct('指揮中心')" :aria-label="ct('指揮中心')" @pointerdown.prevent @click="space('ArrowUp')"><f7-icon f7="rectangle_3_offgrid" :size="16"/></button>
                 <button type="button" class="remote-key tool space-left" :title="ct('上一個桌面')" :aria-label="ct('上一個桌面')" @pointerdown.prevent @click="space('ArrowLeft')"><f7-icon f7="arrow_left_square" :size="16"/></button>
                 <button type="button" class="remote-key tool space-right" :title="ct('下一個桌面')" :aria-label="ct('下一個桌面')" @pointerdown.prevent @click="space('ArrowRight')"><f7-icon f7="arrow_right_square" :size="16"/></button>
               </div>
             </div>
           </div>
-          <div class="remote-keys-dots" aria-hidden="true"><span v-for="i in 2" :key="i" :class="{on: i - 1 === keyPage}"></span></div>
+          <div class="remote-keys-dots" aria-hidden="true"><span v-for="i in 4" :key="i" :class="{on: i - 1 === keyPage}"></span></div>
           <!-- Follows whether the keyboard is really up (the page's height), not the field's
                focus: on an iPhone a focused field does not mean a keyboard came up. -->
           <button type="button" class="remote-round kb-btn" :title="kbShown ? ct('收起鍵盤') : ct('叫出鍵盤')" :aria-label="kbShown ? ct('收起鍵盤') : ct('叫出鍵盤')" @pointerdown.prevent @mousedown.prevent @click="kbButton"><f7-icon :f7="kbShown ? 'keyboard_chevron_compact_down' : 'keyboard'" :size="18"/></button>
+          <button type="button" class="remote-round compose-btn" :class="{on: compose}" :aria-pressed="compose" :title="ct('輸入文字')" :aria-label="ct('輸入文字')" @pointerdown.prevent @mousedown.prevent @click="toggleCompose"><f7-icon :f7="compose ? 'square_pencil_fill' : 'square_pencil'" :size="18"/></button>
         </div>
         <div v-if="!isTouch && keyboardOpen" class="remote-keys" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
           <button v-for="k in KEYS" :key="k.code" type="button" class="remote-key" @pointerdown.prevent @click="tap(k.code)">{{ k.label }}</button>
@@ -296,6 +304,12 @@ const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: 
 const mode = ref(isTouch ? (localGet('castpane-remote-mode') || 'direct') : 'direct');
 const QUALITY_LABEL = { auto: '自動', low: '低', standard: '標準', high: '高', max: '最高' };
 const KEYS = [{ code: 'Escape', label: 'esc' }, { code: 'Tab', label: 'tab' }];
+// The phone's capsule (as CC Agent's terminal keys): a terminal's on its first page, editing
+// and moving keys on its third. `mods` go with the key, as well as those held.
+const TERM_KEYS = [{ code: 'Escape', label: 'esc', name: 'esc' }, { code: 'Tab', label: 'tab', name: 'tab' }, { code: 'Tab', label: 'tab', name: '⇧tab', shift: true, mods: ['shift'] },
+  { code: 'ArrowUp', icon: 'chevron_up', name: '↑' }, { code: 'ArrowDown', icon: 'chevron_down', name: '↓' }, { code: 'ArrowLeft', icon: 'chevron_left', name: '←' }, { code: 'ArrowRight', icon: 'chevron_right', name: '→' },
+  { code: 'KeyC', label: '^C', name: '⌃C', mods: ['ctrl'] }];
+const EDIT_KEYS = [{ code: 'Backspace', icon: 'delete_left', name: 'delete' }, { code: 'Enter', icon: 'return', name: 'return' }, { code: 'Home', label: 'home', name: 'home' }, { code: 'End', label: 'end', name: 'end' }, { code: 'PageUp', label: 'pgup', name: 'page up' }, { code: 'PageDown', label: 'pgdn', name: 'page down' }];
 const LAST_KEYS = [{ code: 'Backspace', label: '⌫', icon: 'delete_left', name: 'delete' }, { code: 'Enter', label: '⏎', icon: 'return', name: 'return' }, { code: 'ArrowLeft', label: '←', icon: 'arrow_left', name: '←' }, { code: 'ArrowUp', label: '↑', icon: 'arrow_up', name: '↑' }, { code: 'ArrowDown', label: '↓', icon: 'arrow_down', name: '↓' }, { code: 'ArrowRight', label: '→', icon: 'arrow_right', name: '→' }];
 // The phone's capsule: which page of keys shows.
 const keyTrack = ref(null), keyPage = ref(0);
@@ -1128,11 +1142,16 @@ function toggleCompose() {
 function sendCompose() {
   const s = composeText.value;
   if (!s) { tap('Enter');composeField.value?.focus({ preventScroll: true });return; }
-  const chars = [...s];
-  for (let i = 0; i < chars.length; i += 1000) link?.send({ t: 'text', s: chars.slice(i, i + 1000).join('') });
+  // Several lines go through the Mac's clipboard and ⌘V, as a paste: typed, each line break
+  // would be a Return the app acts on.
+  if (/[\r\n]/.test(s)) pasteAtCursor(s, true);
+  else { const chars = [...s];for (let i = 0; i < chars.length; i += 1000) link?.send({ t: 'text', s: chars.slice(i, i + 1000).join('') }); }
   composeText.value = '';releaseMods();
+  nextTick(growCompose);
   composeField.value?.focus({ preventScroll: true });
 }
+// The card grows with its text, up to five lines, then scrolls.
+function growCompose() { const el = composeField.value;if (!el) return;el.style.height = 'auto';el.style.height = Math.min(el.scrollHeight, 5 * 22 + 12) + 'px'; }
 // ---- apps ----
 // The Labs page opens on the Mac's open apps (RemoteHome.vue), and an app's window then fills
 // it, made a phone's or tablet's shape on the Mac so its text reads as the device's own apps
@@ -1608,9 +1627,10 @@ async function pasteFromHere(e) {
   }
   pasteKey(m);
 }
-// Return sends, except while the input method is still choosing characters.
+// Return makes a new line; with a hardware keyboard ⌘ or Ctrl+Return sends (the round button
+// too), except while the input method is still choosing characters.
 function composeKey(e) {
-  if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
+  if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229 || !(e.metaKey || e.ctrlKey)) return;
   e.preventDefault();sendCompose();
 }
 function compositionEnd(e) { composing = false;sendText(e.data || '');if (typing.value) typing.value.value = ''; }
@@ -1761,14 +1781,24 @@ function keyUp(e) {
 .remote-keys-page {flex:0 0 100%;display:flex;align-items:center;padding:0 4px;box-sizing:border-box;scroll-snap-align:start;}
 .remote-stage .remote-keys-touch .remote-key {flex:1 1 0;min-width:0;height:34px;padding:0;border-radius:999px;background:transparent;color:rgba(255,255,255,.88);font:14px/1 -apple-system,system-ui,sans-serif;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
 .remote-stage .remote-keys-touch .remote-key.mod {font-size:16px;font-weight:600;}
+.remote-stage .remote-keys-touch .remote-key.term {flex:1 0 auto;min-width:24px;padding:0 2px;font:13px/1 Menlo,monospace;}
+/* ⇧ in the system face: Menlo's is a thin outline set low. */
+.remote-key-mod {font:600 14px/1 -apple-system,system-ui,sans-serif;margin-right:1px;position:relative;top:-1px;}
+/* Few keys: kept at the others' spacing from the left, not spread across the capsule. */
+.remote-keys-page.few {justify-content:flex-start;}
+.remote-stage .remote-keys-touch .remote-keys-page.few .remote-key {flex:0 0 44px;}
+.remote-stage .remote-round.compose-btn.on {background:rgba(255,255,255,.24);}
 .remote-stage .remote-keys-touch .remote-key:active {background:rgba(255,255,255,.18);}
 .remote-stage .remote-keys-touch .remote-key.on {background:#0a84ff;color:#fff;}
-.remote-keys-dots {position:absolute;left:12px;right:64px;bottom:3px;display:flex;justify-content:center;gap:5px;pointer-events:none;}
+.remote-keys-dots {position:absolute;left:12px;right:116px;bottom:3px;display:flex;justify-content:center;gap:5px;pointer-events:none;}
 .remote-keys-dots span {width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.18);}
 .remote-keys-dots span.on {background:rgba(255,255,255,.55);}
 /* Room for every key (a tablet, a phone held sideways): one page, no dots. */
 @media (min-width: 700px) {
-  .remote-keys-page {flex:1 1 0;}
+  /* Every page at once: each takes room for its keys, and what is left is shared out. */
+  .remote-keys-page {flex:1 1 auto;}
+  .remote-stage .remote-keys-touch .remote-key {flex:1 1 auto;min-width:40px;}
+  .remote-stage .remote-keys-touch .remote-key.term {padding:0 8px;}
   .remote-keys-track {overflow-x:hidden;}
   .remote-keys-dots {display:none;}
   .remote-keys.remote-keys-touch {padding-bottom:8px;}
@@ -1780,9 +1810,10 @@ function keyUp(e) {
 .remote-clip {display:flex;gap:6px;padding:6px 8px;background:rgba(28,28,30,.96);border-top:1px solid rgba(255,255,255,.08);}
 .remote-stage .remote-clip-btn {flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;height:36px;margin:0;padding:0 8px;border:0;border-radius:9px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap;}
 .remote-clip-text {width:100%;height:160px;box-sizing:border-box;font-size:14px;-webkit-user-select:text;user-select:text;}
-.remote-compose {display:flex;gap:6px;padding:6px 8px;background:rgba(28,28,30,.96);border-top:1px solid rgba(255,255,255,.08);}
-.remote-compose-field {flex:1;min-width:0;height:36px;box-sizing:border-box;padding:0 10px;border-radius:9px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.5);color:#fff;font-size:16px;-webkit-user-select:text;user-select:text;}
-.remote-stage .remote-compose-send {flex:0 0 auto;width:auto;height:36px;margin:0;padding:0 14px;border:0;border-radius:9px;background:#0a84ff;color:#fff;font-size:14px;cursor:pointer;}
+.remote-compose {display:flex;align-items:flex-end;gap:8px;margin:0 12px 2px;padding:10px 10px 10px 16px;border-radius:22px;background:#1c1c1e;border:1px solid rgba(255,255,255,.12);}
+.remote-compose-field {flex:1;min-width:0;min-height:32px;max-height:122px;box-sizing:border-box;padding:5px 0;border:0;background:transparent;color:#fff;font:16px/22px -apple-system,system-ui,sans-serif;resize:none;outline:none;-webkit-user-select:text;user-select:text;}
+.remote-stage .remote-compose-send {flex:0 0 auto;width:32px;height:32px;margin:0;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:#fff;color:#000;cursor:pointer;}
+.remote-stage .remote-compose-send .icon {font-weight:700;}
 .remote-stage .remote-compose-send:disabled {opacity:.4;}
 .remote-panel {background:rgba(28,28,30,.96);}
 .remote-pages {display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;}
