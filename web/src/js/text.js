@@ -339,6 +339,8 @@ const english = {
 "關閉":"Close",
 "關閉兩步驟驗證":"Turn off two-step sign-in",
 "驗證碼":"Code",
+"加的途中帳號的密碼或狀態變了，這把沒有留下，請重新加一次。":"Your password or account changed while this was being added; it was not kept. Add it again.",
+"加的途中帳號的密碼或狀態變了，但這把沒能移除，請在下方清單刪掉它。":"Your password or account changed while this was being added, and it could not be removed; delete it in the list below.",
 "驗證碼不正確":"That code is not right",
 "驗證碼或備用碼":"Code or recovery code",
 "高":"High",
