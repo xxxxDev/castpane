@@ -87,6 +87,14 @@ const MESSAGES = {
   // force: as Force Quit (no question asked, nothing saved).
   quit: (m) => (typeof m.bundle === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(m.bundle) && (m.force === undefined || bool(m.force)) ? { bundle: m.bundle, ...(m.force ? { force: true } : {}) } : null),
   dock: none,
+  // A folder or file kept at the Dock's right, by its place in the dock answer's others
+  // (the capture core reads the Dock again and opens only what it lists), or the Trash:
+  // exactly one of the two, never a path (other fields dropped, as for every message).
+  'dock-open'(m) {
+    if (m.index !== undefined && m.trash !== undefined) return null;
+    if (m.index !== undefined) return int(m.index, 0, 63) ? { index: m.index } : null;
+    return m.trash === true ? { trash: true } : null;
+  },
   icons: (m) => (Array.isArray(m.bundles) && m.bundles.length <= 40 && m.bundles.every((b) => typeof b === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(b)) ? { bundles: m.bundles } : null),
   launch: (m) => (typeof m.bundle === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(m.bundle) ? { bundle: m.bundle } : null),
   fit: (m) => (int(m.id, 0, 0xffffffff) && int(m.width, 240, 8000) && int(m.height, 240, 8000) ? { id: m.id, width: m.width, height: m.height } : null),

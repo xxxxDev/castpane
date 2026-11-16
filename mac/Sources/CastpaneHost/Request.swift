@@ -56,6 +56,10 @@ enum Request: Equatable, Sendable {
     case quit(String, force: Bool = false)
     /// The apps kept in the Mac's Dock, in its order.
     case dock
+    /// A folder or file kept at the right of the Dock, by its place there (0…63), opened.
+    case dockOpen(Int)
+    /// The Trash, opened in the Finder.
+    case dockOpenTrash
     /// The Mac's password typed into its lock screen; never kept or logged.
     case unlock(String)
     /// A known request with a field out of shape; `t` is what it was, for an error answer.
@@ -94,6 +98,15 @@ enum Request: Equatable, Sendable {
             return .clipboardSet(s)
         case "apps": return .apps
         case "dock": return .dock
+        case "dock-open":
+            // Exactly one: a place in the Dock's list, or trash as a JSON true.
+            let trash = msg["trash"]
+            if trash == nil {
+                guard let i = Field.exactInt(msg["index"], in: 0...63) else { return .invalid(t) }
+                return .dockOpen(i)
+            }
+            guard msg["index"] == nil, let b = trash as? NSNumber, CFGetTypeID(b) == CFBooleanGetTypeID(), b.boolValue else { return .invalid(t) }
+            return .dockOpenTrash
         case "unfit": return .unfit
         case "close":
             guard let id = Field.exactInt(msg["id"], in: ids) else { return .invalid(t) }

@@ -288,6 +288,9 @@ function app(x) {
   if (!x || typeof x !== 'object' || Array.isArray(x) || !str(x.bundle, 200)) return null;
   return pick({ bundle: x.bundle, name: str(x.name, 200) ?? '', running: bool(x.running) ?? false, kept: bool(x.kept) });
 }
+// A folder or file at the Dock's right: its name and kind only (the page opens it by its
+// place in the list, so each one stays, however malformed, to keep the places).
+const other = (x) => ({ name: str(x?.name, 200) ?? '', kind: x?.kind === 'folder' ? 'folder' : 'file' });
 const SHAPES = {
   locked: (m) => ({ locked: bool(m.locked) ?? false }),
   unlocked: (m) => pick({ ok: bool(m.ok) ?? false, busy: bool(m.busy) }),
@@ -308,7 +311,8 @@ const SHAPES = {
     ? { icons: Object.fromEntries(Object.entries(m.icons).slice(0, 40).filter(([b, v]) => str(b, 200) && typeof v === 'string' && v.length <= 64 * 1024 && ICON.test(v))) } : null),
   launched: (m) => (str(m.bundle, 200) ? { bundle: m.bundle, ok: bool(m.ok) ?? false } : null),
   quit: (m) => (str(m.bundle, 200) ? { bundle: m.bundle, ok: bool(m.ok) ?? false } : null),
-  dock: (m) => (Array.isArray(m.apps) ? { apps: m.apps.slice(0, 300).map(app).filter(Boolean) } : null),
+  dock: (m) => (Array.isArray(m.apps) ? pick({ apps: m.apps.slice(0, 300).map(app).filter(Boolean), others: Array.isArray(m.others) ? m.others.slice(0, 64).map(other) : undefined, trash: bool(m.trash) }) : null),
+  'dock-opened': (m) => ({ ok: bool(m.ok) ?? false }),
   fitted: (m) => (int(m.id) !== undefined ? pick({ id: m.id, ok: bool(m.ok) ?? false, width: int(m.width), height: int(m.height) }) : null),
   'clipboard-busy': () => ({}),
 };

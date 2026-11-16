@@ -380,7 +380,18 @@ actor Session {
         case let .minimize(id): queued { await self.minimize(CGWindowID(id)) }
         case .dock:
             let link = self.link
-            Task { @MainActor in link.send(json: ["t": "dock", "apps": Apps.dock()]) }
+            Task { @MainActor in
+                // The folders and files at the Dock's right by name and kind only (no path),
+                // then the Trash; opened by their place with dock-open.
+                let others = Apps.dockOthers().map { ["name": $0.name, "kind": $0.folder ? "folder" : "file"] }
+                link.send(json: ["t": "dock", "apps": Apps.dock(), "others": others, "trash": true])
+            }
+        case let .dockOpen(index):
+            let link = self.link
+            Task { @MainActor in link.send(json: ["t": "dock-opened", "ok": Apps.openDockOther(index)]) }
+        case .dockOpenTrash:
+            let link = self.link
+            Task { @MainActor in link.send(json: ["t": "dock-opened", "ok": Apps.openTrash()]) }
         case let .quit(bundle, force):
             let link = self.link
             Task { @MainActor in

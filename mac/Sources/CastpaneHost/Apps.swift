@@ -85,6 +85,44 @@ enum Apps {
         return out
     }
 
+    /// The folders and files kept at the right of the Mac's Dock (Downloads, Documents…), in
+    /// its order: those with a local file URL to something that exists, at most 64. Other
+    /// tiles (a web link, a spacer, Recent Applications) have none and are left out. The page
+    /// gets their names and kinds only, never a path, and opens one by its place here.
+    @MainActor static func dockOthers() -> [(name: String, folder: Bool, url: URL)] {
+        let tiles = CFPreferencesCopyAppValue("persistent-others" as CFString, "com.apple.dock" as CFString) as? [[String: Any]] ?? []
+        var out: [(name: String, folder: Bool, url: URL)] = []
+        for tile in tiles {
+            guard let data = tile["tile-data"] as? [String: Any], let file = data["file-data"] as? [String: Any],
+                  let s = file["_CFURLString"] as? String else { continue }
+            // A URL string (type 15, the usual) or, from older Docks, a plain path (type 0).
+            let url: URL? = s.hasPrefix("/") ? URL(fileURLWithPath: s) : URL(string: s)
+            guard let url, url.isFileURL else { continue }
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { continue }
+            // A package (an app, a bundle) is opened as a file, not shown as a folder.
+            let folder = isDir.boolValue && !NSWorkspace.shared.isFilePackage(atPath: url.path)
+            let label = (data["file-label"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? FileManager.default.displayName(atPath: url.path)
+            out.append((String(label.prefix(200)), folder, url))
+            if out.count == 64 { break }
+        }
+        return out
+    }
+
+    /// Opens the Dock's folder or file at this place, as `dockOthers` lists them now (the
+    /// Finder shows a folder, a file opens in its app).
+    @MainActor static func openDockOther(_ index: Int) -> Bool {
+        let others = dockOthers()
+        guard others.indices.contains(index) else { return false }
+        return NSWorkspace.shared.open(others[index].url)
+    }
+
+    /// Opens the Trash in the Finder.
+    @MainActor static func openTrash() -> Bool {
+        guard let url = try? FileManager.default.url(for: .trashDirectory, in: .userDomainMask, appropriateFor: nil, create: false) else { return false }
+        return NSWorkspace.shared.open(url)
+    }
+
     /// An app asked to quit that is still running, brought to the front with its windows.
     @MainActor static func bringForwardIfRunning(_ bundle: String) {
         let me = ProcessInfo.processInfo.processIdentifier

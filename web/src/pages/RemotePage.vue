@@ -156,7 +156,7 @@
         </div>
         <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
         <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
-          <template #dock><RemoteDock v-if="macWindows" docked :apps="dockApps" :windows="dockWindows" :icons="icons" @app="openApp" @window="openWindow"/></template>
+          <template #dock><RemoteDock v-if="macWindows" docked :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="openApp" @window="openWindow" @other="openDockOther" @trash="openDockTrash"/></template>
         </RemoteHome>
         <!-- An app starting takes the Mac a few seconds: said wherever it was started from (the
              home, All apps, the Dock over an app or the whole screen), with a way to cancel. -->
@@ -170,7 +170,7 @@
         <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''" :can-quit="mayQuit(windowsOfList[0])" @quit="() => { const w = windowsOfList[0];windowsOf = '';quitApp(w); }" @force-quit="() => { const w = windowsOfList[0];windowsOf = '';forceQuit(w); }"/>
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
         <button v-if="!isTouch && macWindows && appMode !== 'home' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
-        <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @close="dockOpen = false"/>
+        <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @other="(i, o) => { dockOpen = false;openDockOther(i, o); }" @trash="dockOpen = false;openDockTrash()" @close="dockOpen = false"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
@@ -560,7 +560,7 @@ function onMessage(msg) {
   } else if (msg.t === 'started') {
     if (!current.value || current.value.kind !== msg.kind || current.value.id !== msg.id) resetView();
     current.value = { kind: msg.kind, id: msg.id };notice.value = '';
-  } else if (msg.t === 'apps' || msg.t === 'icons' || msg.t === 'launched' || msg.t === 'fitted' || msg.t === 'dock' || msg.t === 'quit') {
+  } else if (msg.t === 'apps' || msg.t === 'icons' || msg.t === 'launched' || msg.t === 'fitted' || msg.t === 'dock' || msg.t === 'dock-opened' || msg.t === 'quit') {
     appsMessage(msg);
   } else if (msg.t === 'caret') {
     if (keyboardOpen.value && Array.isArray(msg.caret) && !zoomTo) keepInSight({ x: msg.caret[0] + msg.caret[2] / 2, y: msg.caret[1] + msg.caret[3] / 2 });
@@ -1245,7 +1245,12 @@ function appsMessage(msg) {
   } else if (msg.t === 'launched') {
     if (!msg.ok && launching.value === msg.bundle) { launching.value = '';toast(ct('這個 App 打不開')); }
   } else if (msg.t === 'fitted') { fitWait?.(msg); }
-  else if (msg.t === 'dock') { dockApps.value = msg.apps || [];askIconsFor(dockApps.value.map((a) => a.bundle)); }
+  else if (msg.t === 'dock') {
+    dockApps.value = msg.apps || [];dockOthers.value = Array.isArray(msg.others) ? msg.others : [];dockTrash.value = msg.trash === true;
+    askIconsFor(dockApps.value.map((a) => a.bundle));
+  } else if (msg.t === 'dock-opened') {
+    if (!msg.ok && launching.value === FINDER) { stopLaunch();toast(ct('這個項目打不開')); }
+  }
   else if (msg.t === 'quit') { if (macWindows.value) setTimeout(() => link?.send({ t: 'dock' }), 1200);if (!msg.ok) { toast(ct('這個 App 沒有結束'));if (quitWatch?.bundle === msg.bundle) quitWatch = null; } }
 }
 // Icons for these bundles that the page has not kept yet (the Dock's, which `apps` may not
@@ -1256,7 +1261,7 @@ function askIconsFor(bundles) {
   for (const b of missing) iconsAsked.add(b);
   link?.send({ t: 'icons', bundles: missing });
 }
-const launchingName = computed(() => apps.value.find((a) => a.bundle === launching.value)?.name || dockApps.value.find((a) => a.bundle === launching.value)?.name || items.value.find((w) => w.bundle === launching.value)?.app || launching.value);
+const launchingName = computed(() => launchLabel.value || apps.value.find((a) => a.bundle === launching.value)?.name || dockApps.value.find((a) => a.bundle === launching.value)?.name || items.value.find((w) => w.bundle === launching.value)?.app || launching.value);
 // An app's windows to choose from, by its bundle id ('' when closed).
 const windowsOf = ref('');
 const windowsOfList = computed(() => orderedWindows.value.filter((w) => (w.bundle || w.app) === windowsOf.value));
@@ -1265,15 +1270,38 @@ const appWindowCount = computed(() => { const b = currentWindow.value?.bundle;re
 function showWindows(bundle) { if (bundle) windowsOf.value = bundle; }
 // The Mac's Dock: asked for each time it opens; the windows in it from the list.
 const dockOpen = ref(false), dockApps = ref([]);
+// The folders and files kept at the Dock's right ({name, kind}, no path) and whether the Mac
+// offers its Trash: a Mac from before sends neither, and is never asked to open them.
+const dockOthers = ref([]), dockTrash = ref(false);
 // Whether the Mac knows minimize, quit and dock (its status says so): a Mac from before ends
 // the session on a request it does not know, so they are not offered there.
 const macWindows = ref(false);
 // The Finder is never quit from here: nothing on this page starts it again.
 const mayQuit = (w) => macWindows.value && !!w?.bundle && w.bundle.toLowerCase() !== 'com.apple.finder';
 // The windows' sheet, the Dock and a card's menu belong to one Mac and one moment.
-function closeWindowViews() { windowsOf.value = '';dockOpen.value = false;dockApps.value = [];cardMenu.value = null; }
+function closeWindowViews() { windowsOf.value = '';dockOpen.value = false;dockApps.value = [];dockOthers.value = [];dockTrash.value = false;cardMenu.value = null; }
 const dockWindows = computed(() => orderedWindows.value.filter((w) => w.minimized));
 function openDock() { dockOpen.value = true;link?.send({ t: 'dock' });list(); }
+// A folder or file from the Dock (by its place there) or the Trash, opened on the Mac; the
+// Finder window that comes for it is shown: one that was not open before. A file opened in
+// its own app brings none, and is given up on as an app without a window is.
+const FINDER = 'com.apple.finder';
+// A folder already open in the Finder is brought forward there, not opened again: its window
+// (titled with the folder's name) is shown at once. A file opens in its own app: said, as
+// there is no Finder window to wait for.
+function openFromDock(request, name, kind = 'folder') {
+  const finder = items.value.filter((x) => x.kind === 'window' && x.bundle === FINDER);
+  link?.send({ t: 'dock-open', ...request });
+  const open = kind === 'folder' && finder.find((x) => x.title === name);
+  if (open) { openWindow(open);return; }
+  if (kind === 'file') { toast(ct('已在 Mac 上打開「{name}」').replace('{name}', () => name));return; }
+  waitForWindow(FINDER, new Set(finder.map((x) => x.id)), () => {
+    const now = items.value.find((x) => x.kind === 'window' && x.bundle === FINDER && x.title === name);
+    if (now) openWindow(now);else noWindow();
+  }, name);
+}
+function openDockOther(index, o) { const item = o || dockOthers.value[index];openFromDock({ index }, item?.name || '', item?.kind === 'file' ? 'file' : 'folder'); }
+function openDockTrash() { openFromDock({ trash: true }, ct('垃圾桶')); }
 // A window gone from here (closed, or put in the Dock): the one shown now goes back home.
 function leaveIfShown(w) { if (current.value?.kind === 'window' && current.value.id === w.id) goHome(); }
 function minimizeWindow(w) {
@@ -1333,7 +1361,7 @@ function forceQuit(w) {
 function appsListed() {
   quitStillOpen();
   if (launching.value) {
-    const w = items.value.find((x) => x.kind === 'window' && x.bundle === launching.value && x.id !== launchSkip);
+    const w = items.value.find((x) => x.kind === 'window' && x.bundle === launching.value && !skipped(x.id));
     if (w) { launching.value = '';clearInterval(launchTimer);openWindow(w); }
   } else if (resumeItem && appMode.value === 'home') {
     const w = items.value.find((x) => x.kind === resumeItem.kind && x.id === resumeItem.id);
@@ -1354,20 +1382,24 @@ function openApp(a) {
   waitForWindow(a.bundle);
 }
 // Opening an app given up on from the page: its window, if one comes, is not shown.
-function stopLaunch() { launching.value = '';launchSkip = null;clearInterval(launchTimer); }
-// A window of the app, other than one just gone, looked for each second for 15 seconds.
+function stopLaunch() { launching.value = '';launchSkip = null;launchLabel.value = '';clearInterval(launchTimer); }
+// A window of the app, other than one just gone (an id) or those open before (a Set of ids),
+// looked for each second for 15 seconds.
 let launchSkip = null;
+const skipped = (id) => (launchSkip instanceof Set ? launchSkip.has(id) : id === launchSkip);
+// The name shown while waiting, when it is not the app's (a folder the Finder opens).
+const launchLabel = ref('');
 // None by then: giveUp, or a toast.
 // An app with no window of its own to show (one in the menu bar, one that only draws over
 // the whole screen) is offered the whole screen instead.
 function noWindow() {
   f7.dialog.create({ title: ct('這個 App 沒有開出視窗'), text: ct('有些 App 只在選單列或整個螢幕上出現，沒有可以單獨顯示的視窗。要改看整個螢幕嗎？'), buttons: [{ text: ct('取消') }, { text: ct('整個螢幕'), bold: true, onClick: goDesktop }] }).open();
 }
-function waitForWindow(bundle, skip = null, giveUp = noWindow) {
-  launching.value = bundle;launchSkip = skip;
+function waitForWindow(bundle, skip = null, giveUp = noWindow, label = '') {
+  launching.value = bundle;launchSkip = skip;launchLabel.value = label;
   clearInterval(launchTimer);
   let tries = 0;
-  launchTimer = setInterval(() => { if (!launching.value || ++tries > 15) { clearInterval(launchTimer);if (launching.value) { launching.value = '';launchSkip = null;giveUp(); } return; } list(); }, 1000);
+  launchTimer = setInterval(() => { if (!launching.value || ++tries > 15) { clearInterval(launchTimer);if (launching.value) { launching.value = '';launchSkip = null;launchLabel.value = '';giveUp(); } return; } list(); }, 1000);
   if (skip) list();
 }
 // Waiting for the window after one gone is dropped once the person goes elsewhere.
