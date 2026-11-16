@@ -1152,34 +1152,58 @@ exports.deleteUser = inTurn(async (req, res) => {
   }
 });
 
-// One account (2026-11-16): an account that is not an administrator (a member, or one
-// stored with a role name, which counts as a member) is deleted by the server itself at
-// every start (server/start.js), through the same delete as the route, by SYSTEM_ACTOR
-// (services/userLifecycle.js). Disabled ones and ones with a disable or enable left
-// pending go too; tombstones are left as they are. Other administrators stay (Settings
-// lists them, with a delete by hand). Each removal is one audit line, which the Mac
-// app's Activity shows (localApi.js, kind account-removed). One that fails is logged and
-// tried again at the next start; nothing here throws.
+// One account: a member account (role 'user') left from a version that had several is
+// deleted by the server itself at start (server/start.js), through the same delete as the
+// route, by SYSTEM_ACTOR (services/userLifecycle.js). Disabled ones and ones with a
+// disable or enable left pending go too. Only while an administrator is active, with
+// nothing pending: with none, the accounts are not what Castpane makes (a database cut
+// short, restored or edited by hand) and nothing is deleted; it is logged instead.
+// Administrators stay (Settings lists the others, with a delete by hand). A removal
+// stopped before its clean-up or its audit line, or with a clean-up left undone, is
+// finished at the next start: the tombstone keeps systemRemoval until it is clean. Each
+// removal is one audit line, which the Mac app's Activity shows (localApi.js, kind
+// account-removed). Nothing here throws.
+const usersNow = () => new Promise((ok, no) => usersDB.find({}, (e, r) => (e ? no(e) : ok(r))));
+const markRemoval = (id, mark) => new Promise((ok, no) => usersDB.update({ _id: id }, { $set: { systemRemoval: mark } }, {}, (e) => (e ? no(e) : ok())));
 exports.removeMembers = async () => {
   const removed = [], failed = [];
   let rows;
-  try { rows = await new Promise((ok, no) => usersDB.find({}, (e, r) => (e ? no(e) : ok(r)))); }
-  catch (e) { console.error('members not removed (tried again at the next start):', e.message); return { removed, failed: [{ error: e.message }] }; }
-  for (const u of rows) {
-    if (u.role === 'admin' || u.lifecycleStatus === LIFECYCLE_STATUS.DELETED_TOMBSTONE) continue;
+  try { rows = await usersNow(); }
+  catch (e) { console.error('members not removed (tried again at the next start):', e.message); return { removed, failed: [{ error: e.message }], skipped: false }; }
+  let adminActive = false;
+  for (const u of rows) if (u.role === 'admin' && await activeAccount(String(u._id)).catch(() => null)) { adminActive = true; break; }
+  const members = rows.filter((u) => u.role === 'user' && u.lifecycleStatus !== LIFECYCLE_STATUS.DELETED_TOMBSTONE);
+  if (members.length && !adminActive) {
+    console.error(`${members.length} member account(s) not removed: no administrator is active, so the accounts are not as Castpane leaves them`);
+    audit({ source: 'users', action: 'members-kept', count: members.length, reason: 'no-active-admin', by: SYSTEM_ACTOR.id });
+    return { removed, failed, skipped: true };
+  }
+  for (const u of members) {
     const id = String(u._id);
-    try {
-      await lifecycleService().deleteUser({ targetUserId: id, actor: SYSTEM_ACTOR, reason: 'not-an-admin' });
-      const { left } = await afterDelete(id, u.username);
-      audit({ source: 'users', action: 'account-removed', username: u.username, target: id, reason: 'not-an-admin', by: SYSTEM_ACTOR.id, ...(left ? { cleanupIncomplete: true } : {}) });
-      removed.push(id);
-    } catch (e) {
+    try { await lifecycleService().deleteUser({ targetUserId: id, actor: SYSTEM_ACTOR, reason: 'not-an-admin' }); }
+    catch (e) {
       if (e?.code === 'USER_LIFECYCLE_PARTIAL') await stopAgentsIfOff(id);
       console.error(`member ${id} not removed (tried again at the next start):`, e?.code || '', e?.message);
       failed.push({ id, error: e?.code || e?.message });
     }
   }
-  return { removed, failed };
+  // Every tombstone this deleted that is not yet clean: those just made, and those an
+  // earlier start left part-way.
+  try { rows = await usersNow(); } catch (e) { console.error('removals not finished (tried again at the next start):', e.message); return { removed, failed, skipped: false }; }
+  for (const u of rows) {
+    if (u.lifecycleStatus !== LIFECYCLE_STATUS.DELETED_TOMBSTONE || u.deletedBy?.type !== 'system' || u.systemRemoval?.clean) continue;
+    const id = String(u._id);
+    try {
+      const { left } = await afterDelete(id, u.username);
+      if (!u.systemRemoval?.logged) audit({ source: 'users', action: 'account-removed', username: u.username, target: id, reason: 'not-an-admin', by: SYSTEM_ACTOR.id, ...(left ? { cleanupIncomplete: true } : {}) });
+      await markRemoval(id, { logged: true, clean: !left });
+      if (left) failed.push({ id, error: 'CREDENTIAL_CLEANUP_INCOMPLETE' }); else removed.push(id);
+    } catch (e) {
+      console.error(`member ${id} removal not finished (tried again at the next start):`, e?.message);
+      failed.push({ id, error: e?.message });
+    }
+  }
+  return { removed, failed, skipped: false };
 };
 
 exports._setUserLifecycleServiceForTests = (service) => {

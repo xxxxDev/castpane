@@ -95,7 +95,7 @@ function publicLifecycleUser(user) {
 }
 
 // The server itself, as the one deleting: authController.removeMembers removes at
-// every start the accounts that are not administrators (one account, 2026-11-16). Only
+// start the member accounts (one account). Only
 // this object, by reference, is taken, and only for a delete: a request's principal is
 // always a user (trustedPrincipal.js) and an object of the same shape is refused.
 const SYSTEM_ACTOR = Object.freeze({

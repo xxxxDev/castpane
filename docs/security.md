@@ -13,7 +13,9 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   (below), or the password and, with two-step on, a code. That gives a pass for 8 hours, for
   that sign-in only, kept in the server's memory (a restart ends every pass).
 - **Accounts left from an earlier version,** which allowed several: a member account is deleted
-  by the server when it starts, and the Activity tab says so. An admin account is kept, as the
+  by the server when it starts, and the Activity tab says so; only while an admin account is
+  active, so a database cut short or edited by hand is left alone (and logged). A delete stopped
+  part-way is finished at the next start. An admin account is kept, as the
   server cannot tell which one is yours; it still signs in and can open Remote (a disabled one
   does not). Settings lists them under a warning, the Mac app's Account tab counts them, and Settings deletes them (each delete asks for your
   password, or passkey, again). Delete them soon: a leftover admin
