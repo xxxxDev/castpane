@@ -63,6 +63,16 @@ export async function signInWithPasskey({ conditional = false, signal } = {}) {
 export async function passkeyAgain(startPath) {
   const { challenge, allow } = await api(startPath, { method: 'POST', body: '{}' });
   if (!challenge) return null;
+  return answerPasskeyAgain({ challenge, allow });
+}
+// Confirming one admin action: the challenge is asked for first, so the device's sheet
+// opens straight from the tap that confirms (Safari wants it from a tap). Null when the
+// account has no passkey that may stand for the password, or passkeys do not work here.
+export async function passkeyAgainChallenge() {
+  if (!passkeysWork()) return null;
+  try { const o = await api('/auth/passkey/again', { method: 'POST', body: '{}' }); return o?.challenge && o.allow?.length ? o : null; } catch { return null; }
+}
+export async function answerPasskeyAgain({ challenge, allow }) {
   const got = await navigator.credentials.get({ publicKey: { challenge: unb64u(challenge), rpId: location.hostname, userVerification: 'required', allowCredentials: (allow || []).map((id) => ({ type: 'public-key', id: unb64u(id) })) } });
   const r = got.response;
   return { id: got.id, clientDataJSON: b64u(r.clientDataJSON), authenticatorData: b64u(r.authenticatorData), signature: b64u(r.signature) };

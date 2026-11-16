@@ -660,7 +660,8 @@ exports.addPasskey = async (req, res) => {
       recordLoginFailure(resolveClientIp(req), req, user.username, 'wrong-code', 'passkey');
       return res.status(400).json({ message: 'Invalid code', code: 'WRONG_CODE' });
     }
-    const passkey = await passkeyStore.add(user._id, typeof body.name !== 'string' || textProblem(body.name, 40, 'name') ? 'Passkey' : body.name, made);
+    // How it was added: whether it may stand for the password and code later (passkeys.confirmsAdmin).
+    const passkey = await passkeyStore.add(user._id, typeof body.name !== 'string' || textProblem(body.name, 40, 'name') ? 'Passkey' : body.name, { ...made, addedWith: 'password', withCode: Boolean(user.twoStep) });
     audit({ source: 'passkey', action: 'add', userId: req.userId, passkeyId: passkey.id });
     security.passkey({ action: 'add', userId: req.userId, ip: resolveClientIp(req), place: placeOf(req) });
     res.status(201).json({ passkey });
@@ -705,20 +706,41 @@ exports._passkeyChallenges = passkeyChallenges;
 // own, so a login page's challenge is never accepted here.
 const againChallenges = passkeys.createChallenges();
 exports.adminPasskeyStart = async (req) => {
-  const ids = await passkeyStore.ids(req.userId);
+  const me = await activeAccount(req.userId);
+  if (!me || me.role !== 'admin') return null;
+  const ids = await passkeyStore.ids(req.userId, (d) => passkeys.confirmsAdmin(d, me));
   if (!ids.length) return null;
   return { challenge: againChallenges.issue('get', req.userId, `again:${req.userId}`), allow: ids };
 };
-// Throws (400) unless the answer is this admin's passkey, signed just now.
+// Throws (400) unless the answer is this admin's passkey, one that may stand for the
+// password and code, signed just now. Refused answers count as the wrong password does,
+// and a blocked address is refused (429) before the answer is looked at.
 exports.adminPasskeyAgain = async (req, body = {}) => {
+  const ip = resolveClientIp(req);
+  if (loginBlocked(ip, req, req.username || '', 'admin-grant')) throw Object.assign(new Error('Too many attempts'), { status: 429 });
   const me = await activeAccount(req.userId);
   if (!me || me.role !== 'admin') throw Object.assign(new Error('Account is not active'), { status: 403 });
-  const answer = passkeys.answer(body, { challenges: againChallenges, isAllowedOrigin: isPasskeyOrigin, userId: me._id });
-  const kept = await passkeyStore.byCredential(body.id);
-  if (!kept || String(kept.userId) !== String(me._id)) throw Object.assign(new Error('Passkey not accepted'), { status: 400 });
-  const { signCount } = passkeys.assert(answer, body, kept);
-  if (!(await passkeyStore.used(kept, signCount))) throw Object.assign(new Error('Passkey not accepted'), { status: 400 });
+  try {
+    const answer = passkeys.answer(body, { challenges: againChallenges, isAllowedOrigin: isPasskeyOrigin, userId: me._id });
+    const kept = await passkeyStore.byCredential(body.id);
+    if (!kept || String(kept.userId) !== String(me._id)) throw Object.assign(new Error('Passkey not accepted'), { status: 400 });
+    if (!passkeys.confirmsAdmin(kept, me)) throw Object.assign(new Error('Passkey not accepted'), { status: 400 });
+    const { signCount } = passkeys.assert(answer, body, kept);
+    if (!(await passkeyStore.used(kept, signCount))) throw Object.assign(new Error('Passkey not accepted'), { status: 400 });
+  } catch (e) {
+    if (e.status === 400) recordLoginFailure(ip, req, me.username, 'wrong-passkey', 'admin-grant');
+    throw e;
+  }
   return me;
+};
+// POST /api/auth/passkey/again: a challenge for the signed-in admin to confirm one action
+// with a passkey, and which of their keys may answer it. None: the page asks for the
+// password (and code) instead.
+exports.passkeyAgain = async (req, res) => {
+  try {
+    if (req.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    res.json((await exports.adminPasskeyStart(req)) || { challenge: null, allow: [] });
+  } catch (e) { sendPasskeyError(res, e); }
 };
 exports._applySignInRescue = applySignInRescue;
 
@@ -943,7 +965,22 @@ exports.listUsers = (req, res) => {
 // take over an administrator that exists instead of making one.
 // how: create, promote, demote, reset-password, reset-two-step, enable, disable, delete, purge, rename.
 async function adminAgain(req, res, how, target) {
-  const { adminPassword, adminCode } = req.body || {};
+  const { adminPassword, adminCode, adminPasskey } = req.body || {};
+  // A passkey stands for the password and the code together (adminPasskeyAgain): one
+  // challenge, one action.
+  if (adminPasskey && typeof adminPasskey === 'object' && !Array.isArray(adminPasskey)) {
+    let me;
+    try { me = await exports.adminPasskeyAgain(req, adminPasskey); }
+    catch (e) {
+      if (e.status === 429) res.status(429).json(TOO_MANY);
+      else if (e.status === 403) res.status(403).json({ message: 'Account is not active' });
+      else if (e.status === 400) res.status(400).json({ message: 'Passkey not accepted', code: 'PASSKEY_REFUSED' });
+      else throw e;
+      return false;
+    }
+    req.adminGrant = { how, target, me, claimed: null, by: 'passkey' };
+    return true;
+  }
   if (typeof adminPassword !== 'string' || !adminPassword) { res.status(400).json({ message: 'Enter your own password to do this', code: 'NEED_PASSWORD' }); return false; }
   const ip = resolveClientIp(req);
   if (loginBlocked(ip, req, req.username || '', 'admin-grant') || !held(ip, res)) { res.status(429).json(TOO_MANY); return false; }

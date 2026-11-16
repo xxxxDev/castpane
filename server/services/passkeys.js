@@ -140,10 +140,18 @@ function createStore(db) {
   // The counter moves only forwards: of two uses of one signature's count, one writes.
   const used = async (doc, signCount) => (await call('update', { _id: doc._id, signCount: doc.signCount }, { $set: { signCount, lastUsedAt: new Date().toISOString() } }, {})) > 0;
   const list = async (userId) => (await call('find', { userId: String(userId) })).map(shown).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const ids = async (userId) => (await call('find', { userId: String(userId) })).map((d) => d.credentialId);
+  const ids = async (userId, which = () => true) => (await call('find', { userId: String(userId) })).filter(which).map((d) => d.credentialId);
   const remove = async (userId, id) => (await call('remove', { _id: String(id), userId: String(userId) }, {})) > 0;
   const removeAll = (userId) => call('remove', { userId: String(userId) }, { multi: true });
   return { add, byCredential, used, list, ids, remove, removeAll };
 }
 
-module.exports = { createChallenges, createStore, register, answer, assert, b64u, ALGS, CHALLENGE_MS, MAX_PASSKEYS };
+// Only a key added with the password, and with the code when two-step is on, may stand
+// for them when an admin confirms an action: one added before two-step was turned on
+// never had the code asked. Adding one has always taken both here, so a key kept before
+// this mark was written counts as added with the code when it was made after two-step
+// was turned on.
+const confirmsAdmin = (doc, user) => (doc?.addedWith ?? 'password') === 'password'
+  && (!user?.twoStep || doc.withCode === true || (doc.withCode === undefined && typeof user.twoStep.enabledAt === 'string' && typeof doc.createdAt === 'string' && doc.createdAt >= user.twoStep.enabledAt));
+
+module.exports = { confirmsAdmin, createChallenges, createStore, register, answer, assert, b64u, ALGS, CHALLENGE_MS, MAX_PASSKEYS };

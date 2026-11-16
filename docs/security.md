@@ -74,6 +74,10 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   the public HTTPS address may add one: this Mac's own loopback page is refused
   (`PASSKEY_ORIGIN`). QR sign-in needs a phone already bound as a login
   key and a matching number chosen on it.
+- Where an admin is asked again (opening Remote, making an administrator, resetting a
+  password), a passkey stands for the password and code, one answer for one action. With
+  two-step on, only a key added after it was turned on counts: one added before never had the
+  code asked. Refused answers count as wrong passwords do.
 
 **Remote**
 
