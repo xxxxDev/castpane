@@ -36,6 +36,6 @@ function go(path) {
   user-select: none;
   -webkit-user-select: none;
 }
-.admin-note {font-size:13px;line-height:1.5;color:var(--dp-color-text-secondary,#8e8e93);margin:8px 32px 24px;}
+.admin-note {font-size:13px;line-height:1.5;color:var(--dp-color-text-secondary,#8e8e93);margin:8px calc(var(--f7-block-padding-horizontal,16px) + 16px) 24px;}
 @media (min-width: 800px){.admin-note{max-width:min(828px,calc(100% - 32px));margin-left:auto;margin-right:auto;padding:0 16px;box-sizing:border-box;}}
 </style>

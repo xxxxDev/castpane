@@ -1704,12 +1704,12 @@ function keyUp(e) {
 }
 </script>
 <style>
-.remote-note {font-size:13px;line-height:1.5;color:var(--dp-color-text-secondary,#8e8e93);margin:12px 32px;}
+.remote-note {font-size:13px;line-height:1.5;color:var(--dp-color-text-secondary,#8e8e93);margin:12px calc(var(--f7-block-padding-horizontal,16px) + 16px);}
 .remote-error {color:#ff453a;}
 .remote-tiles {display:flex;flex-wrap:wrap;gap:16px;padding:0 var(--f7-block-padding-horizontal,16px);}
 /* The tab pages' centred column starts at 1024px (skin.css); the tiles join it there, so they line up with the title and the note. */
 @media (min-width:1024px){.remote-tiles{max-width:min(828px,calc(100% - 32px));margin:0 auto;padding:0;box-sizing:border-box;}}
-.remote-tile {width:min(260px,calc(50vw - 24px));background:var(--f7-list-bg-color,#1f1f21);border:0;border-radius:20px;padding:10px;color:inherit;text-align:left;cursor:pointer;}
+.remote-tile {width:min(260px,calc((100vw - 2 * var(--f7-block-padding-horizontal,16px) - 16px) / 2));background:var(--f7-list-bg-color,#1f1f21);border:0;border-radius:20px;padding:10px;color:inherit;text-align:left;cursor:pointer;}
 .remote-tile.disabled {opacity:.5;cursor:default;}
 .remote-tile-wrap {position:relative;}
 .remote-tile-remove {position:absolute;top:16px;right:16px;width:26px;height:26px;border-radius:13px;border:0;background:rgba(0,0,0,.6);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
