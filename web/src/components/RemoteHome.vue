@@ -86,9 +86,9 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
-const props = defineProps({ name: { type: String, default: '' }, windows: { type: Array, default: () => [] }, apps: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, launching: { type: String, default: '' }, notice: { type: String, default: '' }, canMinimize: { type: Boolean, default: false } });
+const props = defineProps({ name: { type: String, default: '' }, windows: { type: Array, default: () => [] }, apps: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, launching: { type: String, default: '' }, notice: { type: String, default: '' }, canMinimize: { type: Boolean, default: false }, allAsked: { type: Number, default: 0 } });
 // windows: an app with several windows, whose card asks which one (RemoteWindows.vue).
-const emit = defineEmits(['open', 'app', 'desktop', 'leave', 'all', 'windows', 'closeWindow', 'minimize']);
+const emit = defineEmits(['open', 'app', 'desktop', 'leave', 'all', 'windows', 'closeWindow', 'minimize', 'allTaken']);
 const COLS_KEY = 'castpane-home-cols';
 const cols = ref((() => { try { return localStorage.getItem(COLS_KEY) === '1' ? 1 : 2; } catch { return 2; } })());
 function setCols(n) { cols.value = n;try { localStorage.setItem(COLS_KEY, String(n)); } catch { /* this time only */ } }
@@ -127,6 +127,8 @@ function holdMove(e) { if (holdAt && Math.hypot(e.clientX - holdAt.x, e.clientY 
 function holdEnd() { clearTimeout(holdTimer);holdAt = null; }
 onBeforeUnmount(() => clearTimeout(holdTimer));
 const allOpen = ref(false), query = ref(''), pagesEl = ref(null);
+// The Mac's Apps or Launchpad tapped in the Dock: All apps opens.
+watch(() => props.allAsked, (n) => { if (n) { allOpen.value = true;emit('allTaken'); } }, { immediate: true });
 watch(allOpen, (on) => { if (on) emit('all'); query.value = ''; });
 // As many columns as the panel's width holds, four at the least.
 const fitted = ref({ cols: 4 });

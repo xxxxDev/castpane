@@ -152,7 +152,7 @@
           </div>
         </div>
         <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
-        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" @close-window="closeWindow" @minimize="minimizeWindow">
+        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
           <template #dock><RemoteDock v-if="macWindows" docked :apps="dockApps" :windows="dockWindows" :icons="icons" @app="openApp" @window="openWindow"/></template>
         </RemoteHome>
         <!-- An app starting takes the Mac a few seconds: said wherever it was started from (the
@@ -1337,7 +1337,12 @@ function appsListed() {
     if (w?.kind === 'window') openWindow(w);
   }
 }
+// The Mac's own app launchers (Apps, Launchpad) open a full-screen panel, not a window that can
+// be shown alone: here they open All apps, which is the same list.
+const LAUNCHERS = new Set(['com.apple.apps.launcher', 'com.apple.launchpad.launcher']);
+const allAppsAsked = ref(0);
 function openApp(a) {
+  if (LAUNCHERS.has(a.bundle)) { if (appMode.value !== 'home') goHome();allAppsAsked.value++;return; }
   const w = recentWindows.value.find((x) => x.bundle === a.bundle);
   if (w) return openWindow(w);
   // Not open, or open with no window: started (or asked for a window), then shown once it has one.
@@ -1349,7 +1354,12 @@ function stopLaunch() { launching.value = '';launchSkip = null;clearInterval(lau
 // A window of the app, other than one just gone, looked for each second for 15 seconds.
 let launchSkip = null;
 // None by then: giveUp, or a toast.
-function waitForWindow(bundle, skip = null, giveUp = () => toast(ct('這個 App 沒有開出視窗'))) {
+// An app with no window of its own to show (one in the menu bar, one that only draws over
+// the whole screen) is offered the whole screen instead.
+function noWindow() {
+  f7.dialog.create({ title: ct('這個 App 沒有開出視窗'), text: ct('有些 App 只在選單列或整個螢幕上出現，沒有可以單獨顯示的視窗。要改看整個螢幕嗎？'), buttons: [{ text: ct('取消') }, { text: ct('整個螢幕'), bold: true, onClick: goDesktop }] }).open();
+}
+function waitForWindow(bundle, skip = null, giveUp = noWindow) {
   launching.value = bundle;launchSkip = skip;
   clearInterval(launchTimer);
   let tries = 0;

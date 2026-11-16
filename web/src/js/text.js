@@ -127,6 +127,7 @@ const english = {
 "Castpane 帳號":"Castpane account",
 "已停用":"Disabled",
 "安全":"Security",
+"有些 App 只在選單列或整個螢幕上出現，沒有可以單獨顯示的視窗。要改看整個螢幕嗎？":"Some apps appear only in the menu bar or over the whole screen, with no window to show alone. See the whole screen instead?",
 "編輯":"Edit",
 "左側最多 1 顆、右側最多 2 顆，那一顆放回原位了。":"One at most on the left, two on the right: that key went back.",
 "遠端畫面下方的按鈕列：左側最多一顆獨立圓鈕，右側最多兩顆，中間是左右滑動的四頁。點一顆按鈕可以移到別的位置；按「編輯」後可以拖曳把手，跨頁、跨左右調整。存在帳號上，每台裝置都一樣。":"The keys under the remote screen: one round button at most on the left, two on the right, four pages between that slide sideways. Tap a key to move it elsewhere; tap Edit to drag the handles, across pages and sides too. Kept on the account, the same on every device.",
