@@ -65,11 +65,12 @@ back, with touch modes made for a small screen.
 - **The Mac's apps, as a phone's.** The Remote tab opens on the apps open on the Mac, one card
   each. Three filters pick all of them, those on a desktop, or those in the Dock; on a phone
   the cards sit two a row or one. The Mac's Dock stays open at the left: its apps (a dot beside
-  those running) and the windows put in it. Each card has a Mac window's red and yellow
-  buttons, to close its window or put it in the Dock, and the number of its windows; a card
-  with several asks which one, with Quit app and Force quit at the foot.
-- **Every app.** All apps lists every app on the Mac as Launchpad shows them, with a search
-  field; one not running starts, says so while it does, and its window opens as soon as it has
+  those running) and the windows put in it. A card shows the number of its windows at the top
+  right; held, it offers to put its window in the Dock or close it; a card with several asks
+  which one, with Quit app and Force quit at the foot. A window an app keeps hidden gets no
+  card.
+- **Every app.** All apps opens a panel over the home, as the Mac's Apps window: a search
+  field, the apps running in a row, then every app; one not running starts, says so while it does, and its window opens as soon as it has
   one.
 - **Made the device's shape.** Tap an app and its window fills the screen, made the shape of
   this device on the Mac, so its text and buttons are the size of the device's own apps, and
@@ -99,17 +100,20 @@ back, with touch modes made for a small screen.
   pointer you drag by a ring below it, so your finger never hides what it points at. Pinch to
   zoom, or pick a size in the menu; when you tap a text field the keyboard comes up and the
   field is zoomed into view. The keys a phone lacks sit in one capsule you slide sideways, four
-  pages of them: a terminal's (esc, tab, ⇧tab, arrows, ^C), ⌘ ⌥ ⌃ ⇧ with the clipboard and the
-  key panel, editing and moving (delete, return, home, end, page up and down), then the Mac's
-  desktops and Mission Control (a tablet fits them all at once). Beside it, round buttons call
-  up or hide the keyboard and open a card to write in, several lines, input method and all:
+  pages of them: esc, Mission Control, the Mac's desktops, the key panel and the clipboard;
+  ⇧ ⌃ ⌥ ⌘, ^C and return; delete, home, end, page up and down; the arrows and tab (a tablet
+  fits them all at once). Round buttons sit beside it: the Mac's Dock at the left, at the right
+  one to call up or hide the keyboard and one to open a card to write in. The row is yours to
+  arrange in Settings › Remote › Key row, any key on any page or as a round button (one at the
+  left, two at the right), and the account keeps it, so every device shows the same. The card
+  writes several lines, input method and all:
   Send types it where the Mac's cursor is and presses Return, as a message is sent (several
   lines go as a paste, so they replace what the Mac's clipboard held). There is a key panel in
   the keyboard's place (editing keys, the Mac's shortcuts, a number pad, F1 to F12). Held
   sideways, the tabs move to a rail on the right.
 - **At a computer too.** Pinch on a trackpad, Ctrl or ⌘ with the wheel, or the sizes in the top
   bar zoom the picture, which then follows your pointer; the wheel alone keeps scrolling the Mac. On a Windows or Linux keyboard, Ctrl is the Mac's ⌘,
-  the Windows key is ⌃, and F5 reloads; Ctrl+← →, Ctrl+Backspace, Home, End and Ctrl+Y work as on Windows, and the full-screen button lets Chrome and Edge pass on Ctrl+W, Ctrl+T and the like. The keyboard button opens a row of keys under the picture (esc, ⌘ ⌥ ⌃ ⇧, Mission Control, the Mac's desktops, arrows) for shortcuts your browser keeps for itself.
+  the Windows key is ⌃, and F5 reloads; Ctrl+← →, Ctrl+Backspace, Home, End and Ctrl+Y work as on Windows, and the full-screen button lets Chrome and Edge pass on Ctrl+W, Ctrl+T and the like. The keyboard button opens a row of keys under the picture, the same keys as the phone's row in one line, for shortcuts your browser keeps for itself.
 - **Several Macs, one web app.** Other Macs join this one with a one-time code and show up
   beside it on the Remote page. They need no address or account of their own
   ([docs/multi-mac.md](docs/multi-mac.md)).
