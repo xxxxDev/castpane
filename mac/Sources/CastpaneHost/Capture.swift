@@ -105,7 +105,7 @@ enum Catalog {
                 desk = ["id": d.id, "number": d.number, "display": d.display, "fullscreen": d.fullscreen, "current": d.current]
             }
             // An app in the Dock (an ordinary one), not a menu-bar helper or a background
-            // agent that keeps a window it never shows: Labs lists only these.
+            // agent that keeps a window it never shows: the page's home lists only these.
             let regular = w.owningApplication.flatMap { NSRunningApplication(processIdentifier: $0.processID) }?.activationPolicy == .regular
             var inDock = false
             if regular, let pid = w.owningApplication?.processID {
