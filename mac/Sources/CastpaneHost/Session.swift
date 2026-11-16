@@ -384,13 +384,16 @@ actor Session {
         case let .quit(bundle):
             let link = self.link
             Task { @MainActor in
-                link.send(json: ["t": "quit", "bundle": bundle, "ok": Apps.quit(bundle)])
+                let asked = Apps.quit(bundle)
+                link.send(json: ["t": "quit", "bundle": bundle, "ok": asked])
                 // Its windows go as it quits; one with unsaved documents asks on the Mac and stays.
                 try? await Task.sleep(nanoseconds: 800_000_000)
-                // Still running: it is asking something (iTerm2's "Quit iTerm2?", a document to
-                // save). Brought to the front so its question is where the whole screen shows it.
-                Apps.bringForwardIfRunning(bundle)
-                if !link.isClosed { await self.route(.list) }
+                guard !link.isClosed else { return }
+                // Asked and still running: it is asking something (iTerm2's "Quit iTerm2?", a
+                // document to save). Brought to the front so its question is where the whole
+                // screen shows it. One refused (the Finder) is left where it is.
+                if asked { Apps.bringForwardIfRunning(bundle) }
+                await self.route(.list)
             }
         case .ack: video.ack()
         case .keyFrame: video.keyFrame()

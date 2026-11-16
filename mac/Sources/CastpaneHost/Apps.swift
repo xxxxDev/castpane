@@ -89,7 +89,7 @@ enum Apps {
     @MainActor static func bringForwardIfRunning(_ bundle: String) {
         let me = ProcessInfo.processInfo.processIdentifier
         for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundle)
-        where app.activationPolicy == .regular && app.processIdentifier != me && !app.isTerminated {
+        where app.activationPolicy == .regular && app.processIdentifier != me && !app.isTerminated && !neverQuit.contains((app.bundleIdentifier ?? "").lowercased()) {
             app.activate(options: [.activateAllWindows])
         }
     }
