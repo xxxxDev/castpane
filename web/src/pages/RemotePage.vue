@@ -1876,7 +1876,9 @@ function keyUp(e) {
 .remote-home-launching img {flex:0 0 auto;width:28px;height:28px;border-radius:7px;}
 .remote-home-launching-text {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-stage .remote-home-launching-cancel {flex:0 0 auto;width:28px;height:28px;margin:0;padding:0;border:0;border-radius:14px;background:rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.remote-home-launching.over {bottom:auto;top:calc(env(safe-area-inset-top) + 56px);}
+/* Over an app or the whole screen: above the keys and the bar at the bottom, clear of the
+   head, whose height changes with the desktops and windows rows. */
+.remote-home-launching.over {bottom:calc(env(safe-area-inset-bottom) + 100px);}
 .remote-stage .remote-desktop-back {padding-left:0;}
 .remote-card-menu-layer {position:absolute;inset:0;z-index:6;}
 .remote-card-menu {position:absolute;width:220px;background:rgba(44,44,46,.98);border-radius:14px;padding:4px;box-shadow:0 10px 40px rgba(0,0,0,.6);}
