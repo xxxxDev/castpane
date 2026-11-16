@@ -3,7 +3,7 @@
        their number on it: a tap then asks which one), as a phone's own app switcher. Every app is a button away, as Launchpad shows them;
        the whole screen (the remote desktop) is at the top, in reach without scrolling past
        every app. -->
-  <div class="remote-home">
+  <div ref="homeEl" class="remote-home">
     <!-- A bar at the top, as the whole screen's: back to the list of Macs, this Mac, every app. -->
     <div class="remote-home-head">
       <button type="button" class="remote-home-back" :title="ct('中斷連線')" @click="$emit('leave')"><f7-icon f7="chevron_left" :size="18"/></button>
@@ -30,21 +30,26 @@
     <div v-if="!windows.length" class="remote-home-empty">{{ ct('正在讀取…') }}</div>
     <div v-else-if="!openApps.length" class="remote-home-empty">{{ ct('這裡沒有 App') }}</div>
     <div class="remote-home-open" :class="{one: cols === 1}">
-      <div v-for="o in openApps" :key="o.key" role="button" tabindex="0" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.enter.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.space.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
+      <div v-for="o in openApps" :key="o.key" role="button" tabindex="0" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @pointerdown="holdDown($event, o)" @pointermove="holdMove" @pointerup="holdEnd" @pointercancel="holdEnd" @contextmenu.prevent @click="held ? (held = false) : o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.enter.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.space.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
         <span class="remote-home-shot">
-          <!-- A Mac window's buttons, as macOS draws them, at the top left: red closes the window on
-               top, yellow puts it in the Dock, green holds the number of windows. -->
-          <button v-if="o.window" type="button" class="light close" :title="ct('關閉視窗')" :aria-label="ct('關閉視窗')" @click.stop="$emit('closeWindow', o.window)"><f7-icon f7="xmark" :size="13"/></button>
-          <button v-if="o.window && canMinimize && !o.window.minimized" type="button" class="light minimize" :title="ct('縮到 Dock')" :aria-label="ct('縮到 Dock')" @click.stop="$emit('minimize', o.window)"><f7-icon f7="minus" :size="13"/></button>
           <img v-if="o.window?.thumb" :src="o.window.thumb" alt=""/>
           <img v-else-if="icons[o.bundle]" class="remote-home-shot-icon" :src="icons[o.bundle]" alt=""/>
-          <span v-if="o.window" class="remote-home-count" :aria-label="o.count > 1 ? ct('{n} 個視窗').replace('{n}', () => o.count) : null">{{ o.count > 1 ? o.count : '' }}</span>
+          <!-- The number of windows at the top right; held, the window on top's menu. -->
+          <span v-if="o.count > 1" class="remote-home-count" :aria-label="ct('{n} 個視窗').replace('{n}', () => o.count)">{{ o.count }}</span>
         </span>
         <span class="remote-home-label">{{ o.name }}</span>
       </div>
     </div>
 
     </div>
+    </div>
+
+    <!-- A card held: its window on top put in the Dock, or closed. -->
+    <div v-if="menu" class="remote-home-menu-layer" @pointerdown.self="menu = null">
+      <div class="remote-home-menu" :style="{left: menu.x + 'px', top: menu.y + 'px'}">
+        <button v-if="canMinimize && !menu.w.minimized" type="button" class="minimize" @click="$emit('minimize', menu.w);menu = null">{{ ct('縮到 Dock') }}</button>
+        <button type="button" class="close-window" @click="$emit('closeWindow', menu.w);menu = null">{{ ct('關閉視窗') }}</button>
+      </div>
     </div>
 
     <!-- Every app, as the Mac's Apps window: a panel over the home, searched at the top, the
@@ -105,6 +110,22 @@ const openApps = computed(() => {
   }
   return [...seen.values()];
 });
+// Held half a second without moving: the card's menu instead of a tap.
+const menu = ref(null), homeEl = ref(null);
+let held = false, holdAt = null, holdTimer = 0;
+function holdDown(e, o) {
+  if (!o.window) return;
+  holdAt = { x: e.clientX, y: e.clientY };held = false;clearTimeout(holdTimer);
+  const el = e.currentTarget;
+  holdTimer = setTimeout(() => {
+    held = true;holdAt = null;
+    const box = el.getBoundingClientRect(), home = homeEl.value?.getBoundingClientRect() || { left: 0, top: 0, width: innerWidth, height: innerHeight };
+    menu.value = { w: o.window, x: Math.max(8, Math.min(box.left - home.left + 12, home.width - 208)), y: Math.min(box.top - home.top + 40, home.height - 110) };
+  }, 500);
+}
+function holdMove(e) { if (holdAt && Math.hypot(e.clientX - holdAt.x, e.clientY - holdAt.y) > 10) { clearTimeout(holdTimer);holdAt = null; } }
+function holdEnd() { clearTimeout(holdTimer);holdAt = null; }
+onBeforeUnmount(() => clearTimeout(holdTimer));
 const allOpen = ref(false), query = ref(''), pagesEl = ref(null);
 watch(allOpen, (on) => { if (on) emit('all'); query.value = ''; });
 // As many columns as the panel's width holds, four at the least.
@@ -146,25 +167,19 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-stage .remote-home-cols button.on {background:rgba(255,255,255,.22);color:#fff;}
 .remote-home-open.one {grid-template-columns:1fr;}
 .remote-home-open.one .remote-home-shot {aspect-ratio:16/10;}
-/* The Mac's window buttons, as macOS draws them, together at the top left: a red dot (close),
-   a yellow one (into the Dock), a green one holding the number of windows. Each in an area a
-   finger can hit, which shows nothing itself. */
-.remote-stage .remote-home-shot .light {position:absolute;top:2px;z-index:1;width:26px;height:36px;margin:0;padding:0;border:0;border-radius:13px;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.remote-stage .remote-home-shot .light::before, .remote-home-count {content:'';width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.25),0 1px 3px rgba(0,0,0,.45);}
-.remote-stage .remote-home-shot .light .icon {display:none;}
-.remote-stage .remote-home-shot .light.close {left:3px;}
-.remote-stage .remote-home-shot .light.close::before {background:radial-gradient(circle at 50% 35%, #ff7b74, #ec5a52 70%);}
-.remote-stage .remote-home-shot .light.minimize {left:27px;}
-.remote-stage .remote-home-shot .light.minimize::before {background:radial-gradient(circle at 50% 35%, #ffd34d, #f5b81c 70%);}
+.remote-home-menu-layer {position:absolute;inset:0;z-index:15;}
+.remote-home-menu {position:absolute;width:200px;padding:4px;border-radius:14px;background:rgba(44,44,46,.98);box-shadow:0 10px 40px rgba(0,0,0,.6);}
+.remote-stage .remote-home-menu button {display:block;width:100%;height:42px;margin:0;padding:0 12px;border:0;border-radius:10px;background:none;color:#fff;font-size:15px;text-align:left;cursor:pointer;}
+.remote-stage .remote-home-menu button.close-window {color:#ff6961;}
 .remote-home-empty {font-size:14px;color:#888;}
 .remote-home-open {display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:14px 12px;}
 /* A tablet or a computer: as many as fit, two at the least. */
 @media (min-width: 700px) { .remote-home-open:not(.one) {grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));} }
-.remote-stage .remote-home-card {display:flex;flex-direction:column;align-items:stretch;gap:6px;width:auto;height:auto;margin:0;padding:0;border:0;background:none;color:#ddd;font-size:13px;cursor:pointer;text-align:center;}
+.remote-stage .remote-home-card {-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;display:flex;flex-direction:column;align-items:stretch;gap:6px;width:auto;height:auto;margin:0;padding:0;border:0;background:none;color:#ddd;font-size:13px;cursor:pointer;text-align:center;}
 .remote-home-shot {position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;border-radius:18px;background:#2c2c2e;overflow:hidden;}
 .remote-home-shot img {width:100%;height:100%;object-fit:cover;object-position:top;}
 .remote-home-shot img.remote-home-shot-icon {width:56px;height:56px;object-fit:contain;}
-.remote-home-count {position:absolute;top:12px;left:56px;z-index:1;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 35%, #5fd86a, #29b53b 70%);color:rgba(0,0,0,.7);font-size:10px;font-weight:700;line-height:1;}
+.remote-home-count {position:absolute;top:6px;right:6px;z-index:1;min-width:22px;height:22px;padding:0 7px;border-radius:100px;box-sizing:border-box;background:rgba(30,30,32,.55);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:rgba(255,255,255,.4) 0 0 1px 0 inset;color:#fff;font-size:12px;line-height:22px;text-align:center;}
 .remote-home-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-home-card.launching .remote-home-shot, .remote-home-app.launching .remote-home-icon {opacity:.5;animation:remote-home-pulse 1s ease-in-out infinite alternate;}
 @keyframes remote-home-pulse {to {opacity:1;}}
