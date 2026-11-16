@@ -77,9 +77,11 @@ function readActivity({ limit = 50, file = AUDIT_LOG } = {}) {
 // The name the setup assistant gave the first administrator: the newest
 // {source:'users', action:'first-admin'} line (authController.createFirstAdmin), from the
 // audit log and then its rotated segments (services/logRotation.js: archive/<name>-<stamp>.log
-// beside it, kept a year), newest first. At most SCAN_MAX bytes are read; null when none
-// is found. Only lines whose text holds the action's name are parsed. Links and anything
-// not a regular file are not read.
+// beside it, kept a year), newest first. Each file is read from its end, so the newest line
+// ends the search; at most SCAN_MAX bytes are read in all; null when none is found. Only
+// lines whose text holds the action's name are parsed, and a line longer than LINE_MAX is
+// passed over. Links and anything not a regular file are not read. The local API asks
+// once per process (createLocalRoutes).
 const FIRST_ADMIN = Buffer.from('"first-admin"');
 const SCAN_MAX = 512 * 1024 * 1024, CHUNK = 1024 * 1024, LINE_MAX = 64 * 1024;
 const NOFOLLOW = fs.constants.O_NOFOLLOW || 0;
@@ -90,30 +92,45 @@ function firstAdminOf(line) {
 async function lastFirstAdminIn(file, budget) {
   let fh;
   try { fh = await fs.promises.open(file, fs.constants.O_RDONLY | NOFOLLOW); } catch { return { name: null, read: 0 }; }
-  let found = null, read = 0;
+  let read = 0;
   try {
-    if (!(await fh.stat()).isFile()) return { name: null, read: 0 };
-    const chunk = Buffer.alloc(CHUNK);
-    let carry = Buffer.alloc(0), skipping = false;
-    while (read < budget) {
-      const { bytesRead } = await fh.read(chunk, 0, Math.min(CHUNK, budget - read), null);
-      if (!bytesRead) break;
+    const st = await fh.stat();
+    if (!st.isFile()) return { name: null, read: 0 };
+    // carry: the end of a line that begins before pos, up to and with its line end.
+    let pos = st.size, carry = Buffer.alloc(0), skipping = false;
+    while (pos > 0 && read < budget) {
+      const n = Math.min(CHUNK, pos, budget - read);
+      pos -= n;
+      const chunk = Buffer.alloc(n);
+      const { bytesRead } = await fh.read(chunk, 0, n, pos);
       read += bytesRead;
-      let buf = Buffer.concat([carry, chunk.subarray(0, bytesRead)]);
-      // The rest of a line too long to be one of these is passed over.
-      if (skipping) { const nl = buf.indexOf(10); if (nl === -1) { carry = Buffer.alloc(0); continue; } buf = buf.subarray(nl + 1); skipping = false; }
-      const end = buf.lastIndexOf(10) + 1;
-      for (let at = buf.indexOf(FIRST_ADMIN); at !== -1 && at < end; at = buf.indexOf(FIRST_ADMIN, at + 1)) {
-        const from = buf.lastIndexOf(10, at) + 1, to = buf.indexOf(10, at);
-        found = firstAdminOf(buf.subarray(from, to)) || found;
-        at = to;
+      if (bytesRead < n) break; // cut short meanwhile (rotated): what is left is not this file
+      let buf;
+      if (skipping) {
+        // Still inside a line too long to be one of these: up to its start is passed over.
+        const nl = chunk.lastIndexOf(10);
+        if (nl === -1) continue;
+        buf = chunk.subarray(0, nl + 1); skipping = false;
+      } else buf = carry.length ? Buffer.concat([chunk, carry]) : chunk;
+      // The lines wholly read: those after the first line end, or all at the file's start.
+      const nl = buf.indexOf(10);
+      if (pos > 0 && nl === -1) {
+        if (buf.length > LINE_MAX) { carry = Buffer.alloc(0); skipping = true; } else carry = Buffer.from(buf);
+        continue;
       }
-      carry = Buffer.from(buf.subarray(end));
+      const from = pos === 0 ? 0 : nl + 1;
+      for (let at = buf.lastIndexOf(FIRST_ADMIN); at >= from;) {
+        const lineStart = buf.lastIndexOf(10, at) + 1, lineEnd = buf.indexOf(10, at);
+        const name = firstAdminOf(buf.subarray(lineStart, lineEnd === -1 ? buf.length : lineEnd));
+        if (name) return { name, read };
+        if (lineStart === 0) break;
+        at = buf.lastIndexOf(FIRST_ADMIN, lineStart - 1);
+      }
+      carry = Buffer.from(buf.subarray(0, from));
       if (carry.length > LINE_MAX) { carry = Buffer.alloc(0); skipping = true; }
     }
-    if (!skipping && carry.length && carry.includes(FIRST_ADMIN)) found = firstAdminOf(carry) || found;
   } finally { await fh.close().catch(() => {}); }
-  return { name: found, read };
+  return { name: null, read };
 }
 async function findWizardName({ file = AUDIT_LOG, budget = SCAN_MAX } = {}) {
   const files = [file];
@@ -158,39 +175,62 @@ function createLocalRoutes({ home, remote, version, memberLink = null, auth = re
   });
   router.use(express.json({ limit: '8kb' }));
   const count = (db, q) => new Promise((ok, no) => db.count(q, (e, n) => (e ? no(e) : ok(n))));
-  // Active accounts only, by the rule createFirstAdmin is held to (services/userLifecycle.js).
+  // users: active accounts, by the rule createFirstAdmin is held to (services/userLifecycle.js),
+  // so the setup assistant opens on 0. admins: the administrators GET /accounts lists
+  // (auth.activeAdmins: active, nothing pending), so the app offers the choice (admins > 1)
+  // only with a list to choose from.
   const active = activeUserQuery();
   router.get('/status', async (req, res, next) => {
     try {
-      const [users, admins, sessions] = await Promise.all([count(usersDB, active), count(usersDB, { ...active, role: 'admin' }), count(sessionsDB, { expiresAt: { $gt: new Date() } })]);
+      const [users, admins, sessions] = await Promise.all([count(usersDB, active), auth.activeAdmins().then((a) => a.length), count(sessionsDB, { expiresAt: { $gt: new Date() } })]);
       res.json({ version, users, admins, viewer: remote?.viewer() || null, sessions, publicOrigin: publicOrigin() || null });
     } catch (e) { next(e); }
   });
+  // The setup assistant's name in the audit log (wizardName), looked for once per process:
+  // a scan reads up to SCAN_MAX. Looked for again after a setup or a keep; a scan that
+  // fails is not kept.
+  let wizardScan = null;
+  const wizardOnce = () => {
+    if (!wizardScan) {
+      const scan = Promise.resolve().then(() => wizardName());
+      wizardScan = scan;
+      scan.catch(() => { if (wizardScan === scan) wizardScan = null; });
+    }
+    return wizardScan.catch(() => null);
+  };
+  const forgetWizard = () => { wizardScan = null; };
   router.post('/setup', async (req, res) => {
-    try { res.status(201).json({ user: await auth.createFirstAdmin(req.body || {}) }); }
+    try { const user = await auth.createFirstAdmin(req.body || {}); forgetWizard(); res.status(201).json({ user }); }
     catch (e) { res.status(e.status || 500).json({ message: e.status ? e.message : 'Error', ...(e.code ? { code: e.code } : {}) }); }
   });
   // One account (docs/protocol.md): the active administrators to choose from, when there
   // is more than one (status.admins), and the choice. wizard marks the one the setup
   // assistant made, when the audit log still says which (findWizardName); never a hash or
-  // a secret.
+  // a secret. deletes: what keeping one of them deletes, the other listed ones (listed)
+  // and every other account not a tombstone (others: members, disabled ones, ones with
+  // something pending, other roles), from the same read as the list.
   const sayError = (res, e) => res.status(e.status || 500).json({ message: e.status ? e.message : 'Error', ...(e.code ? { code: e.code } : {}) });
   router.get('/accounts', async (req, res) => {
     try {
-      const [admins, wizard] = await Promise.all([auth.activeAdmins(), wizardName().catch(() => null)]);
+      const { admins, others } = await auth.keepChoice();
+      // The setup assistant marks its account (madeBySetup) from this version; for one made
+      // before, its audit line, as above, looked for only then.
+      const marked = admins.filter((a) => a.madeBySetup);
+      const wizard = !marked.length && admins.length ? await wizardOnce() : null;
       const key = (v) => { try { return normalizeUsername(v); } catch { return null; } };
       const wanted = wizard ? key(wizard) : null;
       // Only a name that is one account's: two that fold the same mark neither.
       const matching = wanted ? admins.filter((a) => key(a.username) === wanted) : [];
-      // The setup assistant marks its account (madeBySetup) from this version; for one made
-      // before, its audit line, as above.
-      const marked = admins.filter((a) => a.madeBySetup);
-      res.json({ accounts: admins.map((a) => ({ id: a.id, username: a.username, name: a.name, wizard: marked.length ? marked.length === 1 && marked[0] === a : matching.length === 1 && matching[0] === a })) });
+      res.json({
+        accounts: admins.map((a) => ({ id: a.id, username: a.username, name: a.name, wizard: marked.length ? marked.length === 1 && marked[0] === a : matching.length === 1 && matching[0] === a })),
+        deletes: { listed: Math.max(0, admins.length - 1), others },
+      });
     } catch (e) { console.error('local accounts:', e.message); sayError(res, e); }
   });
   router.post('/accounts/keep', async (req, res) => {
     try { res.json(await auth.keepOneAccount(req.body?.id)); }
     catch (e) { if (!e.status) console.error('keep account:', e.message); sayError(res, e); }
+    finally { forgetWizard(); }
   });
   router.get('/activity', (req, res) => {
     const n = Number(req.query.limit);

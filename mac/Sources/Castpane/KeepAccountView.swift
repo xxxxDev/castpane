@@ -6,7 +6,8 @@ struct KeepAccountView: View {
     @EnvironmentObject var model: AppModel
     @ViewState private var accounts: [LocalAPI.Account] = []
     @ViewState private var chosen: String?
-    @ViewState private var asking = false
+    @ViewState private var deleteCount = 0
+    @ViewState private var loaded = false
     @ViewState private var busy = false
     @ViewState private var message = ""
 
@@ -28,27 +29,45 @@ struct KeepAccountView: View {
                 .onTapGesture { chosen = a.id }
             }
             .frame(minHeight: 140)
+            if loaded && accounts.count < 2 {
+                Text("Nothing to choose now: no more than one admin account can sign in.").foregroundStyle(.secondary).font(.callout)
+            }
             if !message.isEmpty { Text(message).foregroundStyle(.red).font(.callout) }
             HStack {
                 Spacer()
-                Button("Later") { NSApp.keyWindow?.close() }
-                Button("Keep this one") { asking = true }.keyboardShortcut(.defaultAction).disabled(chosen == nil || busy)
+                Button("Later") { close() }
+                Button("Keep this one…") { confirm() }.disabled(chosen == nil || busy || deleteCount == 0)
             }
         }
         .padding(20)
         .task { await load() }
-        .alert("Delete the other accounts?", isPresented: $asking) {
-            Button("Delete", role: .destructive) { keep() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Every account but \(accounts.first { $0.id == chosen }?.username ?? "") is deleted. This cannot be undone.")
-        }
+    }
+
+    /// This window, by its id: the call may take a while, and focus may move meanwhile.
+    private var window: NSWindow? { NSApp.windows.first { $0.identifier?.rawValue == "keep-account" } }
+    private func close() { window?.close() }
+
+    /// Asked first, with Cancel as the default button: Return twice deletes nothing.
+    private func confirm() {
+        guard let id = chosen, let kept = accounts.first(where: { $0.id == id }) else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = "Delete the other accounts?"
+        alert.informativeText = "Only \(kept.username) is kept. \(deleteCount) other account\(deleteCount == 1 ? " is" : "s are") deleted, with their sign-ins, passkeys and devices. This cannot be undone."
+        alert.addButton(withTitle: "Cancel")
+        let delete = alert.addButton(withTitle: "Delete")
+        delete.hasDestructiveAction = true
+        delete.keyEquivalent = ""
+        let answer: (NSApplication.ModalResponse) -> Void = { r in if r == .alertSecondButtonReturn { keep() } }
+        if let window { alert.beginSheetModal(for: window, completionHandler: answer) } else { answer(alert.runModal()) }
     }
 
     private func load() async {
         do {
-            accounts = try await model.api.accounts()
+            let got = try await model.api.accounts()
+            accounts = got.list; deleteCount = got.deletes
             chosen = accounts.first { $0.wizard }?.id
+            loaded = true
         } catch { message = error.localizedDescription }
     }
 
@@ -61,9 +80,9 @@ struct KeepAccountView: View {
                 model.refreshStatus()
                 if left > 0 {
                     message = "\(left) account\(left == 1 ? " was" : "s were") not fully removed. Castpane finishes \(left == 1 ? "it" : "them") at its next start, or press Keep again."
-                    accounts = (try? await model.api.accounts()) ?? accounts
+                    if let got = try? await model.api.accounts() { accounts = got.list; deleteCount = got.deletes }
                 } else {
-                    NSApp.keyWindow?.close()
+                    close()
                 }
             } catch { message = error.localizedDescription }
             busy = false

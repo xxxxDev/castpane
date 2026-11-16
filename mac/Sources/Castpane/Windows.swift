@@ -519,7 +519,7 @@ struct AccountsTab: View {
                 if s.users > 1 {
                     Label("\(s.users - 1) other account\(s.users - 1 == 1 ? "" : "s") from an earlier version can still sign in.",
                           systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                    Button("Choose the One to Keep…") { Windows.shared.showKeepAccount(model) }
+                    if s.admins > 1 { Button("Choose the One to Keep…") { Windows.shared.showKeepAccount(model) } }
                 }
                 LabeledContent("Signed-in sessions", value: String(s.sessions))
             } else {

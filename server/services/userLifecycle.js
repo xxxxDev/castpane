@@ -318,6 +318,10 @@ function createUserLifecycleService({
         deletedAt: user.deletedAt || timestamp,
         deletedBy: actorSnapshot(actor),
         deletionReason: reason,
+        // The server's mark that it carries this delete on (authController.systemDelete),
+        // set before the delete began: it stays with the tombstone, so the removal is
+        // finished whoever began the delete.
+        ...(user.systemRemoval ? { systemRemoval: user.systemRemoval } : {}),
       };
       await databaseCall(usersDB, 'update', { _id: user._id }, tombstone, {});
     } else if (action === 'enable') {

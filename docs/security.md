@@ -16,9 +16,10 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   by the server when it starts, and the Activity tab says so; only while an admin account is
   active, so a database cut short or edited by hand is left alone (and logged). A delete stopped
   part-way is finished at the next start. With more than one admin
-  account, the server cannot tell which is yours: the Mac app asks, at the Mac, which one to keep
+  account, the server cannot tell which is yours: the Mac app asks which one to keep (whoever uses this Mac, in person or through Remote)
   (the setup assistant's is chosen first when the audit log still says which it was), and
-  deletes every other over the app's channel. Until then they sign in and can open Remote.
+  deletes every other over the app's channel. Until then they sign in and can open Remote. A keep stopped part-way finishes the accounts it
+  had started on at the next start; for the rest the Mac app asks again.
   Nothing on the web lists or deletes accounts. A deleted account stays as a record that signs
   nothing in and keeps its name taken.
   The account may trust a device (**Settings › This device › Trust this device**, which asks again
@@ -85,10 +86,9 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   the public HTTPS address may add one: this Mac's own loopback page is refused
   (`PASSKEY_ORIGIN`). QR sign-in needs a phone already bound as a login
   key and a matching number chosen on it.
-- Where you are asked again (opening Remote, deleting a leftover account, trusting a
-  device), a passkey stands for the password and code, one answer for one action. A
-  challenge answers only its own kind: one asked for Remote does not confirm an account
-  action, and one asked for an account action does not open Remote or trust a device. With
+- Where you are asked again (opening Remote, trusting a device), a passkey stands for the
+  password and code, one answer for one action. A challenge answers only that: one asked for
+  signing in does not open Remote. With
   two-step on, only a key added while two-step was on counts (the code was asked when it was
   added), even if two-step was turned off and on since; a key added while it was off does
   not. A key kept from before this rule never
@@ -125,7 +125,7 @@ what protects that, where the secrets are, and what Castpane cannot stop.
 
 **The app's channel**
 
-`/api/local/*` (status, making the account, activity, ending the viewer) answers only a
+`/api/local/*` (status, making the account, listing the admin accounts and keeping one, activity, ending the viewer) answers only a
 request from `127.0.0.1` or `::1`, addressed to the loopback host, with no `Origin`, cookie or
 forwarding header (Cloudflare's, `X-Forwarded-For`, `Forwarded`, Tailscale's), and with
 `Authorization: Bearer <local.token>`. Anything else gets 404 or 401. Making the account works only

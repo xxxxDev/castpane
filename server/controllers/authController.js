@@ -1054,20 +1054,41 @@ async function afterDelete(id, username) {
 // disable or enable left pending go too. A removal stopped before its clean-up or its
 // audit line, or with a clean-up left undone, is finished at the next start: the
 // tombstone keeps systemRemoval until it is clean, and a system delete left pending is
-// run again. Each removal is one audit line, which the Mac app's Activity shows
+// run again. systemRemoval is written on the account, with the reason, before its delete
+// is started, and the delete keeps it on the tombstone (services/userLifecycle.js): a
+// delete an older version's web route left pending is carried on by the lifecycle service
+// under that admin's name (its tombstone's deletedBy is the user), and the mark is what
+// still makes it one of these. Each removal is one audit line, which the Mac app's Activity shows
 // (localApi.js, kind account-removed, with its reason). Nothing here throws but the
 // refusal of an account to keep that is not an active administrator.
 const usersNow = () => new Promise((ok, no) => usersDB.find({}, (e, r) => (e ? no(e) : ok(r))));
 const pendingNow = () => new Promise((ok, no) => userLifecycleTransitionsDB.find({ status: 'pending' }, (e, r) => (e ? no(e) : ok(r))));
 const markRemoval = (id, mark) => new Promise((ok, no) => usersDB.update({ _id: id }, { $set: { systemRemoval: mark } }, {}, (e) => (e ? no(e) : ok())));
+// Before a delete: on an account not yet a tombstone only, so a tombstone's mark (logged
+// already, perhaps) is never set back.
+const notTombstone = (id) => ({ _id: id, lifecycleStatus: { $ne: LIFECYCLE_STATUS.DELETED_TOMBSTONE } });
+const markBefore = (id, reason) => new Promise((ok, no) => usersDB.update(notTombstone(id), { $set: { systemRemoval: { reason, logged: false, clean: false } } }, {}, (e) => (e ? no(e) : ok())));
+const unmarkBefore = (id) => new Promise((ok, no) => usersDB.update(notTombstone(id), { $unset: { systemRemoval: true } }, {}, (e) => (e ? no(e) : ok())));
 const isTombstone = (u) => u.lifecycleStatus === LIFECYCLE_STATUS.DELETED_TOMBSTONE;
+const markedReason = (u) => (SYSTEM_DELETE_REASONS.includes(u?.systemRemoval?.reason) ? u.systemRemoval.reason : null);
+// Deleted by the server: by its own actor, or a delete it carried on (markedReason).
+const byServer = (u) => u.deletedBy?.type === 'system' || !!markedReason(u);
 // A tombstone written before the reason was kept with it is a member's.
-const removalReason = (u) => (SYSTEM_DELETE_REASONS.includes(u.deletionReason) ? u.deletionReason : 'not-an-admin');
+const removalReason = (u) => ((u.deletedBy?.type === 'system' && SYSTEM_DELETE_REASONS.includes(u.deletionReason)) ? u.deletionReason : markedReason(u) || 'not-an-admin');
 
 async function systemDelete(id, reason, failed) {
+  try { await markBefore(id, reason); }
+  catch (e) {
+    console.error(`account ${id} not removed (tried again at the next start):`, e?.message);
+    failed.push({ id, error: e?.code || e?.message });
+    return false;
+  }
   try { await lifecycleService().deleteUser({ targetUserId: id, actor: SYSTEM_ACTOR, reason }); return true; }
   catch (e) {
+    // Left part-way, the delete is still pending and keeps its mark; refused before it
+    // began, the account is as it was.
     if (e?.code === 'USER_LIFECYCLE_PARTIAL') await stopAgentsIfOff(id);
+    else await unmarkBefore(id).catch((u) => console.error(`account ${id}: removal mark not cleared:`, u?.message));
     console.error(`account ${id} not removed (tried again at the next start):`, e?.code || '', e?.message);
     failed.push({ id, error: e?.code || e?.message });
     return false;
@@ -1081,12 +1102,12 @@ async function finishSystemRemovals(only = () => true) {
   let rows;
   try { rows = await usersNow(); } catch (e) { console.error('removals not finished (tried again at the next start):', e.message); return { removed, failed: [{ error: e.message }] }; }
   for (const u of rows) {
-    if (!isTombstone(u) || u.deletedBy?.type !== 'system' || u.systemRemoval?.clean || !only(u)) continue;
+    if (!isTombstone(u) || !byServer(u) || u.systemRemoval?.clean || !only(u)) continue;
     const id = String(u._id);
     try {
       const { left } = await afterDelete(id, u.username);
       if (!u.systemRemoval?.logged) audit({ source: 'users', action: 'account-removed', username: u.username, target: id, reason: removalReason(u), by: SYSTEM_ACTOR.id, ...(left ? { cleanupIncomplete: true } : {}) });
-      await markRemoval(id, { logged: true, clean: !left });
+      await markRemoval(id, { ...(markedReason(u) ? { reason: markedReason(u) } : {}), logged: true, clean: !left });
       if (left) failed.push({ id, error: 'CREDENTIAL_CLEANUP_INCOMPLETE' }); else removed.push(id);
     } catch (e) {
       console.error(`account ${id} removal not finished (tried again at the next start):`, e?.message);
@@ -1109,9 +1130,13 @@ exports.removeMembers = () => inAccountTurn(async () => {
   for (const u of rows) if (u.role === 'admin' && await activeAccount(String(u._id)).catch(() => null)) { adminActive = true; break; }
   const targets = new Map();
   for (const u of rows) if (u.role === 'user' && !isTombstone(u)) targets.set(String(u._id), 'not-an-admin');
-  // A system delete stopped part-way (a tombstone too: its journal row is then closed).
+  // A system delete stopped part-way (a tombstone too: its journal row is then closed),
+  // and an older version's delete the server carried on (its account marked).
+  const byId = new Map(rows.map((u) => [String(u._id), u]));
   for (const t of pending) {
-    if (t.action === 'delete' && t.actor?.type === 'system' && SYSTEM_DELETE_REASONS.includes(t.reason)) targets.set(String(t.userId), t.reason);
+    if (t.action !== 'delete') continue;
+    const reason = t.actor?.type === 'system' && SYSTEM_DELETE_REASONS.includes(t.reason) ? t.reason : markedReason(byId.get(String(t.userId)));
+    if (reason) targets.set(String(t.userId), reason);
   }
   if (targets.size && !adminActive) {
     console.error(`${targets.size} account(s) not removed: no administrator is active, so the accounts are not as Castpane leaves them`);
@@ -1126,17 +1151,23 @@ exports.removeMembers = () => inAccountTurn(async () => {
 });
 
 // The administrators the person at the Mac can choose from (localApi.js, GET
-// /api/local/accounts): active, with nothing pending (activeAccount), by name. Only the
-// id and the names.
-exports.activeAdmins = async () => {
+// /api/local/accounts, and status.admins counts them): active, with nothing pending
+// (activeAccount), by name. Only the id and the names. others: how many accounts that are
+// not tombstones are not among them, which a keep deletes too (members, disabled ones,
+// ones with something pending, other roles); from the same read.
+async function keepChoice() {
   const [rows, pending] = await Promise.all([usersNow(), pendingNow()]);
   const busy = new Set(pending.map((t) => String(t.userId)));
   const key = (u) => String(u.username || '').toLowerCase();
-  return rows
+  const admins = rows
     .filter((u) => u.role === 'admin' && isActiveUser(u) && !busy.has(String(u._id)))
     .sort((a, b) => key(a).localeCompare(key(b)) || String(a._id).localeCompare(String(b._id)))
     .map((u) => ({ id: String(u._id), username: u.username, name: u.name || u.username, madeBySetup: u.madeBySetup === true }));
-};
+  const listed = new Set(admins.map((a) => a.id));
+  return { admins, others: rows.filter((u) => !isTombstone(u) && !listed.has(String(u._id))).length };
+}
+exports.keepChoice = keepChoice;
+exports.activeAdmins = async () => (await keepChoice()).admins;
 
 // POST /api/local/accounts/keep (localApi.js): the person at the Mac keeps one active
 // administrator and every other account goes, whatever its role or state; a tombstone
@@ -1155,7 +1186,7 @@ exports.keepOneAccount = (id) => inAccountTurn(async () => {
   for (const target of targets) await systemDelete(target, 'one-account', failed);
   const notDone = new Set(failed.map((f) => f.id));
   const chosen = new Set(targets);
-  const done = await finishSystemRemovals((u) => !notDone.has(String(u._id)) && (chosen.has(String(u._id)) || u.deletionReason === 'one-account'));
+  const done = await finishSystemRemovals((u) => !notDone.has(String(u._id)) && (chosen.has(String(u._id)) || removalReason(u) === 'one-account'));
   return { kept: keep, removed: done.removed, failed: [...failed, ...done.failed] };
 });
 
