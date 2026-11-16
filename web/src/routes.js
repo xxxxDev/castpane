@@ -16,8 +16,6 @@ import NoFitPage from './pages/NoFitPage.vue';
 export default [
   // Remote: this Mac's screen and input, for an admin (server/remote.js).
   { path: '/remote/', component: RemotePage },
-  // Labs: the Mac's apps used as a phone's own (Settings › System › Labs turns it on).
-  { path: '/labs/', component: RemotePage, options: { props: { labs: true } } },
 
   { path: '/settings/', component: SettingsPage },
   // Settings detail push (within the #view-settings router stack).
@@ -25,7 +23,7 @@ export default [
   // QR sign-in: this phone as a login key, and the account's devices.
   { path: '/scan-login/', component: ScanLoginPage },
   { path: '/devices/', component: DevicesPage },
-  // Labs: the apps whose windows are left at their own size.
+  // The apps whose windows are left at their own size.
   { path: '/no-fit/', component: NoFitPage },
   // Two-step sign-in and passkeys for this account.
   { path: '/two-step/', component: TwoStepPage },

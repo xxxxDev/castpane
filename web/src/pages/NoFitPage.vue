@@ -1,5 +1,5 @@
 <template>
-  <!-- The apps whose windows Labs leaves at their own size (js/noFit.js): those put on the
+  <!-- The apps whose windows the Remote tab leaves at their own size (js/noFit.js): those put on the
        list here or from an app's menu, and those found too wide to be a phone's shape. -->
   <f7-page name="no-fit" class="page-large-static" @page:afterin="query = ''">
     <f7-navbar :title="ct('不調整視窗的 App')" :back-link="t('back')"></f7-navbar>
@@ -11,7 +11,7 @@
       <f7-list-item link no-chevron :title="ct('＋ 新增 App')" class="nofit-add" @click.prevent="picking = true"/>
     </f7-list>
     <f7-block-title>{{ ct('縮不到這麼窄的 App') }}</f7-block-title>
-    <f7-block v-if="!narrowList.length" class="nofit-empty">{{ ct('還沒有。實驗頁打開一個 App 時，縮不到這台裝置寬度的會記在這裡。') }}</f7-block>
+    <f7-block v-if="!narrowList.length" class="nofit-empty">{{ ct('還沒有。在遠端打開一個 App 時，縮不到這台裝置寬度的會記在這裡。') }}</f7-block>
     <f7-list v-else inset strong-ios class="nofit-narrow">
       <f7-list-item v-for="[bundle, n] in narrowList" :key="bundle" :title="n.name" :footer="`${ct('最窄')} ${n.width} ${ct('點')}`">
         <template #after><a v-if="!neverFits(bundle)" href="#" class="nofit-never-add" @click.prevent="setNever(bundle, n.name, true)">{{ ct('加入') }}</a><span v-else class="nofit-on">{{ ct('已加入') }}</span></template>
@@ -23,7 +23,7 @@
       <f7-page-content>
         <f7-block-title>{{ ct('新增 App') }}</f7-block-title>
         <f7-list inset class="nofit-search"><f7-list-input v-model:value="query" type="search" :placeholder="ct('搜尋 App')" clear-button/></f7-list>
-        <f7-block v-if="!knownList.length" class="nofit-empty">{{ ct('先在實驗頁連線到 Mac 一次，這裡才會有它的 App 清單。') }}</f7-block>
+        <f7-block v-if="!knownList.length" class="nofit-empty">{{ ct('先在遠端連線到 Mac 一次，這裡才會有它的 App 清單。') }}</f7-block>
         <f7-list v-else inset strong-ios class="nofit-pick">
           <f7-list-item v-for="[bundle, name] in knownList" :key="bundle" link no-chevron :title="name" :after="neverFits(bundle) ? ct('已加入') : ''" @click.prevent="setNever(bundle, name, true);picking = false"/>
         </f7-list>

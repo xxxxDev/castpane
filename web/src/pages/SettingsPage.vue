@@ -37,9 +37,10 @@
       <f7-list-item v-if="desktop" :title="ct('自動收合電腦版選單')" :footer="ct('選單平常收成一排圖示，滑鼠移上去才展開，移開就收回。只影響這台裝置。')" class="sidebar-auto">
         <template #media><f7-icon f7="sidebar_left"/></template><template #after><label class="toggle"><input type="checkbox" :aria-label="ct('自動收合電腦版選單')" :checked="sidebarAuto" @change="setSidebarAuto($event.target.checked)"/><span class="toggle-icon"></span></label></template>
       </f7-list-item>
-      <!-- Features still being tried show up in their own tab once this is on (js/labs.js). -->
-      <f7-list-item v-if="currentUser?.role === 'admin'" :title="ct('實驗功能')" :footer="ct('打開後下方多一個「實驗」分頁：把 Mac 上開著的 App 當成手機 App 來用。只影響這台裝置。')" class="labs-row"><template #media><f7-icon f7="wand_stars"/></template><template #after><label class="toggle"><input type="checkbox" :aria-label="ct('實驗功能')" :checked="labsOn" @change="setLabs($event.target.checked)"/><span class="toggle-icon"></span></label></template></f7-list-item>
-      <f7-list-item v-if="currentUser?.role === 'admin' && labsOn" link :title="ct('不調整視窗的 App')" :after="Object.keys(noFit.never).length ? Object.keys(noFit.never).length + ' ' + ct('個') : ''" class="nofit-row" @click.prevent="f7.views.get('#view-settings').router.navigate('/no-fit/')"><template #media><f7-icon f7="rectangle_dock"/></template></f7-list-item>
+      <!-- The whole screen lists the Mac's desktops; its windows too only when this is on
+           (js/remotePrefs.js). Kept on this device. -->
+      <f7-list-item v-if="currentUser?.role === 'admin'" :title="ct('整個螢幕也列出 App 視窗')" :footer="ct('打開後，整個螢幕上方除了桌面，也列出每個 App 的視窗。只影響這台裝置。')" class="desk-windows-row"><template #media><f7-icon f7="macwindow"/></template><template #after><label class="toggle"><input type="checkbox" :aria-label="ct('整個螢幕也列出 App 視窗')" :checked="deskWindows" @change="setDeskWindows($event.target.checked)"/><span class="toggle-icon"></span></label></template></f7-list-item>
+      <f7-list-item v-if="currentUser?.role === 'admin'" link :title="ct('不調整視窗的 App')" :after="Object.keys(noFit.never).length ? Object.keys(noFit.never).length + ' ' + ct('個') : ''" class="nofit-row" @click.prevent="f7.views.get('#view-settings').router.navigate('/no-fit/')"><template #media><f7-icon f7="rectangle_dock"/></template></f7-list-item>
       <f7-list-item :title="ct('版本更新提示')" class="update-dialog"><template #media><f7-icon f7="arrow_down_circle"/></template><template #after><label class="toggle"><input type="checkbox" :aria-label="ct('版本更新提示')" :checked="updateDialog" @change="setUpdateDialog($event.target.checked)"/><span class="toggle-icon"></span></label></template></f7-list-item>
       <f7-list-item link :title="t('checkForUpdate')" class="check-update" @click.prevent="checkForUpdate">
         <template #media><f7-icon f7="arrow_2_circlepath" /></template>
@@ -104,7 +105,7 @@ import {
 import { forceAppUpdate } from '../js/pwa-update.js';
 import { isHandheld } from '../js/qrLogin.js';
 import { updateDialog, setUpdateDialog } from '../js/updatePrompt.js';
-import { labsOn, setLabs } from '../js/labs.js';
+import { deskWindows, setDeskWindows } from '../js/remotePrefs.js';
 import { noFit } from '../js/noFit.js';
 import { trustState, trustThisDevice, untrust } from '../js/trust.js';
 import { sidebarAuto, setSidebarAuto } from '../js/sidebarState.js';

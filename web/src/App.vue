@@ -115,7 +115,6 @@
         </div>
 
         <f7-view v-if="isAdmin" id="view-remote" main tab :tab-active="active === 'view-remote'" url="/remote/" />
-        <f7-view v-if="isAdmin && labsOn" id="view-labs" tab :tab-active="active === 'view-labs'" url="/labs/" />
         <f7-view id="view-settings" :main="!isAdmin" tab :tab-active="active === 'view-settings'" url="/settings/" />
         <f7-view v-if="isAdmin" id="view-admin" tab :tab-active="active === 'view-admin'" url="/admin/" />
       </f7-views>
@@ -138,7 +137,6 @@ import { resubscribeIfRotated, setPushAccount } from './js/push.js';
 import { activeTab, setActiveTab } from './js/tab-session.js';
 import { addressFor, screenFor } from './js/appUrl.js';
 import { ADMIN_TABS, MEMBER_TAB } from './js/navigation.js';
-import { labsOn } from './js/labs.js';
 import {useTheme} from './theme.js';
 const {theme,applyTheme}=useTheme();
 import { resolveTabTap } from './tabNavigation.js';
@@ -190,8 +188,6 @@ function useInBrowser() {
 // devices).
 const ALL_TABS = [
   { id: 'view-remote', labelKey: 'tabRemote', icon: 'desktopcomputer', iconClass: 'f7-icons', admin: true },
-  // Labs (js/labs.js): only while Settings › System › Labs is on.
-  { id: 'view-labs', labelKey: 'tabLabs', icon: 'wand_stars', iconClass: 'f7-icons', admin: true, labs: true },
   { id: 'view-settings', labelKey: 'tabSettings', icon: 'gear_alt_fill', iconClass: 'f7-icons' },
   { id: 'view-admin', labelKey: 'tabAdmin', icon: 'shield_lefthalf_fill', iconClass: 'f7-icons', admin: true },
 ];
@@ -213,9 +209,7 @@ async function askWhoIAm() {
 }
 if (authChannel) authChannel.onmessage = (e) => { if (!!e.data?.signedIn !== !!currentUser.value) askWhoIAm(); };
 if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !currentUser.value && !authLoading.value) askWhoIAm(); });
-const tabs = computed(() => ALL_TABS.filter((tb) => (!tb.admin || isAdmin.value) && (!tb.labs || labsOn.value)));
-// Labs turned off while its tab was showing: back to the first tab.
-watch(labsOn, (on) => { if (!on && activeTab.value === 'view-labs') setActiveTab(isAdmin.value ? 'view-remote' : MEMBER_TAB); }, { immediate: true });
+const tabs = computed(() => ALL_TABS.filter((tb) => !tb.admin || isAdmin.value));
 
 // Shared across pages so navigation never leaves the App-level highlight behind.
 const active = activeTab;

@@ -1,4 +1,4 @@
-// The apps whose windows Labs leaves at their own size (pages/NoFitPage.vue): those the
+// The apps whose windows the Remote tab leaves at their own size (pages/NoFitPage.vue): those the
 // owner put on the list, those found too wide to be made a phone's shape, and the names of
 // the apps a Mac listed last, to add from when no Mac is open. Kept on this device.
 import {reactive} from 'vue';

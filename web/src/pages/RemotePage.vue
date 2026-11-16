@@ -1,11 +1,9 @@
 <template>
   <!-- Remote (server/remote.js; first made after Sill): this Mac's
        screen or one of its windows, live, with clicks, scrolls and keys sent back. -->
-  <f7-page :name="labs ? 'labs' : 'remote'" class="page-large-static remote-page" @page:afterin="load">
-    <f7-navbar :title="labs ? ct('實驗') : ct('遠端')" large></f7-navbar>
-    <p v-if="labs" class="remote-note labs-note">{{ ct('以 App 為主，把 Mac 上開著的 App 當成這台裝置的 App 來用。這是實驗功能，可以在設定裡關掉。') }}</p>
-
-    <p class="remote-note">{{ ct('在這裡看到並操作這台 Mac 的畫面，或其中一個視窗。只有管理員能用，開始前要再驗證一次（有通行密鑰就用密鑰，沒有就輸入密碼），8 小時內不用再驗證。') }}</p>
+  <f7-page name="remote" class="page-large-static remote-page" @page:afterin="load">
+    <f7-navbar :title="ct('遠端')" large></f7-navbar>
+    <p class="remote-note">{{ ct('把 Mac 上開著的 App 當成這台裝置的 App 來用，或看整個螢幕。只有管理員能用，開始前要再驗證一次（有通行密鑰就用密鑰，沒有就輸入密碼），8 小時內不用再驗證。') }}</p>
     <f7-block v-if="!supported" class="remote-error" role="alert">{{ ct('這個瀏覽器不支援影片解碼（WebCodecs），請改用新版的 Edge、Chrome 或 Safari。') }}</f7-block>
     <f7-block v-if="error" class="remote-error" role="alert">{{ error }}</f7-block>
 
@@ -34,8 +32,8 @@
         <!-- The Mac's desktops first, then the windows on the one picked: whole
              screens, each desktop, full-screen apps, the Dock. -->
         <div v-if="appMode !== 'home'" class="remote-head" :class="{collapsed: headFolded && appMode === 'desktop'}">
-        <!-- Labs: back to the apps at the top left, the size and place an app's own bar has it. -->
-        <div v-if="labs && appMode === 'desktop'" class="remote-apphead remote-desktop-head">
+        <!-- Back to the apps at the top left, the size and place an app's own bar has it. -->
+        <div v-if="appMode === 'desktop'" class="remote-apphead remote-desktop-head">
           <button type="button" class="remote-apphead-back remote-desktop-back" @click="goHome"><f7-icon f7="chevron_left" :size="17"/>{{ ct('首頁') }}</button>
           <div class="remote-apphead-title">{{ ct('整個螢幕') }}</div>
           <span class="remote-desktop-head-end" aria-hidden="true"></span>
@@ -151,11 +149,10 @@
             </div>
           </div>
         </div>
-        <!-- The home: the Mac's Dock kept open at its left, its open apps beside it. -->
-        <div v-if="appMode === 'home'" class="remote-home-row">
-        <RemoteDock v-if="labs && macWindows" docked :apps="dockApps" :windows="dockWindows" :icons="icons" @app="openApp" @window="openWindow"/>
-        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" @close-window="closeWindow" @minimize="minimizeWindow"/>
-        </div>
+        <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
+        <RemoteHome v-if="appMode === 'home'" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" @close-window="closeWindow" @minimize="minimizeWindow">
+          <template #dock><RemoteDock v-if="macWindows" docked :apps="dockApps" :windows="dockWindows" :icons="icons" @app="openApp" @window="openWindow"/></template>
+        </RemoteHome>
         <!-- An app starting takes the Mac a few seconds: said wherever it was started from (the
              home, All apps, the Dock over an app or the whole screen), with a way to cancel. -->
         <div v-if="launching" class="remote-home-launching" :class="{over: appMode !== 'home'}" role="status">
@@ -167,7 +164,7 @@
         <!-- An app's windows to choose from (its card's number, or More › Other windows). -->
         <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''" :can-quit="mayQuit(windowsOfList[0])" @quit="() => { const w = windowsOfList[0];windowsOf = '';quitApp(w); }"/>
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
-        <button v-if="labs && macWindows && appMode !== 'home' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
+        <button v-if="macWindows && appMode !== 'home' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @close="dockOpen = false"/>
         <div v-show="appMode !== 'home'" ref="area" class="remote-area" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <span v-if="isTouch" class="remote-stats remote-area-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
@@ -291,13 +288,12 @@ import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
 import RemoteHome from '../components/RemoteHome.vue';
+import { deskWindows } from '../js/remotePrefs.js';
 import RemoteWindows from '../components/RemoteWindows.vue';
 import RemoteDock from '../components/RemoteDock.vue';
 import { trustedPass } from '../js/trust.js';
 import { neverFits, setNever, noteNarrow, noteApps } from '../js/noFit.js';
 
-// labs: the Labs tab's page (js/labs.js), the Mac's apps first; the Remote tab's has the whole screen.
-const props = defineProps({ labs: { type: Boolean, default: false } });
 import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, otherKeyboardKey, QUALITY, RESOLUTION, STEPS, autoStep } from '../js/remoteStream.js';
 
 const supported = remoteSupported();
@@ -526,7 +522,7 @@ const tappedFieldNow = (msg) => (probeAnswer?.n === probeN && !!probeAnswer.edit
 function onMessage(msg) {
   if (msg.t === 'status') {
     macWindows.value = msg.windows === true;
-    if (macWindows.value && props.labs) link?.send({ t: 'dock' });
+    if (macWindows.value) link?.send({ t: 'dock' });
     const missing = [!msg.screen && ct('螢幕與系統錄音'), !msg.accessibility && ct('輔助使用')].filter(Boolean);
     permission.value = missing.join('、');
     if (msg.screen) { list();if (appMode.value === 'home') link?.send({ t: 'apps' }); }
@@ -599,10 +595,10 @@ function onMessage(msg) {
     if (msg.where === 'start') list();
   } else if (msg.t === 'stopped') {
     // An app that opens with a window of its own first (Discord's updater) closes it for its
-    // main one: Labs follows the app to that window.
+    // main one: the page follows the app to that window.
     const w = currentWindow.value;
     const stopped = () => { notice.value = ct('畫面已停止：') + (msg.reason || ''); };
-    if (props.labs && appMode.value === 'app' && w?.bundle) { notice.value = ct('正在打開…');waitForWindow(w.bundle, w.id, stopped); }
+    if (appMode.value === 'app' && w?.bundle) { notice.value = ct('正在打開…');waitForWindow(w.bundle, w.id, stopped); }
     else stopped();
   } else if (msg.t === 'closed' && msg.reason === 'replaced') {
     error.value = ct('已在別的頁面打開遠端，這裡已中斷。');
@@ -613,6 +609,9 @@ function onMessage(msg) {
 
 // The windows by desktop. A capture core that does not say (an older build) lists them all.
 const groups = computed(() => {
+  // The whole screen: its displays only, unless Settings asks for the apps' windows too (the
+  // apps have their own home).
+  if (!deskWindows.value) { const screens = items.value.filter((w) => w.kind === 'display');return screens.length ? [{ key: 'screens', label: ct('整個螢幕'), order: -1, items: screens }] : []; }
   const all = items.value;
   if (!all.some((w) => w.kind === 'window' && w.desk !== undefined)) return all.length ? [{ key: 'all', label: '', items: all }] : [];
   const screens = all.filter((w) => w.kind === 'display');
@@ -1172,7 +1171,7 @@ async function sendCompose() {
 // The card grows with its text, up to five lines, then scrolls.
 function growCompose() { const el = composeField.value;if (!el) return;el.style.height = 'auto';el.style.height = Math.min(el.scrollHeight, 5 * 22 + 12) + 'px'; }
 // ---- apps ----
-// The Labs page opens on the Mac's open apps (RemoteHome.vue), and an app's window then fills
+// The page opens on the Mac's open apps (RemoteHome.vue), and an app's window then fills
 // it, made a phone's or tablet's shape on the Mac so its text reads as the device's own apps
 // and a finger can hit its buttons; the whole screen is one choice among them. The Remote
 // page keeps the whole screen as it was.
@@ -1196,7 +1195,7 @@ function startApps(m) {
   machineName.value = m.name || '';
   closeWindowViews();macWindows.value = false;quitWatch = null;
   // Back after a while away: as it was (the whole screen, the home or an app's window).
-  appMode.value = props.labs && resumeMode !== 'desktop' ? 'home' : 'desktop';resumeMode = null;
+  appMode.value = resumeMode !== 'desktop' ? 'home' : 'desktop';resumeMode = null;
   apps.value = [];launching.value = '';switcherOpen.value = false;iconsAsked = new Set();iconsAll = false;
   for (const k of Object.keys(icons)) delete icons[k];
   for (const k of Object.keys(snaps)) delete snaps[k];
@@ -1919,7 +1918,6 @@ function keyUp(e) {
 .remote-desktop-head {padding-bottom:0;}
 /* As wide as the back button, so the title stays centred. */
 .remote-desktop-head-end {flex:0 0 auto;width:64px;}
-.remote-home-row {flex:1;min-height:0;display:flex;}
 .remote-card-menu-layer {position:absolute;inset:0;z-index:6;}
 .remote-card-menu {position:absolute;width:220px;background:rgba(44,44,46,.98);border-radius:14px;padding:4px;box-shadow:0 10px 40px rgba(0,0,0,.6);}
 .remote-stage .remote-card-menu button {display:block;width:100%;height:auto;margin:0;padding:12px;border:0;border-radius:10px;background:none;color:#fff;font-size:16px;text-align:left;cursor:pointer;}

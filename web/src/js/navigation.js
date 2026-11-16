@@ -7,11 +7,11 @@ export const ID = '[A-Za-z0-9_-]{1,64}';
 // Every tab, and the one a stored tab that is no longer there falls back to.
 // 'view-remote' and 'view-admin' are an admin's only; App.vue moves anyone else to
 // Settings.
-export const TAB_IDS = ['view-remote', 'view-labs', 'view-settings', 'view-admin'];
+export const TAB_IDS = ['view-remote', 'view-settings', 'view-admin'];
 export const HOME_TAB = 'view-remote';
 // Where someone who is not an admin goes.
 export const MEMBER_TAB = 'view-settings';
-export const ADMIN_TABS = new Set(['view-remote', 'view-labs', 'view-admin']);
+export const ADMIN_TABS = new Set(['view-remote', 'view-admin']);
 // The tab that holds Manage Users (pages/UsersPage.vue opens an account in it).
 export const ADMIN_TAB = 'view-admin';
 
@@ -20,9 +20,6 @@ export const ADMIN_TAB = 'view-admin';
 export const TAB_PAGES = {
   'view-remote': [
     {route: '/remote/', path: '/', admin: true},
-  ],
-  'view-labs': [
-    {route: '/labs/', path: '/labs', admin: true},
   ],
   'view-admin': [
     {route: '/admin/', path: '/admin', admin: true},
@@ -34,7 +31,8 @@ export const TAB_PAGES = {
   ],
 };
 
-export const oldPath = (path) => (path === '/remote' ? '/' : path);
+// The Labs tab's address from before it became the Remote tab goes there too.
+export const oldPath = (path) => (path === '/remote' || path === '/labs' ? '/' : path);
 
 // The address of a tab with no page table (appUrl.js asks only for those).
 export function tabAddress() { return '/'; }

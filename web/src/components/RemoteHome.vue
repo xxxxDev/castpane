@@ -1,5 +1,5 @@
 <template>
-  <!-- The Labs page's home: the apps open on the Mac, one card each (its windows stacked,
+  <!-- The Remote page's home: the apps open on the Mac, one card each (its windows stacked,
        their number on it: a tap then asks which one), as a phone's own app switcher. Every app is a button away, as Launchpad shows them;
        the whole screen (the remote desktop) is at the top, in reach without scrolling past
        every app. -->
@@ -10,6 +10,10 @@
       <div class="remote-home-name">{{ name }}</div>
       <button type="button" class="remote-home-all" @click="allOpen = true"><f7-icon f7="square_grid_2x2" :size="15"/>{{ ct('所有 App') }}</button>
     </div>
+    <!-- Under the bar: the Mac's Dock at the left (the page's slot), the apps beside it. -->
+    <div class="remote-home-body">
+    <slot name="dock"/>
+    <div class="remote-home-scroll">
     <div v-if="notice" class="remote-home-notice">{{ notice }}</div>
     <button type="button" class="remote-home-desktop" @click="$emit('desktop')"><f7-icon f7="desktopcomputer" :size="18"/>{{ ct('整個螢幕（遠端桌面）') }}</button>
     <div class="remote-home-title">
@@ -35,6 +39,9 @@
         </span>
         <span class="remote-home-label">{{ o.name }}</span>
       </button>
+    </div>
+
+    </div>
     </div>
 
     <!-- Every app, as Launchpad: searched, a page at a time sideways; a tap starts it. -->
@@ -103,8 +110,10 @@ function paged() { const el = pagesEl.value;if (el?.clientWidth) page.value = Ma
 function pick(a) { allOpen.value = false;emit('app', a); }
 </script>
 <style>
-.remote-home {position:relative;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px calc(env(safe-area-inset-bottom) + 16px);box-sizing:border-box;}
-.remote-home-head {position:sticky;top:-12px;z-index:2;display:flex;align-items:center;gap:8px;margin:-12px -16px 10px;padding:10px 16px;background:rgba(0,0,0,.92);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);}
+.remote-home {position:relative;flex:1;min-height:0;display:flex;flex-direction:column;box-sizing:border-box;}
+.remote-home-body {flex:1;min-height:0;display:flex;}
+.remote-home-scroll {flex:1;min-width:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px calc(env(safe-area-inset-bottom) + 16px);box-sizing:border-box;}
+.remote-home-head {flex:0 0 auto;z-index:2;display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(0,0,0,.92);}
 .remote-stage .remote-home-back {flex:0 0 auto;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:17px;background:rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .remote-home-name {flex:1;min-width:0;font-size:18px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-stage .remote-home-all {flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;width:auto;height:34px;margin:0;padding:0 14px;border:0;border-radius:17px;background:rgba(255,255,255,.14);color:#fff;font-size:14px;cursor:pointer;}
