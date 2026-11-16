@@ -34,6 +34,8 @@ app.mount('#app');
 startSwUpdateChecks();
 
 import {bindTabbarViewport} from './js/tabbarViewport.js';
+import {startTouchHighlightRelease} from './js/touchHighlightRelease.js';
+startTouchHighlightRelease();
 bindTabbarViewport();
 
 import {showScrollbarsWhileScrolling} from './js/scrollbars.js';

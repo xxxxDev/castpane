@@ -50,7 +50,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
-      includeAssets: ['castpane-64.png', 'castpane-128.png', 'castpane-256.png', 'castpane-app-180.png', 'castpane-app-1024.png'],
+      // The manifest's 1024 icon is fetched by the browser through the manifest/apple-touch
+      // link; precaching it only added weight to every update check. No includeAssets:
+      // globPatterns below already picks up every public/ file worth caching, and listing the
+      // PNGs here put each one in the precache manifest twice.
+      includeManifestIcons: false,
       manifest: {
         name: 'Castpane',
         short_name: 'Castpane',
@@ -74,7 +78,9 @@ export default defineConfig({
         clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,ico,woff,woff2,json}'],
         // version.json must always come from the network.
-        globIgnores: ['version.json'],
+        // The 1024 icon (see includeManifestIcons) and the .woff fallbacks that browsers
+        // running the woff2 never ask for.
+        globIgnores: ['version.json', '**/castpane-app-1024.png', '**/*.woff'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/live$/, /^\/remote$/, /\.[a-z0-9]+$/i],
         cleanupOutdatedCaches: true,

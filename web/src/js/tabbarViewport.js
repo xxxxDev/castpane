@@ -2,25 +2,40 @@ import {visibleHeight} from './visibleHeight.js';
 
 // Keep the floating tabbar's offset, even when an installed PWA reports
 // a layout viewport taller than the visible screen. Never resize the app shell.
+// More than a status bar or a home indicator, less than any keyboard.
+const STALE_SHORTFALL=120;
 export function bindTabbarViewport({viewport=window.visualViewport}={}) {
   if(!viewport)return ()=>{};
   let frame;
+  // Back from another app that had its keyboard open, iOS can leave the visual viewport short by
+  // that keyboard and send nothing more, and the bar stayed where the keyboard's top had been.
+  // With nothing on this page being typed in, no keyboard is ours: a shortfall that large is
+  // taken as stale and the window's height used instead.
+  const typing=()=>!!document.activeElement?.matches?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])');
+  const height=()=>{const h=visibleHeight(viewport);return !typing()&&window.innerHeight-h>STALE_SHORTFALL?window.innerHeight:h;};
   const sync=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{
     // The same shortfall for what sits at the very bottom of the app, as a toast
     // does ("已經是最新版本" was cut off).
     const app=document.getElementById('app');
-    if(app&&viewport.scale===1)document.documentElement.style.setProperty('--viewport-overflow',Math.max(0,Math.round(app.getBoundingClientRect().bottom-(viewport.offsetTop+visibleHeight(viewport))))+'px');
+    // Written only when it changes: each write restyles the page.
+    if(app&&viewport.scale===1){const value=Math.max(0,Math.round(app.getBoundingClientRect().bottom-(viewport.offsetTop+height())))+'px';if(document.documentElement.style.getPropertyValue('--viewport-overflow')!==value)document.documentElement.style.setProperty('--viewport-overflow',value);}
     const bar=document.querySelector('.toolbar-layout-wrapper');
     if(!bar||viewport.scale!==1)return;
     const parent=bar.offsetParent;
     if(!parent)return;
-    const overflow=Math.max(0,parent.getBoundingClientRect().bottom-(viewport.offsetTop+visibleHeight(viewport)));
-    bar.style.bottom=`${overflow}px`;
+    const overflow=Math.max(0,parent.getBoundingClientRect().bottom-(viewport.offsetTop+height()));
+    if(bar.style.bottom!==`${overflow}px`)bar.style.bottom=`${overflow}px`;
   });};
   viewport.addEventListener('resize',sync);viewport.addEventListener('scroll',sync);
   window.addEventListener('resize',sync);
+  // Measured again a few times once back in front, and when a field is left: iOS may correct its
+  // numbers later without a resize.
+  let later=[];
+  const again=()=>{later.forEach(clearTimeout);later=[0,150,500,1200].map(ms=>setTimeout(sync,ms));};
+  const shown=()=>{if(document.visibilityState==='visible')again();};
+  document.addEventListener('visibilitychange',shown);window.addEventListener('pageshow',again);window.addEventListener('focus',again);document.addEventListener('focusout',again);
   const observer=new MutationObserver(sync);
   observer.observe(document.getElementById('app'),{childList:true,subtree:true});
   sync();
-  return ()=>{cancelAnimationFrame(frame);observer.disconnect();viewport.removeEventListener('resize',sync);viewport.removeEventListener('scroll',sync);window.removeEventListener('resize',sync);const bar=document.querySelector('.toolbar-layout-wrapper');if(bar)bar.style.bottom='';document.documentElement.style.removeProperty('--viewport-overflow');};
+  return ()=>{cancelAnimationFrame(frame);later.forEach(clearTimeout);document.removeEventListener('visibilitychange',shown);window.removeEventListener('pageshow',again);window.removeEventListener('focus',again);document.removeEventListener('focusout',again);observer.disconnect();viewport.removeEventListener('resize',sync);viewport.removeEventListener('scroll',sync);window.removeEventListener('resize',sync);const bar=document.querySelector('.toolbar-layout-wrapper');if(bar)bar.style.bottom='';document.documentElement.style.removeProperty('--viewport-overflow');};
 }
