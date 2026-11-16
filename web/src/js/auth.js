@@ -14,6 +14,15 @@ function applyUser(user) {
   if (user?.language) setLang(user.language, { persist: false });
 }
 
+// The account read again (what another device changed: the key row), at most every few
+// seconds; a failure keeps what is here.
+let rereadAt = 0;
+export async function rereadAccount(now = false) {
+  if (!currentUser.value || (!now && Date.now() - rereadAt < 3000)) return;
+  rereadAt = Date.now();
+  try { const data = await api('/auth/me', { signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS) });if (data?.user && currentUser.value) applyUser(data.user); } catch { /* kept as it is */ }
+}
+
 const VERIFY_TIMEOUT_MS = 8000, VERIFY_RETRY_FOR_MS = 90 * 1000;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

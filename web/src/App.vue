@@ -130,7 +130,7 @@ import LoginPage from './pages/LoginPage.vue';
 import { t } from './js/i18n.js';
 import { ct } from './js/text.js';
 import { sidebarFolded, sidebarAuto, sidebarRail, sidebarNarrow, setSidebarFolded, peekSidebar } from './js/sidebarState.js';
-import { api, authLoading, currentUser, verifyAuth, signedInByQr } from './js/auth.js';
+import { api, authLoading, currentUser, verifyAuth, signedInByQr, rereadAccount } from './js/auth.js';
 import { createPresenceHeartbeat } from './js/presence-heartbeat.js';
 import { resubscribeIfRotated, setPushAccount } from './js/push.js';
 import { activeTab, setActiveTab } from './js/tab-session.js';
@@ -273,7 +273,7 @@ watch([currentUser, activeTab], ([user, tab]) => {
 let live = null;
 watch(() => currentUser.value?.id || '', (id) => {
   live?.close(); live = null;
-  if (id && typeof WebSocket === 'function') live = openLiveConnection({ onSignedOut: () => verifyAuth(), tracksPresence: () => !!currentUser.value });
+  if (id && typeof WebSocket === 'function') live = openLiveConnection({ onSignedOut: () => verifyAuth(), onChanged: () => rereadAccount(true), tracksPresence: () => !!currentUser.value });
 }, { immediate: true });
 
 watch(currentUser, (user) => {

@@ -100,12 +100,12 @@ back, with touch modes made for a small screen.
   pointer you drag by a ring below it, so your finger never hides what it points at. Pinch to
   zoom, or pick a size in the menu; when you tap a text field the keyboard comes up and the
   field is zoomed into view. The keys a phone lacks sit in one capsule you slide sideways, four
-  pages of them: esc, Mission Control, the Mac's desktops, the key panel and the clipboard;
-  ⇧ ⌃ ⌥ ⌘, ^C and return; delete, home, end, page up and down; the arrows and tab (a tablet
+  pages of them: esc, ⇧ ⌃ ⌥ ⌘ and the clipboard; delete, home, end, page up and down; the
+  key panel, Mission Control, the Mac's desktops, return and ^C; the arrows and tab (a tablet
   fits them all at once). Round buttons sit beside it: the Mac's Dock at the left, at the right
   one to call up or hide the keyboard and one to open a card to write in. The row is yours to
   arrange in Settings › Remote › Key row, any key on any page or as a round button (one at the
-  left, two at the right), and the account keeps it, so every device shows the same. The card
+  left, two at the right), and the account keeps it, so every device shows the same, changed on all of them at once. The card
   writes several lines, input method and all:
   Send types it where the Mac's cursor is and presses Return, as a message is sent (several
   lines go as a paste, so they replace what the Mac's clipboard held). There is a key panel in

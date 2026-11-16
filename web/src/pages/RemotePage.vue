@@ -271,7 +271,7 @@ import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
 import RemoteHome from '../components/RemoteHome.vue';
-import { deskWindows, keyLayout } from '../js/remotePrefs.js';
+import { deskWindows, keyLayout, rereadAccount } from '../js/remotePrefs.js';
 import RemoteWindows from '../components/RemoteWindows.vue';
 import RemoteDock from '../components/RemoteDock.vue';
 import { trustedPass } from '../js/trust.js';
@@ -1208,6 +1208,7 @@ const orderedWindows = computed(() => {
 const recentWindows = computed(() => orderedWindows.value.slice(0, 12));
 const appTitle = computed(() => { const w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);return w ? w.app || w.title : ''; });
 function startApps(m) {
+  rereadAccount(); // the key row as another device may have set it
   machineName.value = m.name || '';
   closeWindowViews();macWindows.value = false;quitWatch = null;
   // Back after a while away: as it was (the whole screen, the home or an app's window).

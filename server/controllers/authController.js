@@ -834,6 +834,8 @@ exports.updateMe = (req, res) => {
       return res.status(409).json({ message: 'Account is no longer active', code: 'ACCOUNT_INACTIVE' });
     }
     compactQuietly(usersDB, 'users');
+    // The account's other pages read it again at once (the key row is the same everywhere).
+    try { require('../liveUpdates').accountChanged(req.userId); } catch (e) { console.error('account changed, not said:', e.message); }
     usersDB.findOne({ _id: req.userId }, (readErr, user) => {
       if (readErr || !user) return res.status(404).json({ message: 'User not found' });
       res.json({ user: publicUser(user) });

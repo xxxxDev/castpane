@@ -24,6 +24,12 @@ function endSignIn(tokenHash){
  for(const wss of servers)for(const ws of wss.clients){try{if(ws.readyState===1&&hashSessionToken(ws.token)===tokenHash){ws.close(4401,'signed out');n++;}}catch{}}
  return n;
 }
+// The account changed (its key row): every page it has open is told, and reads it again.
+function accountChanged(userId){
+ if(!userId)return 0;let n=0;
+ for(const wss of servers)for(const ws of wss.clients){try{if(ws.readyState===1&&String(ws.owner)===String(userId)){ws.send(JSON.stringify({type:'changed',what:'account'}));n++;}}catch{}}
+ return n;
+}
 function readBuildId(file){try{const id=JSON.parse(fs.readFileSync(file,'utf8')).buildId;return typeof id==='string'&&id?id:null;}catch{return null;}}
 function installLiveUpdates(server,{
  tickMs=700,
@@ -109,4 +115,4 @@ function installLiveUpdates(server,{
  const close=()=>{clearInterval(timer);servers.delete(wss);for(const ws of wss.clients)ws.close();wss.close();};
  return {close,wss};
 }
-module.exports={installLiveUpdates,endSignIn};
+module.exports={installLiveUpdates,endSignIn,accountChanged};

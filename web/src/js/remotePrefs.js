@@ -1,7 +1,8 @@
 // Whether the whole screen lists the Mac's app windows beside its desktops
 // (pages/RemotePage.vue). Off by default: the apps have their own home. Kept on each device.
 import {ref, watch} from 'vue';
-import {currentUser, updateCurrentUser} from './auth.js';
+import {currentUser, updateCurrentUser, rereadAccount} from './auth.js';
+export {rereadAccount};
 import {PRODUCT} from './productConfig.js';
 
 const KEY = PRODUCT.storageKeys.deskWindows;
@@ -26,7 +27,7 @@ export const KEY_NAMES = {
 export const KEY_LIMITS = {left: 1, right: 2};
 export const DEFAULT_LAYOUT = Object.freeze({
   left: ['dock'],
-  pages: [['esc', 'mission', 'space-left', 'space-right', 'panel', 'clip'], ['shift', 'ctrl', 'alt', 'meta', '⌃C', 'return'], ['delete', 'home', 'end', 'page up', 'page down'], ['↑', '↓', '←', '→', 'tab', '⇧tab']],
+  pages: [['esc', 'shift', 'ctrl', 'alt', 'meta', 'clip'], ['delete', 'home', 'end', 'page up', 'page down'], ['panel', 'mission', 'space-left', 'space-right', 'return', '⌃C'], ['↑', '↓', '←', '→', 'tab', '⇧tab']],
   right: ['kb', 'compose'],
 });
 const LAYOUT_KEY = PRODUCT.storageKeys.keyLayout;
@@ -60,6 +61,8 @@ export function setKeyLayout(layout) {
 }
 // The account's row, as each sign-in or reading of the account brings it.
 watch(() => (currentUser.value ? JSON.stringify(currentUser.value.keyLayout || null) : ''), (j) => { if (j) keepHere(JSON.parse(j)); }, {immediate: true});
+// Changed on another device: read again whenever this one comes back to the page.
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') rereadAccount(); });
 // A key moved: to another place ('left', 'right' or a page 0 to 3), at its end.
 export function moveKey(id, to) {
   const l = copy(keyLayout.value);

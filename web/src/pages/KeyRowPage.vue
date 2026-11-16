@@ -34,12 +34,14 @@
   </f7-page>
 </template>
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { f7 } from 'framework7-vue';
 import { t } from '../js/i18n.js';
 import { ct } from '../js/text.js';
-import { KEY_NAMES, KEY_LIMITS, keyLayout, setKeyLayout, moveKey, flatLayout, setFlatLayout } from '../js/remotePrefs.js';
+import { KEY_NAMES, KEY_LIMITS, keyLayout, setKeyLayout, moveKey, flatLayout, setFlatLayout, rereadAccount } from '../js/remotePrefs.js';
 const editing = ref(false);
+// What another device set, before this one changes it.
+onMounted(rereadAccount);
 const PAGE_TITLES = ['第 1 頁', '第 2 頁', '第 3 頁', '第 4 頁'];
 const sections = computed(() => [
   { where: 'left', title: ct('左側獨立按鈕（最多 1 顆）'), ids: keyLayout.value.left },
