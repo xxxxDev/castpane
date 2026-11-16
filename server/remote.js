@@ -159,11 +159,15 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
   const trustCookie = (req) => (typeof req.cookies?.[trust.COOKIE] === 'string' ? req.cookies[trust.COOKIE] : '');
   // The admin's passkey, or their password (and two-step code), asked again: false when
   // it was refused (the answer is sent).
+  // How the admin was asked again: a passkey sent either way, or the password. Read once it
+  // was accepted.
+  const sent = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+  const viaOf = (req) => (req.body?.passkey || sent(req.body?.adminPasskey) ? 'passkey' : 'password');
   async function againOrRefused(req, res, purpose) {
     if (req.body?.passkey) {
       try { await auth.adminPasskeyAgain(req, res, req.body.passkey, 'remote'); return true; } catch (e) { res.status(e.status === 429 ? 429 : 400).json({ message: 'Passkey not accepted', code: 'PASSKEY_REFUSED' }); return false; }
     }
-    if (!(await auth.adminAgain(req, res, purpose, 'remote'))) return false;
+    if (!(await auth.adminAgain(req, res, purpose, 'remote', { purpose: 'remote' }))) return false;
     auth.adminGranted(req, 'remote');
     return true;
   }
@@ -209,11 +213,11 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
       if (req.body?.passkey) {
         try { await auth.adminPasskeyAgain(req, res, req.body.passkey, 'remote'); } catch (e) { return res.status(e.status || 400).json({ message: 'Passkey not accepted', code: 'PASSKEY_REFUSED' }); }
       } else {
-        if (!(await auth.adminAgain(req, res, 'remote-open', 'remote'))) return;
+        if (!(await auth.adminAgain(req, res, 'remote-open', 'remote', { purpose: 'remote' }))) return;
         auth.adminGranted(req, 'remote');
       }
       const issued = passes.issue(req.userId, sessionToken(req) || req.headers.authorization || '');
-      audit({ source: 'remote', action: 'pass', username: req.username, via: req.body?.passkey ? 'passkey' : 'password', ip: resolveClientIp(req) });
+      audit({ source: 'remote', action: 'pass', username: req.username, via: viaOf(req), ip: resolveClientIp(req) });
       res.json(issued);
     } catch (e) { try { auth.adminKept(req); } catch { /* nothing granted */ } next(e); }
   });
@@ -232,7 +236,7 @@ function installRemoteRoutes(app, { verifyToken, auth = require('./controllers/a
       await t.forget(trustCookie(req));
       const made = await t.trust(req.userId, req.headers['user-agent']);
       setTrustCookie(req, res, made.cookie, made.expiresAt);
-      audit({ source: 'remote', action: 'trust', username: req.username, via: req.body?.passkey ? 'passkey' : 'password', ip: resolveClientIp(req) });
+      audit({ source: 'remote', action: 'trust', username: req.username, via: viaOf(req), ip: resolveClientIp(req) });
       res.json({ trusted: true, expiresAt: new Date(made.expiresAt).toISOString(), days: await t.days() });
     } catch (e) { try { auth.adminKept(req); } catch { /* nothing granted */ } next(e); }
   });

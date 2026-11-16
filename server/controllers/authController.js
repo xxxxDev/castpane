@@ -970,13 +970,15 @@ exports.listUsers = (req, res) => {
 // that was disabled, renaming an administrator. A session alone could otherwise
 // take over an administrator that exists instead of making one.
 // how: create, promote, demote, reset-password, reset-two-step, enable, disable, delete, purge, rename.
-async function adminAgain(req, res, how, target) {
+// purpose: the kind of action ('admin' for account management, 'remote' for Remote), which
+// a passkey's challenge must have been issued for.
+async function adminAgain(req, res, how, target, { purpose = 'admin' } = {}) {
   const { adminPassword, adminCode, adminPasskey } = req.body || {};
   // A passkey stands for the password and the code together (adminPasskeyAgain): one
-  // challenge, one action.
+  // challenge, one action, of its own kind.
   if (adminPasskey && typeof adminPasskey === 'object' && !Array.isArray(adminPasskey)) {
     let me;
-    try { me = await exports.adminPasskeyAgain(req, res, adminPasskey, 'admin'); }
+    try { me = await exports.adminPasskeyAgain(req, res, adminPasskey, purpose); }
     catch (e) {
       if (e.status === 429) res.status(429).json(TOO_MANY);
       else if (e.status === 403) res.status(403).json({ message: 'Account is not active' });
