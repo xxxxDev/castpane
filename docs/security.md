@@ -8,9 +8,10 @@ what protects that, where the secrets are, and what Castpane cannot stop.
 - **Signed out:** the sign-in page only. Every API request needs a session, except signing in.
 - **A member:** their own settings, devices, passkeys and two-step sign-in. No Remote, no
   account management.
-- **An admin:** everything, and Remote. Opening Remote asks again: the admin's own passkey, or
-  their password and, with two-step on, a code. That gives a pass for 8 hours, for that admin
-  and that sign-in only, kept in the server's memory (a restart ends every pass).
+- **An admin:** everything, and Remote. Opening Remote asks again: a passkey of the admin's that
+  may stand for the password and code (below), or their password and, with two-step on, a
+  code. That gives a pass for 8 hours, for that admin and that sign-in only, kept in the
+  server's memory (a restart ends every pass).
   An admin may trust a device (**Settings › Account › Trust this device**, which asks again
   once): from it, a pass is given with no password or passkey for 30, 60, 90 or 180 days (set
   in **Admin › Trusted devices**, and a shorter setting counts at once) from its last use. The device keeps an HttpOnly, SameSite=Strict
@@ -79,8 +80,9 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   password), a passkey stands for the password and code, one answer for one action. A
   challenge answers only its own kind: one asked for Remote does not confirm an account
   action, and one asked for an account action does not open Remote or trust a device. With
-  two-step on, only a key added while it was on counts (the code was asked when it was
-  added); a key added while it was off does not. A key kept from before this rule never
+  two-step on, only a key added while two-step was on counts (the code was asked when it was
+  added), even if two-step was turned off and on since; a key added while it was off does
+  not. A key kept from before this rule never
   counts, with two-step on or off: add it again. Refused answers count as wrong passwords
   do.
 

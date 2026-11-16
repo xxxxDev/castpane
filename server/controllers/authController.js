@@ -662,6 +662,14 @@ exports.addPasskey = async (req, res) => {
     }
     // How it was added: whether it may stand for the password and code later (passkeys.confirmsAdmin).
     const passkey = await passkeyStore.add(user._id, typeof body.name !== 'string' || textProblem(body.name, 40, 'name') ? 'Passkey' : body.name, { ...made, addedWith: 'password', withCode: Boolean(user.twoStep) });
+    // The password changed, or the account was switched off, while this was checked: the
+    // key goes again (a password change removes the account's passkeys, and this one came
+    // after that).
+    const after = await activeAccount(req.userId);
+    if (!after || after.password !== user.password) {
+      await passkeyStore.remove(user._id, passkey.id).catch((e) => console.error('passkey not removed again:', e.message));
+      return res.status(409).json({ message: 'Your sign-in changed meanwhile; add the passkey again', code: 'SIGN_IN_CHANGED' });
+    }
     audit({ source: 'passkey', action: 'add', userId: req.userId, passkeyId: passkey.id });
     security.passkey({ action: 'add', userId: req.userId, ip: resolveClientIp(req), place: placeOf(req) });
     res.status(201).json({ passkey });
@@ -714,7 +722,9 @@ exports.adminPasskeyStart = async (req, purpose) => {
   if (!me || me.role !== 'admin') return null;
   const ids = await passkeyStore.ids(req.userId, (d) => passkeys.confirmsAdmin(d, me));
   if (!ids.length) return null;
-  return { challenge: againChallenges.issue('get', req.userId, `again:${req.userId}`, purpose), allow: ids };
+  // Each kind waits in its own few (a stolen session asking for many cannot push out the one
+  // the admin is answering for the other kind).
+  return { challenge: againChallenges.issue('get', req.userId, `again:${purpose}:${req.userId}`, purpose), allow: ids };
 };
 // Throws (400) unless the answer is this admin's passkey, one that may stand for the
 // password and code, signed just now, to a challenge issued for this purpose. Refused
