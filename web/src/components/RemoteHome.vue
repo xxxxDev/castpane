@@ -17,7 +17,10 @@
     <div v-if="notice" class="remote-home-notice">{{ notice }}</div>
     <button type="button" class="remote-home-desktop" @click="$emit('desktop')"><f7-icon f7="desktopcomputer" :size="18"/>{{ ct('整個螢幕（遠端桌面）') }}</button>
     <div class="remote-home-title">
-      <span>{{ ct('開著的 App') }}</span>
+      <!-- Which apps: those with a window on a desktop, those put in the Dock, or both. -->
+      <span class="remote-home-filter" role="tablist" :aria-label="ct('開著的 App')">
+        <button v-for="f in FILTERS" :key="f.id" type="button" role="tab" :class="['filter-' + f.id, {on: filter === f.id}]" :aria-selected="filter === f.id" @click="setFilter(f.id)">{{ ct(f.label) }}</button>
+      </span>
       <!-- Two a row or one: kept on this device. -->
       <span class="remote-home-cols" role="group" :aria-label="ct('排列')">
         <button type="button" class="cols-2" :class="{on: cols === 2}" :title="ct('一列兩個')" :aria-label="ct('一列兩個')" :aria-pressed="cols === 2" @click="setCols(2)"><f7-icon f7="square_grid_2x2" :size="15"/></button>
@@ -28,11 +31,11 @@
     <div class="remote-home-open" :class="{one: cols === 1}">
       <button v-for="o in openApps" :key="o.key" type="button" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @click="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
         <span class="remote-home-shot">
-          <!-- As a Mac window's top left: red closes the window on top, yellow puts it in the Dock. -->
-          <span v-if="o.window" class="remote-home-lights" @click.stop>
-            <button type="button" class="light close" :title="ct('關閉視窗')" :aria-label="ct('關閉視窗')" @click.stop="$emit('closeWindow', o.window)"><f7-icon f7="xmark" :size="9"/></button>
-            <button v-if="canMinimize && !o.window.minimized" type="button" class="light minimize" :title="ct('縮到 Dock')" :aria-label="ct('縮到 Dock')" @click.stop="$emit('minimize', o.window)"><f7-icon f7="minus" :size="9"/></button>
-          </span>
+          <!-- A Mac window's buttons, as big as the bar's: red at the top left closes the window
+               on top, yellow at the top right puts it in the Dock; the number of windows at the
+               bottom right. -->
+          <button v-if="o.window" type="button" class="light close" :title="ct('關閉視窗')" :aria-label="ct('關閉視窗')" @click.stop="$emit('closeWindow', o.window)"><f7-icon f7="xmark" :size="15"/></button>
+          <button v-if="o.window && canMinimize && !o.window.minimized" type="button" class="light minimize" :title="ct('縮到 Dock')" :aria-label="ct('縮到 Dock')" @click.stop="$emit('minimize', o.window)"><f7-icon f7="minus" :size="15"/></button>
           <img v-if="o.window?.thumb" :src="o.window.thumb" alt=""/>
           <img v-else-if="icons[o.bundle]" class="remote-home-shot-icon" :src="icons[o.bundle]" alt=""/>
           <span v-if="o.count > 1" class="remote-home-count">{{ o.count }}</span>
@@ -73,9 +76,14 @@ const cols = ref((() => { try { return localStorage.getItem(COLS_KEY) === '1' ? 
 function setCols(n) { cols.value = n;try { localStorage.setItem(COLS_KEY, String(n)); } catch { /* this time only */ } }
 // One card an app with a window open, its window used last on top. Apps running with no
 // window (helpers in the background, menu-bar apps) are left to All apps.
+const FILTERS = [{ id: 'all', label: '全部' }, { id: 'desk', label: '桌面上' }, { id: 'dock', label: 'Dock 裡' }];
+const FILTER_KEY = 'castpane-home-filter';
+const filter = ref((() => { try { const f = localStorage.getItem(FILTER_KEY);return FILTERS.some((x) => x.id === f) ? f : 'all'; } catch { return 'all'; } })());
+function setFilter(f) { filter.value = f;try { localStorage.setItem(FILTER_KEY, f); } catch { /* this time only */ } }
 const openApps = computed(() => {
   const seen = new Map();
-  for (const w of props.windows) {
+  const wanted = (w) => filter.value === 'all' || (filter.value === 'dock' ? !!w.minimized : !w.minimized);
+  for (const w of props.windows.filter(wanted)) {
     const key = w.bundle || w.app || String(w.id);
     if (seen.has(key)) seen.get(key).count++;
     else seen.set(key, { key, bundle: w.bundle || '', name: w.app || w.title, window: w, count: 1 });
@@ -119,17 +127,19 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-stage .remote-home-all {flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;width:auto;height:34px;margin:0;padding:0 14px;border:0;border-radius:17px;background:rgba(255,255,255,.14);color:#fff;font-size:14px;cursor:pointer;}
 .remote-home-notice {margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,69,58,.18);color:#fff;font-size:14px;}
 .remote-home-title {display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px;font-size:13px;color:#999;}
+.remote-home-filter {display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:rgba(255,255,255,.08);}
+.remote-stage .remote-home-filter button {height:24px;margin:0;padding:0 10px;border:0;border-radius:7px;background:none;color:#999;font-size:12px;cursor:pointer;}
+.remote-stage .remote-home-filter button.on {background:rgba(255,255,255,.18);color:#fff;}
 .remote-home-cols {display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:rgba(255,255,255,.08);}
 .remote-stage .remote-home-cols button {width:30px;height:24px;margin:0;padding:0;border:0;border-radius:7px;background:none;color:#999;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .remote-stage .remote-home-cols button.on {background:rgba(255,255,255,.18);color:#fff;}
 .remote-home-open.one {grid-template-columns:1fr;}
 .remote-home-open.one .remote-home-shot {aspect-ratio:16/10;}
-/* The Mac's window buttons, with room around them for a finger. */
-.remote-home-lights {position:absolute;top:0;left:0;z-index:1;display:flex;gap:2px;padding:6px;}
-.remote-stage .remote-home-lights .light {width:26px;height:26px;margin:0;padding:6px;border:0;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.remote-home-lights .light .icon {width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,.55);font-weight:700;}
-.remote-home-lights .light.close .icon {background:#ff5f57;}
-.remote-home-lights .light.minimize .icon {background:#febc2e;}
+/* The Mac's window buttons, the size of the bar's round buttons. */
+.remote-stage .remote-home-shot .light {position:absolute;top:6px;z-index:1;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:17px;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,.6);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4);}
+.remote-stage .remote-home-shot .light .icon {font-weight:700;}
+.remote-stage .remote-home-shot .light.close {left:6px;background:#ff5f57;}
+.remote-stage .remote-home-shot .light.minimize {right:6px;background:#febc2e;}
 .remote-home-empty {font-size:14px;color:#888;}
 .remote-home-open {display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:14px 12px;}
 /* A tablet or a computer: as many as fit, two at the least. */
@@ -138,7 +148,7 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-home-shot {position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;border-radius:12px;background:#2c2c2e;overflow:hidden;}
 .remote-home-shot img {width:100%;height:100%;object-fit:cover;object-position:top;}
 .remote-home-shot img.remote-home-shot-icon {width:56px;height:56px;object-fit:contain;}
-.remote-home-count {position:absolute;top:6px;right:6px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:rgba(0,0,0,.7);color:#fff;font-size:12px;line-height:20px;box-sizing:border-box;}
+.remote-home-count {position:absolute;bottom:6px;right:6px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:rgba(0,0,0,.7);color:#fff;font-size:12px;line-height:20px;box-sizing:border-box;}
 .remote-home-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-home-card.launching .remote-home-shot, .remote-home-app.launching .remote-home-icon {opacity:.5;animation:remote-home-pulse 1s ease-in-out infinite alternate;}
 @keyframes remote-home-pulse {to {opacity:1;}}

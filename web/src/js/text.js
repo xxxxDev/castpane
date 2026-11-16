@@ -51,6 +51,7 @@ const english = {
 "全螢幕":"full screen",
 "全螢幕顯示":"Full screen",
 "全部":"All",
+"桌面上":"On desktops",
 "兩步驟":"Two-step",
 "兩步驟驗證":"Two-step sign-in",
 "兩步驟驗證已重設":"Two-step sign-in reset",
