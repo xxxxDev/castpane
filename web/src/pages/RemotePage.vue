@@ -664,7 +664,7 @@ function disconnect() {
   saveShot();
   try { link?.send({ t: 'stop' }); } catch {}
   if (document.fullscreenElement) document.exitFullscreen();
-  closeWindowViews();
+  closeWindowViews();quitWatch = null;
   link?.close();link = null;streaming.value = false;keyboardOpen.value = false;settingsOpen.value = false;menuOpen.value = false;held.clear();panel.value = false;compose.value = false;composeText.value = '';clipOpen.value = false;clipWait?.reject(new Error('closed'));
 }
 const headCollapsed = ref(localGet('castpane-remote-head') === 'folded');
@@ -1189,7 +1189,7 @@ const recentWindows = computed(() => orderedWindows.value.slice(0, 12));
 const appTitle = computed(() => { const w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);return w ? w.app || w.title : ''; });
 function startApps(m) {
   machineName.value = m.name || '';
-  closeWindowViews();macWindows.value = false;
+  closeWindowViews();macWindows.value = false;quitWatch = null;
   // Back after a while away: as it was (the whole screen, the home or an app's window).
   appMode.value = props.labs && resumeMode !== 'desktop' ? 'home' : 'desktop';resumeMode = null;
   apps.value = [];launching.value = '';switcherOpen.value = false;iconsAsked = new Set();iconsAll = false;
@@ -1221,7 +1221,7 @@ function appsMessage(msg) {
     if (!msg.ok && launching.value === msg.bundle) { launching.value = '';toast(ct('這個 App 打不開')); }
   } else if (msg.t === 'fitted') { fitWait?.(msg); }
   else if (msg.t === 'dock') { dockApps.value = msg.apps || [];askIconsFor(dockApps.value.map((a) => a.bundle)); }
-  else if (msg.t === 'quit') { if (!msg.ok) toast(ct('這個 App 沒有結束')); }
+  else if (msg.t === 'quit') { if (!msg.ok) { toast(ct('這個 App 沒有結束'));if (quitWatch?.bundle === msg.bundle) quitWatch = null; } }
 }
 // Icons for these bundles that the page has not kept yet (the Dock's, which `apps` may not
 // have asked for).
