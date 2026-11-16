@@ -156,7 +156,7 @@
         </div>
         <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
         <!-- CastpaneOS: on a computer, the Mac's windows as windows of this page (components/CastpaneDesk.vue). -->
-        <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineName" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" @home="goHome" @all="goHome();allAppsAsked++" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
+        <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" @home="goHome" @all="goHome();allAppsAsked++" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
         <RemoteHome v-if="appMode === 'home'" :os="osAvailable" @os="goOs" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
           <template #dock><RemoteDock v-if="macWindows" docked :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="openApp" @window="openWindow" @other="openDockOther" @trash="openDockTrash"/></template>
         </RemoteHome>
@@ -1216,7 +1216,7 @@ const recentWindows = computed(() => orderedWindows.value.slice(0, 12));
 const appTitle = computed(() => { const w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);return w ? w.app || w.title : ''; });
 function startApps(m) {
   rereadAccount(); // the key row as another device may have set it
-  machineName.value = m.name || '';
+  machineName.value = m.name || '';machineId.value = m.id || '';
   closeWindowViews();macWindows.value = false;quitWatch = null;
   // Back after a while away: as it was (the whole screen, the home or an app's window).
   appMode.value = resumeMode !== 'desktop' ? 'home' : 'desktop';resumeMode = null;
@@ -1484,14 +1484,14 @@ async function openWindow(w, keepOrder = false, tried = new Set()) {
   watchPicture(w, tried);
 }
 // CastpaneOS, a computer's only (a mouse and the room): its windows' pictures read again every
-// two seconds while it is up.
+// five seconds while it is up and shown (a list takes the Mac about half a second of work).
 const osAvailable = computed(() => !isTouch && typeof window !== 'undefined' && window.innerWidth >= 1024);
-const deskRef = ref(null);
+const deskRef = ref(null), machineId = ref('');
 let osTimer = 0;
 function goOs() {
   goHome();
   appMode.value = 'os';
-  clearInterval(osTimer);osTimer = setInterval(() => { if (appMode.value === 'os' && document.visibilityState === 'visible') list();else if (appMode.value !== 'os') clearInterval(osTimer); }, 2000);
+  clearInterval(osTimer);osTimer = setInterval(() => { if (appMode.value === 'os' && document.visibilityState === 'visible') list();else if (appMode.value !== 'os') clearInterval(osTimer); }, 5000);
 }
 onBeforeUnmount(() => clearInterval(osTimer));
 function goHome() {

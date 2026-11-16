@@ -3,7 +3,7 @@
        that is dragged by its bar, resized from its corner and brought to the front with a
        click; the Mac's Dock at the foot. Which windows are open here, where and how big, is
        kept on this device for each Mac. Their pictures are the Mac's thumbnails, read again
-       every second or so; a double click opens one live (stage 1 of .local/CASTPANEOS-PLAN). -->
+       every few seconds; a double click opens one live (stage 1 of .local/CASTPANEOS-PLAN). -->
   <div ref="deskEl" class="cp-desk" @pointerdown.self="focused = null">
     <div class="cp-desk-top">
       <button type="button" class="cp-desk-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="$emit('home')"><f7-icon f7="chevron_left" :size="16"/></button>
