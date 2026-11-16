@@ -176,7 +176,13 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-home-empty {font-size:14px;color:#888;}
 .remote-home-open {display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:14px 12px;}
 /* A tablet or a computer: as many as fit, two at the least. */
-@media (min-width: 700px) { .remote-home-open:not(.one) {grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));} }
+/* A tablet or a computer: the two sizes are small and large cards, as many as fit (on a
+   phone, two a row or one). */
+@media (min-width: 700px) {
+  .remote-home-open:not(.one) {grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));}
+  .remote-home-open.one {grid-template-columns:repeat(auto-fill, minmax(460px, 1fr));}
+  .remote-home-open.one .remote-home-shot {aspect-ratio:4/3;}
+}
 .remote-stage .remote-home-card {-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;display:flex;flex-direction:column;align-items:stretch;gap:6px;width:auto;height:auto;margin:0;padding:0;border:0;background:none;color:#ddd;font-size:13px;cursor:pointer;text-align:center;}
 .remote-home-shot {position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;border-radius:18px;background:#2c2c2e;overflow:hidden;}
 .remote-home-shot img {width:100%;height:100%;object-fit:cover;object-position:top;}

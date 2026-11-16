@@ -34,7 +34,7 @@
         <div v-if="appMode !== 'home'" class="remote-head" :class="{collapsed: headFolded && appMode === 'desktop'}">
         <!-- Back to the apps at the top left, the size and place an app's own bar has it. -->
         <div v-if="appMode === 'desktop'" class="remote-apphead remote-desktop-head">
-          <button type="button" class="remote-apphead-back remote-desktop-back" @click="goHome"><f7-icon f7="chevron_left" :size="17"/>{{ ct('首頁') }}</button>
+          <button type="button" class="remote-apphead-back remote-desktop-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goHome"><f7-icon f7="chevron_left" :size="18"/></button>
           <div class="remote-apphead-title">{{ ct('整個螢幕') }}</div>
           <!-- At the right of the bar, as an app's: the picture's numbers, then its buttons. -->
           <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
@@ -81,7 +81,7 @@
         </div>
         <!-- An app's own bar: back to the home, its name, the keyboard and the rest. -->
         <div v-if="appMode === 'app'" class="remote-apphead">
-          <button type="button" class="remote-apphead-back" @click="goHome"><f7-icon f7="chevron_left" :size="17"/>{{ ct('首頁') }}</button>
+          <button type="button" class="remote-apphead-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goHome"><f7-icon f7="chevron_left" :size="18"/></button>
           <div class="remote-apphead-title">{{ appTitle }}</div>
           <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <button v-if="view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
@@ -1796,7 +1796,9 @@ function keyUp(e) {
 .remote-tile-shot {aspect-ratio:16/10;border-radius:12px;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#8e8e93;}
 .remote-tile-shot img {width:100%;height:100%;object-fit:cover;}
 .remote-tile-name {margin-top:8px;font-weight:600;font-size:15px;}
-.remote-tile-sub {font-size:12px;color:var(--dp-color-text-secondary,#8e8e93);}
+/* Every tile the same height: the line under the name kept when there is nothing to say. */
+.remote-tile-sub {min-height:1.4em;line-height:1.4;font-size:12px;color:var(--dp-color-text-secondary,#8e8e93);}
+.remote-tile-name {line-height:1.3;}
 .remote-stage {-webkit-touch-callout:none;position:fixed;inset:0;z-index:12000;background:#000;display:flex;flex-direction:column;color:#fff;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box;box-shadow:0 100vh 0 100vh #000;user-select:none;-webkit-user-select:none;}
 .remote-desks {display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:6px 8px 0;background:rgba(28,28,30,.96);}
 .remote-desks::-webkit-scrollbar {display:none;}
@@ -1930,7 +1932,8 @@ function keyUp(e) {
 .remote-btn:disabled {opacity:.35;cursor:default;}
 .remote-head-stats {align-self:center;margin-right:6px;}
 .remote-apphead {display:flex;align-items:center;gap:6px;padding:4px 8px;}
-.remote-stage .remote-apphead-back {flex:0 0 auto;display:inline-flex;align-items:center;gap:2px;width:auto;height:34px;margin:0;padding:0 8px 0 2px;border:0;background:none;color:#0a84ff;font-size:16px;cursor:pointer;}
+/* Back to the home: a round button, as the home's own back to the Macs. */
+.remote-stage .remote-apphead-back {flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:17px;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;}
 .remote-apphead-title {flex:1;min-width:0;text-align:center;font-size:15px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-homebar {flex:0 0 auto;height:22px;display:flex;align-items:center;justify-content:center;touch-action:none;}
 .remote-homebar span {width:120px;height:5px;border-radius:3px;background:rgba(255,255,255,.7);}
