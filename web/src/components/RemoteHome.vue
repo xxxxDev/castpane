@@ -45,7 +45,7 @@
       <img v-if="icons[launching]" :src="icons[launching]" alt=""/>
       <span class="remote-home-launching-text">{{ ct('正在打開「{name}」…').replace('{name}', () => launchingName) }}</span>
       <f7-preloader :size="18"/>
-      <button type="button" class="remote-home-launching-cancel" :title="ct('取消')" @click="$emit('cancel')"><f7-icon f7="xmark" :size="13"/></button>
+      <button type="button" class="remote-home-launching-cancel" :title="ct('取消')" :aria-label="ct('取消')" @click="$emit('cancel')"><f7-icon f7="xmark" :size="13"/></button>
     </div>
   </div>
 </template>
