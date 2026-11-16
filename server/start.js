@@ -85,6 +85,12 @@ async function main() {
   const service = require('./serviceStart');
   // Logins still holding a raw token are converted before serving.
   await service.migrateSessions({ sessionsDB, subscriptionsDB: pushSubscriptionsDB });
+  // One account: what is not an administrator is removed before serving. A failure is
+  // logged and tried again at the next start; it never stops the service. The audit log
+  // is rotated first (startService does it again, finding nothing to do), so a removal's
+  // line lands in the log the Mac app's Activity reads, not in one moved to archive/.
+  try { require('./services/logRotation').runLogRotation({ logsDir: path.dirname(require('./services/audit').AUDIT_LOG) }); } catch (e) { console.error('[logRotation] pass failed:', e.message); }
+  try { await require('./controllers/authController').removeMembers(); } catch (e) { console.error('members not removed (tried again at the next start):', e.message); }
   const remote = require('./remote');
   const { getDefaultPushService } = require('./services/pushService');
   const { getPushConfig } = require('./services/pushCrypto');

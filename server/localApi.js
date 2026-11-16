@@ -40,7 +40,8 @@ function ensureLocalToken(home) {
   return t;
 }
 
-// The latest remote opens and ends, clipboard reads and writes, and sign-ins, newest first, from the end of the
+// The latest remote opens and ends, clipboard reads and writes, sign-ins and accounts the
+// server removed (not an administrator, authController.removeMembers), newest first, from the end of the
 // audit log (the last 2 MB of it: a week's log is rotated away by logRotation.js).
 function readActivity({ limit = 50, file = AUDIT_LOG } = {}) {
   let text = '';
@@ -65,6 +66,8 @@ function readActivity({ limit = 50, file = AUDIT_LOG } = {}) {
       else out.push({ at: e.ts, kind: e.action, username: e.username || '', ...(machine ? { machine } : {}) });
     } else if (e.source === 'auth' && e.action === 'sign-in') {
       out.push({ at: e.ts, kind: 'sign-in', username: e.username || '', method: e.method || 'password', ...(e.ip ? { ip: e.ip } : {}) });
+    } else if (e.source === 'users' && e.action === 'account-removed') {
+      out.push({ at: e.ts, kind: 'account-removed', username: e.username || '', reason: e.reason || '' });
     }
   }
   return out;

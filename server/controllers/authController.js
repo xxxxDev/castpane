@@ -19,6 +19,7 @@ const TRUST = require('../services/trustedDevices');
 const trustedDevices = () => TRUST.sharedTrustedDevices();
 const {
   LIFECYCLE_STATUS,
+  SYSTEM_ACTOR,
   effectiveLifecycleStatus,
   isActiveUser,
   normalizeUsername,
@@ -1105,6 +1106,18 @@ async function stopAgentsIfOff(id) {
   } catch (e) { console.error('account off: its agents not all stopped:', e.message); return { agentsStopUnchecked: true }; }
 }
 
+// What goes with an account once the lifecycle delete has made it a tombstone, for the
+// route below and for removeMembers. A deleted account keeps no login-key phone, nor
+// anything they approved; `left` says they did not all go (they open nothing while the
+// account is off). A delete forgets what the security log holds for the account.
+async function afterDelete(id, username) {
+  let left = null;
+  qrRequests.revokeUser(id); twoStepTickets.revokeUser(id); endPasskeyChallenges(id);
+  try { await Promise.all([loginDevices.removeAll(id), trustedDevices().removeAll(id), passkeyStore.removeAll(id)]); } catch (e) { left = e; console.error('delete: passkeys or bound phones not removed:', e.message); }
+  security.forgetUser(id, username);
+  return { left, agentsLeft: await stopAgentsIfOff(id) };
+}
+
 // DELETE /api/auth/users/:id: an account left from a version that had several. Always
 // confirmed with the acting admin's own password (and code when two-step is on) or a
 // passkey, member or administrator alike: a session alone must not be able to remove
@@ -1123,15 +1136,8 @@ exports.deleteUser = inTurn(async (req, res) => {
       actor: req.principal,
       reason: req.body?.reason,
     });
-    // A deleted account keeps no login-key phone, nor anything they approved. Said when
-    // they did not all go: they open nothing while the account is off.
-    let left = null;
-    qrRequests.revokeUser(id);twoStepTickets.revokeUser(id);endPasskeyChallenges(id);
-    try { await Promise.all([loginDevices.removeAll(id), trustedDevices().removeAll(id), passkeyStore.removeAll(id)]); } catch (e) { left = e; console.error('delete: passkeys or bound phones not removed:', e.message); }
-    // A delete forgets what the security log holds for the account.
-    security.forgetUser(id, before.username);
     adminGranted(req, id);
-    const agentsLeft = await stopAgentsIfOff(id);
+    const { left, agentsLeft } = await afterDelete(id, before.username);
     if (left) return res.status(500).json({ message: 'User deleted, but its passkeys or bound phones could not all be removed. Delete it again to remove them.', code: 'CREDENTIAL_CLEANUP_INCOMPLETE', ...result, ...agentsLeft });
     res.json({ message: 'User deleted', ...result, ...agentsLeft });
   } catch (error) {
@@ -1145,6 +1151,36 @@ exports.deleteUser = inTurn(async (req, res) => {
     sendLifecycleError(res, error, agentsLeft);
   }
 });
+
+// One account (2026-11-16): an account that is not an administrator (a member, or one
+// stored with a role name, which counts as a member) is deleted by the server itself at
+// every start (server/start.js), through the same delete as the route, by SYSTEM_ACTOR
+// (services/userLifecycle.js). Disabled ones and ones with a disable or enable left
+// pending go too; tombstones are left as they are. Other administrators stay (Settings
+// lists them, with a delete by hand). Each removal is one audit line, which the Mac
+// app's Activity shows (localApi.js, kind account-removed). One that fails is logged and
+// tried again at the next start; nothing here throws.
+exports.removeMembers = async () => {
+  const removed = [], failed = [];
+  let rows;
+  try { rows = await new Promise((ok, no) => usersDB.find({}, (e, r) => (e ? no(e) : ok(r)))); }
+  catch (e) { console.error('members not removed (tried again at the next start):', e.message); return { removed, failed: [{ error: e.message }] }; }
+  for (const u of rows) {
+    if (u.role === 'admin' || u.lifecycleStatus === LIFECYCLE_STATUS.DELETED_TOMBSTONE) continue;
+    const id = String(u._id);
+    try {
+      await lifecycleService().deleteUser({ targetUserId: id, actor: SYSTEM_ACTOR, reason: 'not-an-admin' });
+      const { left } = await afterDelete(id, u.username);
+      audit({ source: 'users', action: 'account-removed', username: u.username, target: id, reason: 'not-an-admin', by: SYSTEM_ACTOR.id, ...(left ? { cleanupIncomplete: true } : {}) });
+      removed.push(id);
+    } catch (e) {
+      if (e?.code === 'USER_LIFECYCLE_PARTIAL') await stopAgentsIfOff(id);
+      console.error(`member ${id} not removed (tried again at the next start):`, e?.code || '', e?.message);
+      failed.push({ id, error: e?.code || e?.message });
+    }
+  }
+  return { removed, failed };
+};
 
 exports._setUserLifecycleServiceForTests = (service) => {
   injectedLifecycleService = service || null;

@@ -12,9 +12,10 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   Remote asks again: a passkey of the account's that may stand for the password and code
   (below), or the password and, with two-step on, a code. That gives a pass for 8 hours, for
   that sign-in only, kept in the server's memory (a restart ends every pass).
-- **Accounts left from an earlier version,** which allowed several, still sign in as they did (a disabled one does not):
-  one that was an admin can open Remote, one that was a member cannot. Settings lists them under
-  a warning, the Mac app's Account tab counts them, and Settings deletes them (each delete asks for your
+- **Accounts left from an earlier version,** which allowed several: a member account is deleted
+  by the server when it starts, and the Activity tab says so. An admin account is kept, as the
+  server cannot tell which one is yours; it still signs in and can open Remote (a disabled one
+  does not). Settings lists them under a warning, the Mac app's Account tab counts them, and Settings deletes them (each delete asks for your
   password, or passkey, again). Delete them soon: a leftover admin
   account sees yours as the other one, and can delete it just the same. A deleted account stays as
   a record that signs nothing in and keeps its name taken.

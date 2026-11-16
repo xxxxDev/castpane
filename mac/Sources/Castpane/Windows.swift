@@ -586,6 +586,7 @@ private struct ActivityRow: View {
         case "clipboard-read": return ("doc.on.clipboard.fill", .orange, "\(who) copied \(whose) clipboard\(times)")
         case "clipboard-write": return ("doc.on.clipboard", Palette.blue, "\(who) put text on \(whose) clipboard\(times)")
         case "unlock": return ("lock.open.fill", .orange, "\(who) typed a password into \(whose) lock screen\(times)")
+        case "account-removed": return ("person.crop.circle.badge.xmark", .orange, "Castpane deleted \(who), a member account from an earlier version: Castpane has one account")
         default: return ("circle.fill", .gray, "\(who): \(item.kind)")
         }
     }

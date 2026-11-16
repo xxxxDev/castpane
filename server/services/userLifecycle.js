@@ -94,9 +94,17 @@ function publicLifecycleUser(user) {
   };
 }
 
+// The server itself, as the one deleting: authController.removeMembers removes at
+// every start the accounts that are not administrators (one account, 2026-11-16). Only
+// this object, by reference, is taken, and only for a delete: a request's principal is
+// always a user (trustedPrincipal.js) and an object of the same shape is refused.
+const SYSTEM_ACTOR = Object.freeze({
+  type: 'system', id: 'castpane', username: 'castpane', name: 'Castpane', role: 'system',
+});
+
 function actorSnapshot(actor) {
   return {
-    type: 'user',
+    type: actor.type === 'system' ? 'system' : 'user',
     id: actor.id,
     username: actor.username,
     name: actor.name,
@@ -138,7 +146,11 @@ function createUserLifecycleService({
     return user;
   }
 
-  function validateActor(input) {
+  function validateActor(input, action) {
+    if (input === SYSTEM_ACTOR) {
+      if (action !== 'delete') throw lifecycleError(403, 'FORBIDDEN', 'Only an admin can change user lifecycle');
+      return SYSTEM_ACTOR;
+    }
     const actor = normalizeTrustedPrincipal(input);
     if (actor.role !== 'admin') {
       throw lifecycleError(403, 'FORBIDDEN', 'Only an admin can change user lifecycle');
@@ -398,7 +410,10 @@ function createUserLifecycleService({
     if (action === 'delete') await assertDeleteSafe(userId);
     const timestamp = now().toISOString();
     const transition = await beginTransition({ userId, action, actor, reason, timestamp });
-    const durableActor = validateActor({ type: 'user', ...transition.actor });
+    // A journal row this service wrote for the system delete names it as the actor.
+    const durableActor = transition.actor?.type === 'system'
+      ? validateActor(SYSTEM_ACTOR, transition.action)
+      : validateActor({ type: 'user', ...transition.actor }, transition.action);
     const durableReason = transition.reason;
     const durableTimestamp = transition.startedAt;
 
@@ -428,7 +443,7 @@ function createUserLifecycleService({
   }
 
   async function run(action, { targetUserId, actor: actorInput, reason: reasonInput }) {
-    const actor = validateActor(actorInput);
+    const actor = validateActor(actorInput, action);
     const userId = String(targetUserId || '');
     if (!userId) throw lifecycleError(400, 'USER_ID_INVALID', 'User id is required');
     if (actor.id === userId && ['disable', 'delete'].includes(action)) {
@@ -487,6 +502,7 @@ function getDefaultUserLifecycleService() {
 module.exports = {
   LIFECYCLE_STATUS,
   LIFECYCLE_SCHEMA_VERSION,
+  SYSTEM_ACTOR,
   normalizeUsername,
   effectiveLifecycleStatus,
   isActiveUser,
