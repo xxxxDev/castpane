@@ -107,8 +107,9 @@ what protects that, where the secrets are, and what Castpane cannot stop.
   anything a page asks for.
 - When the page falls behind, video is dropped up to the next key frame, so input does not
   queue behind a backlog. Input stops if the capture core stops reading.
-- Every pass, every session opened and ended (with its length) is in the audit log. Every admin
-  gets a push notification when a session opens, naming who and from where.
+- Every pass, every session opened and ended (with its length), and every app force-quit (who,
+  and which app) is in the audit log. Every admin gets a push notification when a session
+  opens, naming who and from where.
 - The server never starts the capture core or any other program. It connects to `host.sock` in
   Castpane's folder and proves itself with `host.token`; if the socket is not there, it says
   Castpane is not running.
