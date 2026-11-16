@@ -1192,7 +1192,12 @@ const orderedWindows = computed(() => {
   const area = (w) => (w.width || 0) * (w.height || 0);
   // Only apps in the Dock: a menu-bar helper's hidden window (a settings panel never shown)
   // was listed as if open. A Mac from before says nothing (dock undefined): all of them.
-  return items.value.filter((w) => w.kind === 'window' && w.dock !== false).sort((a, b) => rank(a) - rank(b) || area(b) - area(a));
+  // Nor a window the app keeps but does not show: on the desktop shown now, not on the
+  // screen, not in the Dock (Notes's Account window): there is nothing to see, and closing it
+  // did nothing, so it came back at the next list. On another desktop a window is off the
+  // screen too, and stays.
+  const unseen = (w) => w.here === false && !w.minimized && w.desk?.current === true;
+  return items.value.filter((w) => w.kind === 'window' && w.dock !== false && !unseen(w)).sort((a, b) => rank(a) - rank(b) || area(b) - area(a));
 });
 const recentWindows = computed(() => orderedWindows.value.slice(0, 12));
 const appTitle = computed(() => { const w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);return w ? w.app || w.title : ''; });
