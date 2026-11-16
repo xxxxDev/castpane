@@ -49,6 +49,11 @@ back, with touch modes made for a small screen.
 ## Features
 
 <p align="center">
+  <img src="docs/assets/anim/labs-home-dark.svg" width="250" alt="Remote tab: the Mac's open apps as cards; Notes opens made the phone's shape, a slide in from the left edge goes home, All apps opens Music, which was not running">
+  <img src="docs/assets/anim/labs-switch-dark.svg" width="250" alt="Remote tab: the bar at the bottom slid sideways goes to Mail, then Calendar; slid up, Calendar shrinks into its card among the others; Mail's card slid up closes it; Notes opens from its card">
+  <img src="docs/assets/anim/labs-keys-dark.svg" width="250" alt="Remote tab: the same capsule of keys under an app; with the keyboard up the Mac's window is made the shape of what is left above it">
+</p>
+<p align="center">
   <img src="docs/assets/anim/remote-windows-dark.svg" width="300" alt="Remote tab: the whole screen, then Desktop 1 and its Notes window, then Desktop 2 and a Calendar window that was not on screen">
   <img src="docs/assets/anim/remote-unlock-dark.svg" width="300" alt="Remote tab: a locked Mac asks for its password in a small window, then unlocks and shows its screen">
 </p>
@@ -57,11 +62,32 @@ back, with touch modes made for a small screen.
   <img src="docs/assets/anim/remote-trust-dark.svg" width="300" alt="Settings: trust this device after asking once; Admin: trusted devices, kept for 90 days">
 </p>
 
-- **Your screen or one window.** Pick a whole display, a desktop (Space), a full-screen app or a
-  single window. The list is grouped by desktop, with thumbnails. A window on another desktop,
-  or one its app keeps closed in the background, comes up as a click on its Dock icon brings
-  it; when you leave or turn to another, it goes back out of sight as it was and the app that
-  was in front comes back.
+- **The Mac's apps, as a phone's.** The Remote tab opens on the apps open on the Mac, one card
+  each, all of them, those on a desktop or those in the Dock, two a row or one. The Mac's Dock
+  stays open at the left: its apps (a dot under those running) and the windows put in it. Each
+  card has a Mac window's red and yellow buttons, to close its window or put it in the Dock,
+  and the number of its windows; a card with several asks which one.
+- **Every app.** All apps lists every app on the Mac as Launchpad shows them, with a search
+  field; one not running starts, says so while it does, and its window opens as soon as it has
+  one.
+- **Made the device's shape.** Tap an app and its window fills the screen, made the shape of
+  this device on the Mac, so its text and buttons are the size of the device's own apps, and
+  you use it with your finger, with no pointer to move. An app that cannot be that narrow keeps
+  the width it can have and is made as close as it allows. With the keyboard up, the window is
+  made the shape of what is left above it. The window goes back as it was when you leave it. An
+  app's menu can leave that app at its own size from then on, or turn the fitting off;
+  **Settings › System › Apps left at their size** lists them.
+- **Moving between apps as on a phone.** Slide the bar at the bottom sideways for the app used
+  before or after, up for the open windows as cards (tap one to open it, slide one up to close
+  that window on the Mac, hold one for more), or slide in from the left edge for the home.
+- **Windows, the Dock and quitting.** An app's menu puts its window in the Dock, closes it, or
+  quits the app as ⌘Q does (asked first; an app that stays, asking something on the Mac, is
+  said so, with the whole screen a tap away, or a force quit, asked once more).
+- **The whole screen too.** One button at the top of the home shows a whole display, or all of
+  them side by side. Settings can list the desktops (Spaces), full-screen apps and every window
+  there as well, grouped by desktop with thumbnails. A window on another desktop, or one its
+  app keeps closed in the background, comes up as a click on its Dock icon brings it; when you
+  leave or turn to another, it goes back out of sight as it was.
 - **Asleep or locked.** Connecting wakes the Mac's display, and it stays on while you watch.
   A locked Mac asks for its password in a small window and unlocks; it locks again when you
   leave, or when the phone drops off the network.
@@ -72,10 +98,11 @@ back, with touch modes made for a small screen.
   pages of them: a terminal's (esc, tab, ⇧tab, arrows, ^C), ⌘ ⌥ ⌃ ⇧ with the clipboard and the
   key panel, editing and moving (delete, return, home, end, page up and down), then the Mac's
   desktops and Mission Control (a tablet fits them all at once). Beside it, round buttons call
-  up or hide the keyboard and open a card to write in, several lines, input method and all,
-  sent to the Mac's cursor (several lines go as a paste, so they replace what the Mac's
-  clipboard held). There is a key panel in the keyboard's place (editing keys, the Mac's
-  shortcuts, a number pad, F1 to F12). Held sideways, the tabs move to a rail on the right.
+  up or hide the keyboard and open a card to write in, several lines, input method and all:
+  Send types it where the Mac's cursor is and presses Return, as a message is sent (several
+  lines go as a paste, so they replace what the Mac's clipboard held). There is a key panel in
+  the keyboard's place (editing keys, the Mac's shortcuts, a number pad, F1 to F12). Held
+  sideways, the tabs move to a rail on the right.
 - **At a computer too.** Pinch on a trackpad, Ctrl or ⌘ with the wheel, or the sizes in the top
   bar zoom the picture, which then follows your pointer; the wheel alone keeps scrolling the Mac. On a Windows or Linux keyboard, Ctrl is the Mac's ⌘,
   the Windows key is ⌃, and F5 reloads; Ctrl+← →, Ctrl+Backspace, Home, End and Ctrl+Y work as on Windows, and the full-screen button lets Chrome and Edge pass on Ctrl+W, Ctrl+T and the like. The keyboard button opens a row of keys under the picture (esc, ⌘ ⌥ ⌃ ⇧, Mission Control, the Mac's desktops, arrows) for shortcuts your browser keeps for itself.
@@ -106,43 +133,6 @@ back, with touch modes made for a small screen.
   It offers each new version as it arrives.
 - **English and Traditional Chinese** in the web app.
 
-## Labs
-
-Labs holds features still being tried. It is off by default: turn on **Settings › System ›
-Labs** (admins only, on each device by itself) and a Labs tab appears beside Remote. What is
-in it may still change. The Remote tab is not affected and stays the whole screen.
-
-<p align="center">
-  <img src="docs/assets/anim/labs-home-dark.svg" width="250" alt="Labs tab: the Mac's open apps as cards; Notes opens made the phone's shape, a slide in from the left edge goes home, All apps opens Music, which was not running">
-  <img src="docs/assets/anim/labs-switch-dark.svg" width="250" alt="Labs tab: the bar at the bottom slid sideways goes to Mail, then Calendar; slid up, Calendar shrinks into its card among the others; Mail's card slid up closes it; Notes opens from its card">
-  <img src="docs/assets/anim/labs-keys-dark.svg" width="250" alt="Labs tab: the same capsule of keys under an app; with the keyboard up the Mac's window is made the shape of what is left above it">
-</p>
-
-- **The Mac's apps, as a phone's.** On a phone or tablet the Labs tab opens on the apps open
-  on the Mac, one card each, with this Mac's whole screen one button above them.
-- **Every app.** All apps lists every app on the Mac as Launchpad shows them, with a search
-  field; one not running starts, and its window opens as soon as it has one.
-- **Made the device's shape.** Tap an app and its window fills the screen, made the shape of
-  this device on the Mac, so its text and buttons are the size of the device's own apps, and
-  you use it with your finger, with no pointer to move. An app that cannot be that narrow
-  keeps the width it can have and is made as close as it allows. With the keyboard up, the
-  window is made the shape of what is left above it. The window goes back as it was when you
-  leave it.
-- **Moving between apps as on a phone.** Slide the bar at the bottom sideways for the app
-  used before or after, up for the open windows as cards (tap one to open it, slide one up to
-  close that window on the Mac), or slide in from the left edge for the home.
-- **Windows, the Dock and quitting.** An app's card with a number on it lists its windows to
-  pick from. Its menu, or a card held down among the cards, puts the window in the Dock,
-  closes it, or quits the app as ⌘Q does (asked first; an app that stays, asking something on
-  the Mac, is said so, with the whole screen a tap away, or a force quit, asked once more). The handle at the left edge opens
-  the Mac's Dock: its apps, and the windows put in it.
-- **The same keys.** The capsule of keys and the keyboard's round button are there under an
-  app as on the Remote tab.
-- **Apps left at their own size.** An app's menu can leave that app at its own size from then
-  on, or turn the fitting off. **Settings › System › Apps left at their size** lists them,
-  takes more, and shows the apps found too wide to be made the device's shape. The list is
-  kept on that device.
-
 ## What it looks like
 
 <p align="center">
@@ -164,7 +154,7 @@ On the Mac, the setup assistant and Settings:
 
 These pictures come from fixtures: the web app's from `npm run shots`, where the "Mac screen"
 is drawn by the script, and the Mac app's from a debug build's snapshots, with a made-up
-address. The animations under Features and Labs were recorded the same way, from the web app with
+address. The animations under Features were recorded the same way, from the web app with
 made-up answers and made-up Mac windows. No real screen was captured. On macOS 26 and later the app's panels and buttons are
 Liquid Glass, which the snapshots do not draw.
 
