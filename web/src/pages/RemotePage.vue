@@ -1390,8 +1390,16 @@ function appsListed() {
 // be shown alone: here they open All apps, which is the same list.
 const LAUNCHERS = new Set(['com.apple.apps.launcher', 'com.apple.launchpad.launcher']);
 const allAppsAsked = ref(0);
+// Apps macOS keeps out of a window's own picture (System Settings: its windows are not
+// captured alone): started, then offered the whole screen at once rather than waited for.
+const WHOLE_SCREEN_ONLY = new Set(['com.apple.systempreferences']);
 function openApp(a) {
   if (LAUNCHERS.has(a.bundle)) { if (appMode.value !== 'home') goHome();allAppsAsked.value++;return; }
+  if (WHOLE_SCREEN_ONLY.has(a.bundle)) {
+    link?.send({ t: 'launch', bundle: a.bundle });
+    f7.dialog.create({ title: ct('「{name}」只能在整個螢幕操作').replace('{name}', () => a.name), text: ct('macOS 不讓它的視窗單獨顯示。它已在 Mac 上打開，可以到整個螢幕使用。'), buttons: [{ text: ct('取消') }, { text: ct('整個螢幕'), bold: true, onClick: goDesktop }] }).open();
+    return;
+  }
   const w = recentWindows.value.find((x) => x.bundle === a.bundle);
   if (w) return openWindow(w);
   // Not open, or open with no window: started (or asked for a window), then shown once it has one.

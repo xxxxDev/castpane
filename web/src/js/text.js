@@ -127,6 +127,8 @@ const english = {
 "Castpane 帳號":"Castpane account",
 "已停用":"Disabled",
 "安全":"Security",
+"「{name}」只能在整個螢幕操作":"“{name}” works on the whole screen only",
+"macOS 不讓它的視窗單獨顯示。它已在 Mac 上打開，可以到整個螢幕使用。":"macOS does not let its window be shown alone. It is open on the Mac: use it on the whole screen.",
 "Mac 上可能正在詢問權限":"The Mac may be asking for permission",
 "「{name}」還沒打開：macOS 可能正在問 Castpane 能不能打開它。到整個螢幕或在 Mac 上看看，按「允許」後就會打開。":"“{name}” has not opened yet: macOS may be asking whether Castpane may open it. Look from the whole screen or at the Mac; once you choose Allow, it opens.",
 "單獨全畫面":"Alone, full size",
