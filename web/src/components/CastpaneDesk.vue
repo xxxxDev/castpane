@@ -152,22 +152,22 @@ watch([focused, placed], () => nextTick(() => emit('live', liveRect())), { deep:
 let sized = null;
 watch(deskEl, (el) => { sized?.disconnect();sized = null;if (el && typeof ResizeObserver !== 'undefined') { sized = new ResizeObserver(() => { fitIn();emit('live', liveRect()); });sized.observe(el); } });
 // Each window kept within the desk as it is now (one placed on a wider screen, or before the
-// phone turned): no wider or taller than the room right of the Dock and under the bar.
-// Only when its width changes (turned, another screen): the keyboard coming up takes height for a
-// while, and the windows stay as they were.
-let fitWidth = 0;
+// phone turned): no wider than it. On a phone's narrow desk wholly in the room right of the
+// Dock; on a wider one only within the limits a drag has (partly off an edge is left so).
+// Heights are left: the keyboard up while the phone turns would have made them short for good.
 function fitIn() {
   const b = deskEl.value?.getBoundingClientRect();if (!b?.width || Math.round(b.width) === fitWidth) return;
   fitWidth = Math.round(b.width);
-  const left = b.width < 600 ? 62 : 0;
+  const narrow = b.width < 600, left = narrow ? 62 : 0;
   let changed = false;
   const next = placed.value.map((o) => {
     if (o.max) return o;
-    let { x, y, w, h } = o;
-    w = Math.min(w, Math.max(240, Math.floor(b.width - left - 4)));h = Math.min(h, Math.max(160, Math.floor(b.height - 44)));
-    if (x + w > b.width) x = Math.max(left, Math.floor(b.width - w));
-    if (y + h > b.height) y = Math.max(40, Math.floor(b.height - h));
-    if (x === o.x && y === o.y && w === o.w && h === o.h) return o;
+    let { x, y, w } = o;const { h } = o;
+    w = Math.min(w, Math.max(240, Math.floor(b.width - left - 4)));
+    if (narrow) { if (x + w > b.width) x = Math.max(left, Math.floor(b.width - w));if (x < left) x = left; }
+    else x = Math.min(Math.max(x, -w + 80), Math.floor(b.width - 80));
+    y = Math.min(Math.max(y, 40), Math.floor(b.height - 60));
+    if (x === o.x && y === o.y && w === o.w) return o;
     changed = true;return { ...o, x, y, w, h };
   });
   if (changed) { placed.value = next;keep(); }

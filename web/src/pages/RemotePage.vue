@@ -1608,6 +1608,9 @@ function osFocus(f) {
   // last made, not the step before: a drag's last small steps once cancelled the refit, and the
   // picture was left stretched over the larger window.
   const refit = async () => {
+    // Not while typing: the area is then the desk's size, not the window's. Made once the
+    // keyboard has gone (the desk grows back and says so; nothing is taken as fitted).
+    if (osTyping.value) { osFitted = null;return; }
     const size = { width: f.rect.width, height: f.rect.height };
     if (await fitTo(f.win) && osLive.value?.id === f.win.id) { osFitted = size;show(f.win); }
   };
@@ -2040,7 +2043,8 @@ function keyUp(e) {
 .remote-dock-menu-layer {position:fixed;inset:0;z-index:9700;}
 .remote-home-menu.remote-dock-menu {position:fixed;}
 .remote-stage .remote-area.cp-live.cp-waiting {background:transparent;}
-.remote-stage .remote-area.cp-live.cp-typing {border-radius:0;background:#000;}
+/* Over the desk's Dock as well (its taps are the Mac's while typing). */
+.remote-stage .remote-area.cp-live.cp-typing {z-index:9100;border-radius:0;background:#000;}
 .remote-stage .remote-area.cp-live.cp-waiting .remote-notice {top:auto;bottom:14px;left:50%;right:auto;transform:translateX(-50%);height:auto;flex-direction:row;gap:8px;padding:6px 12px;border-radius:16px;background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);}
 .remote-stage .remote-area.cp-live.cp-waiting .remote-notice p {margin:0;font-size:12px;}
 .remote-canvas {width:100%;height:100%;object-fit:contain;display:block;cursor:default;transform-origin:0 0;}
