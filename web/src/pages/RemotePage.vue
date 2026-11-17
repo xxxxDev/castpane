@@ -43,7 +43,7 @@
           <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <div class="remote-actions">
             <!-- The screens, desktops and windows fold away for a bigger picture. -->
-            <button v-if="isTouch" type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="isTouch ? (headFolded ? 'chevron_down' : 'chevron_up') : (headFolded ? 'sidebar_right' : 'chevron_right')" :size="16"/></button>
+            <button v-if="isTouch" type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headFolded ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
             <button v-if="isTouch && view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
             <!-- A computer: the picture's size, and what the bottom bar used to hold. -->
             <template v-if="!isTouch">
@@ -134,7 +134,7 @@
         </div>
 
         <!-- A computer: the screens, desktops and windows in a column at the right of the picture. -->
-        <div v-if="railShown" class="remote-rail" :class="{auto: railAuto, out: railAuto && !railHover}" :style="{top: headH + 'px'}" role="tablist" @mouseenter="railHover = true" @mouseleave="railHover = false">
+        <div v-if="railShown" class="remote-rail" :class="{auto: railAuto, out: railAuto && !railHover}" :style="{top: headH + 'px'}" role="tablist" @mouseenter="railEnter" @mouseleave="railLeave">
           <div class="remote-rail-top"><span>{{ ct('視窗') }}</span><button v-if="!railAuto" type="button" class="remote-btn rail-fold" :title="ct('收起側欄')" :aria-label="ct('收起側欄')" @click="toggleHead"><f7-icon f7="sidebar_right" :size="16"/></button></div>
           <!-- Its groups (the screens, each desktop, the Dock) as headings, the one picked open with its windows under it. -->
           <template v-for="g in (groups.length > 1 ? groups : [{key: groupKey, items: shownItems}])" :key="'g' + g.key">
@@ -148,7 +148,7 @@
           </template>
           </template>
         </div>
-        <button v-if="!isTouch && appMode === 'desktop' && !railAuto && headFolded" type="button" class="remote-rail-handle" :title="ct('展開側欄')" :aria-label="ct('展開側欄')" @click="toggleHead"><span></span></button>
+        <button v-if="!isTouch && appMode === 'desktop' && !railAuto && headFolded && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-rail-handle" :title="ct('展開側欄')" :aria-label="ct('展開側欄')" @click="toggleHead"><span></span></button>
         <!-- The Mac at its lock screen: its password asked here and typed into it. The Mac
              is locked again when the viewer leaves. -->
         <div v-if="macLocked && !unlockOpen" class="remote-locked" @pointerdown.stop>
@@ -758,7 +758,14 @@ const keyboardSideways = ref(false), headFolded = computed(() => headCollapsed.v
 // and out while the mouse is on it; folded by its button, a handle at the edge brings it back.
 const railShown = computed(() => !isTouch && appMode.value === 'desktop' && (railAuto.value || !headFolded.value));
 const rail = computed(() => railShown.value && !railAuto.value);
+// Out after a moment on it, so a pass to a window's scroll bar at the edge leaves it in.
 const railHover = ref(false);
+let railTimer = 0;
+function railEnter() { clearTimeout(railTimer);railTimer = setTimeout(() => { railHover.value = true; }, 180); }
+function railLeave() { clearTimeout(railTimer);railHover.value = false; }
+// (Watched once mounted: what it reads is set up further on.)
+onMounted(() => watch(railShown, (on) => { if (!on) railLeave(); }));
+onBeforeUnmount(() => clearTimeout(railTimer));
 const headEl = ref(null), headH = ref(48);
 let headSized = null;
 watch(headEl, (el) => { headSized?.disconnect();headSized = null;if (el && typeof ResizeObserver !== 'undefined') { headSized = new ResizeObserver(() => { headH.value = el.offsetHeight; });headSized.observe(el); } });
