@@ -12,6 +12,13 @@ export function setDeskWindows(on) {
   deskWindows.value = !!on;
   try { localStorage.setItem(KEY, on ? '1' : '0'); } catch {}
 }
+// A computer's whole screen: its column at the right kept at the edge, out while the mouse is on it.
+const RAIL_KEY = PRODUCT.storageKeys.railAuto;
+export const railAuto = ref((() => { try { return localStorage.getItem(RAIL_KEY) === '1'; } catch { return false; } })());
+export function setRailAuto(on) {
+  railAuto.value = !!on;
+  try { localStorage.setItem(RAIL_KEY, on ? '1' : '0'); } catch {}
+}
 
 // The phone's key row (Settings › Remote › Key row): one round button at most at its left,
 // two at most at its right, and four pages of keys between, each key in one place only.

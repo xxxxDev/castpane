@@ -43,7 +43,7 @@
           <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <div class="remote-actions">
             <!-- The screens, desktops and windows fold away for a bigger picture. -->
-            <button type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="isTouch ? (headFolded ? 'chevron_down' : 'chevron_up') : (headFolded ? 'sidebar_right' : 'chevron_right')" :size="16"/></button>
+            <button v-if="isTouch" type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="isTouch ? (headFolded ? 'chevron_down' : 'chevron_up') : (headFolded ? 'sidebar_right' : 'chevron_right')" :size="16"/></button>
             <button v-if="isTouch && view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
             <!-- A computer: the picture's size, and what the bottom bar used to hold. -->
             <template v-if="!isTouch">
@@ -134,7 +134,8 @@
         </div>
 
         <!-- A computer: the screens, desktops and windows in a column at the right of the picture. -->
-        <div v-if="rail" class="remote-rail" :style="{top: headH + 'px'}" role="tablist">
+        <div v-if="railShown" class="remote-rail" :class="{auto: railAuto, out: railAuto && !railHover}" :style="{top: headH + 'px'}" role="tablist" @mouseenter="railHover = true" @mouseleave="railHover = false">
+          <div class="remote-rail-top"><span>{{ ct('視窗') }}</span><button v-if="!railAuto" type="button" class="remote-btn rail-fold" :title="ct('收起側欄')" :aria-label="ct('收起側欄')" @click="toggleHead"><f7-icon f7="sidebar_right" :size="16"/></button></div>
           <!-- Its groups (the screens, each desktop, the Dock) as headings, the one picked open with its windows under it. -->
           <template v-for="g in (groups.length > 1 ? groups : [{key: groupKey, items: shownItems}])" :key="'g' + g.key">
           <button v-if="groups.length > 1" type="button" class="remote-desk remote-rail-group" :class="{active: g.key === groupKey, current: g.current}" :aria-expanded="g.key === groupKey" @click="groupKey = g.key"><f7-icon :f7="g.key === groupKey ? 'chevron_down' : 'chevron_right'" :size="11"/><span class="remote-rail-label">{{ g.label }}</span><span class="remote-desk-count">{{ g.items.length }}</span></button>
@@ -147,6 +148,7 @@
           </template>
           </template>
         </div>
+        <button v-if="!isTouch && appMode === 'desktop' && !railAuto && headFolded" type="button" class="remote-rail-handle" :title="ct('展開側欄')" :aria-label="ct('展開側欄')" @click="toggleHead"><span></span></button>
         <!-- The Mac at its lock screen: its password asked here and typed into it. The Mac
              is locked again when the viewer leaves. -->
         <div v-if="macLocked && !unlockOpen" class="remote-locked" @pointerdown.stop>
@@ -302,7 +304,7 @@ import { viewportBroken } from '../js/visibleHeight.js';
 import RemoteHome from '../components/RemoteHome.vue';
 import AppsPanel from '../components/AppsPanel.vue';
 import CastpaneDesk from '../components/CastpaneDesk.vue';
-import { deskWindows, keyLayout, rereadAccount } from '../js/remotePrefs.js';
+import { deskWindows, keyLayout, rereadAccount, railAuto } from '../js/remotePrefs.js';
 import RemoteWindows from '../components/RemoteWindows.vue';
 import RemoteDock from '../components/RemoteDock.vue';
 import { trustedPass } from '../js/trust.js';
@@ -752,7 +754,11 @@ const headCollapsed = ref(localGet('castpane-remote-head') === 'folded');
 // away for that time, or the picture has almost none.
 const keyboardSideways = ref(false), headFolded = computed(() => headCollapsed.value || keyboardSideways.value);
 // A computer's whole screen: its list at the right, under the bar (its height followed).
-const rail = computed(() => !isTouch && appMode.value === 'desktop' && !headFolded.value);
+// Shown as a column beside the picture; or, set to fold by itself, at the edge over the picture
+// and out while the mouse is on it; folded by its button, a handle at the edge brings it back.
+const railShown = computed(() => !isTouch && appMode.value === 'desktop' && (railAuto.value || !headFolded.value));
+const rail = computed(() => railShown.value && !railAuto.value);
+const railHover = ref(false);
 const headEl = ref(null), headH = ref(48);
 let headSized = null;
 watch(headEl, (el) => { headSized?.disconnect();headSized = null;if (el && typeof ResizeObserver !== 'undefined') { headSized = new ResizeObserver(() => { headH.value = el.offsetHeight; });headSized.observe(el); } });
@@ -2060,6 +2066,13 @@ function keyUp(e) {
 .remote-rail .remote-thumb span {max-width:100%;}
 .remote-stage .remote-rail .remote-desk {justify-content:space-between;width:100%;box-sizing:border-box;}
 .remote-rail .remote-desk.active {border-color:#0a84ff;}
+.remote-rail.auto {transition:transform .22s cubic-bezier(.2,.8,.2,1);box-shadow:-10px 0 30px rgba(0,0,0,.5);}
+.remote-rail.auto.out {transform:translateX(calc(100% - 10px));}
+.remote-rail-top {flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:6px;color:#8e8e93;font-size:12px;font-weight:600;}
+.remote-stage .remote-rail .rail-fold {width:28px;height:28px;border-radius:14px;}
+/* The same handle as the Dock's at the left edge, mirrored. */
+.remote-stage .remote-rail-handle {position:absolute;right:0;top:50%;z-index:12;width:14px;height:72px;margin:-36px 0 0;padding:0;border:0;border-radius:8px 0 0 8px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.remote-rail-handle span {width:4px;height:32px;border-radius:2px;background:rgba(255,255,255,.6);}
 .remote-stage .remote-rail .remote-rail-group {justify-content:flex-start;gap:6px;flex:0 0 auto;}
 .remote-rail-label {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left;}
 /* Everything under the bar leaves the rail its room. */

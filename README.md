@@ -93,9 +93,11 @@ back, with touch modes made for a small screen.
   nothing unsaved is kept. The Dock, the yellow button, Minimize and the quitting need the Mac
   app from this version on; an older Mac shows the rest.
 - **The whole screen too.** One button at the top of the home shows a whole display, or all of
-  them side by side. **Settings › System › Whole screen lists app windows too** lists the
-  desktops (Spaces), full-screen apps and every window there as well, grouped by desktop with
-  thumbnails. A window on another desktop, or one its app keeps closed in the background, comes
+  them side by side; the list of them sits at the top on a phone or tablet, and in a column at
+  the right on a computer, which folds away to a handle at the edge (or, in **Settings › Remote**,
+  stays at the edge and slides out while the mouse is on it). **Settings › Remote › Whole screen
+  lists every window** lists the desktops (Spaces), full-screen apps and every window there as
+  well, grouped by desktop with thumbnails. A window on another desktop, or one its app keeps closed in the background, comes
   up as a click on its Dock icon brings it; when you leave or turn to another, it goes back out
   of sight as it was.
 - **Asleep or locked.** Connecting wakes the Mac's display, and it stays on while you watch.
