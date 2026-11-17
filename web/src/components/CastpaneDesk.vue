@@ -81,14 +81,14 @@ function pick(a) {
   if (w) place(w);else emit('app', a);
 }
 defineExpose({ place });
-// The window in front is live: the page lays its picture over this window's body (a strip at
-// the foot left for the corner that resizes it), told again as the window moves or is resized.
+// The window in front is live: the page lays its picture over this window's body, told again as
+// the window moves or is resized (the corner that resizes it sits just outside).
 function liveRect() {
   const o = shown.value.find((x) => x.id === focused.value);
   const el = o && deskEl.value?.querySelector(`.cp-win[data-id="${o.id}"] .cp-win-body`);
   if (!el) return null;
   const b = el.getBoundingClientRect();
-  return { win: o.win, rect: { left: Math.round(b.left), top: Math.round(b.top), width: Math.round(b.width), height: Math.round(b.height - (o.max ? 0 : 14)) } };
+  return { win: o.win, rect: { left: Math.round(b.left), top: Math.round(b.top), width: Math.round(b.width), height: Math.round(b.height) } };
 }
 watch([focused, placed], () => nextTick(() => emit('live', liveRect())), { deep: true });
 // The desk itself moved or resized (the browser window, the sidebar folded or opened): told again.
@@ -124,24 +124,25 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
 .cp-desk-name {font-size:14px;color:#fff;}
 .cp-desk-space {flex:1;}
 .remote-stage .cp-desk-tool {display:inline-flex;align-items:center;gap:6px;width:auto;height:28px;margin:0;padding:0 12px;border:0;border-radius:14px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;cursor:pointer;}
-.cp-win {position:absolute;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:#1c1c1e;box-shadow:0 18px 50px rgba(0,0,0,.55), 0 0 0 .5px rgba(255,255,255,.18);}
+.cp-win {position:absolute;display:flex;flex-direction:column;border-radius:12px;background:#1c1c1e;box-shadow:0 18px 50px rgba(0,0,0,.55), 0 0 0 .5px rgba(255,255,255,.18);}
 .cp-win.focus {box-shadow:0 24px 70px rgba(0,0,0,.7), 0 0 0 1px rgba(10,132,255,.6);}
 .cp-win.max {left:0 !important;top:40px !important;right:0;bottom:0;width:auto !important;height:auto !important;border-radius:0;}
-.cp-win-bar {flex:0 0 auto;height:30px;display:flex;align-items:center;gap:7px;padding:0 10px;background:rgba(40,40,44,.96);color:#fff;font-size:13px;cursor:grab;touch-action:none;}
+.cp-win-bar {flex:0 0 auto;height:30px;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:7px;padding:0 10px;background:rgba(40,40,44,.96);color:#fff;font-size:13px;cursor:grab;touch-action:none;}
 .remote-stage .cp-light {width:12px;height:12px;margin:0;padding:0;border:0;border-radius:6px;cursor:pointer;}
 .remote-stage .cp-light.close {background:#ff5f57;}
 .remote-stage .cp-light.minimize {background:#febc2e;}
 .remote-stage .cp-light.zoom {background:#28c840;}
 .cp-win-bar img {width:16px;height:16px;margin-left:6px;}
 .cp-win-title {margin-left:6px;color:#9a9a9f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.cp-win-body {position:relative;flex:1;min-height:0;background:#000;cursor:default;}
-.cp-win-body > img {width:100%;height:100%;object-fit:contain;object-position:top center;}
+/* The body as the Mac's window: its rounded foot, no black around its picture. */
+.cp-win-body {position:relative;flex:1;min-height:0;overflow:hidden;border-radius:0 0 12px 12px;background:#1c1c1e;cursor:default;}
+.cp-win-body > img {width:100%;height:100%;object-fit:cover;object-position:top center;}
 .cp-win-blank {width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
 .cp-win-blank img {width:64px;height:64px;}
 .remote-stage .cp-win-full {margin:0 0 0 auto;width:24px;height:22px;padding:0;border:0;border-radius:6px;background:none;color:#bbb;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .remote-stage .cp-win-full:hover {background:rgba(255,255,255,.12);color:#fff;}
-.cp-win-grip {position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;touch-action:none;}
-.cp-win-grip::after {content:'';position:absolute;right:4px;bottom:4px;width:8px;height:8px;border-right:2px solid rgba(255,255,255,.4);border-bottom:2px solid rgba(255,255,255,.4);}
+.cp-win-grip {position:absolute;right:-16px;bottom:-16px;z-index:9001;width:22px;height:22px;cursor:nwse-resize;touch-action:none;}
+.cp-win-grip::after {content:'';position:absolute;right:10px;bottom:10px;width:8px;height:8px;border-right:2px solid rgba(255,255,255,.4);border-bottom:2px solid rgba(255,255,255,.4);}
 .cp-desk-empty {position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);color:#9a9a9f;font-size:14px;}
 .cp-dock {position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:9000;display:flex;gap:8px;max-width:calc(100% - 40px);overflow-x:auto;scrollbar-width:none;padding:8px 10px;border-radius:22px;background:rgba(40,40,44,.6);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px rgba(255,255,255,.25), 0 10px 40px rgba(0,0,0,.5);}
 .remote-stage .cp-dock-app {position:relative;flex:0 0 auto;width:48px;height:48px;margin:0;padding:0;border:0;background:none;cursor:pointer;}

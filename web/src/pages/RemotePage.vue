@@ -1419,7 +1419,8 @@ onBeforeUnmount(() => { clearInterval(launchTimer);clearTimeout(fitTimer); });
 // shown (one left there stayed at Connecting), and puts it back when another app opens.
 function fitTo(w) {
   const r = area.value?.getBoundingClientRect();
-  if (!r || !r.width || prefs.fit === false || !isTouch || neverFits(w.bundle)) return Promise.resolve(null);
+  // A phone or tablet's whole area, or a CastpaneOS window's body on a computer.
+  if (!r || !r.width || prefs.fit === false || (!isTouch && appMode.value !== 'os') || neverFits(w.bundle)) return Promise.resolve(null);
   const size = { width: Math.max(240, Math.round(r.width)), height: Math.max(240, Math.round(r.height)) };
   const ask = (want) => new Promise((resolve) => {
     const done = (m) => { clearTimeout(t);fitWait = null;resolve(m); };
@@ -1492,10 +1493,18 @@ const deskRef = ref(null), machineId = ref(''), osLive = ref(null);
 function osFocus(f) {
   if (appMode.value !== 'os') return;
   if (!f) { if (osLive.value) { link?.send({ t: 'stop' });current.value = null;hasPicture.value = false; } osLive.value = null;return; }
-  const changed = osLive.value?.id !== f.win.id;
+  const changed = osLive.value?.id !== f.win.id, before = osLive.value?.rect;
   osLive.value = { id: f.win.id, rect: f.rect };
-  if (changed) { resetView();hasPicture.value = false;show(f.win); }
+  // The Mac's window made the shape of this one's body (no bands around its picture), then its
+  // picture started; made again once a resize has settled.
+  clearTimeout(osFitTimer);
+  if (changed) { resetView();hasPicture.value = false;nextTick(async () => { await fitTo(f.win);if (osLive.value?.id === f.win.id) show(f.win); });return; }
+  if (before && (Math.abs(before.width - f.rect.width) > 2 || Math.abs(before.height - f.rect.height) > 2)) {
+    osFitTimer = setTimeout(async () => { if (osLive.value?.id === f.win.id && await fitTo(f.win)) show(f.win); }, 600);
+  }
 }
+let osFitTimer = 0;
+onBeforeUnmount(() => clearTimeout(osFitTimer));
 let osTimer = 0;
 function goOs() {
   goHome();
@@ -1886,7 +1895,7 @@ function keyUp(e) {
 .remote-btn.danger {background:rgba(255,69,58,.25);color:#ff6961;}
 .remote-area {position:relative;flex:1;min-height:0;touch-action:none;overflow:hidden;}
 /* CastpaneOS: the live picture over the window in front (components/CastpaneDesk.vue). */
-.remote-stage .remote-area.cp-live {position:fixed;z-index:8999;flex:none;border-radius:0 0 4px 4px;}
+.remote-stage .remote-area.cp-live {position:fixed;z-index:8999;flex:none;border-radius:0 0 12px 12px;background:#1c1c1e;}
 .remote-canvas {width:100%;height:100%;object-fit:contain;display:block;cursor:default;transform-origin:0 0;}
 .remote-canvas.smooth {transition:transform .28s cubic-bezier(.2, .8, .2, 1);}
 .remote-btn.zoom {font-size:12px;font-weight:600;}
