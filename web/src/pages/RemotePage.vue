@@ -241,14 +241,14 @@
         </div>
         <!-- The pencil's field: text written on the phone, input method and all, and sent
              to where the Mac's cursor is in one go. -->
-        <div v-if="compose" class="remote-compose" @pointerdown.stop>
+        <div v-if="compose" class="remote-compose" :class="{'beside-rail': rail}" @pointerdown.stop>
           <!-- A card as CC Agent's composer: several lines, growing; the round button at its
                bottom right sends (Return makes a new line here). -->
           <textarea ref="composeField" v-model="composeText" class="remote-compose-field" rows="1" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" :placeholder="ct('打好字，送到 Mac 的游標位置')" @input="growCompose" @keydown="composeKey"></textarea>
           <button type="button" class="remote-compose-send" :title="ct('送出')" :aria-label="ct('送出')" @pointerdown.prevent @mousedown.prevent @click="sendCompose"><f7-icon f7="arrow_up" :size="17"/></button>
         </div>
         <!-- The clipboard both ways. -->
-        <div v-if="clipOpen" class="remote-clip" @pointerdown.stop>
+        <div v-if="clipOpen" class="remote-clip" :class="{'beside-rail': rail}" @pointerdown.stop>
           <button type="button" class="remote-clip-btn from-mac" @pointerdown.prevent @mousedown.prevent @click="copyFromMac"><f7-icon f7="arrow_down_doc" :size="17"/>{{ ct('拷貝 Mac 的剪貼簿') }}</button>
           <button type="button" class="remote-clip-btn to-mac" @pointerdown.prevent @mousedown.prevent @click="pasteToMac"><f7-icon f7="arrow_up_doc" :size="17"/>{{ ct('貼到 Mac 游標') }}</button>
         </div>
@@ -276,7 +276,7 @@
           <template v-for="id in deskKeys" :key="id"><button v-if="keyDef(id)" type="button" :class="['remote-key', keyDef(id).cls, {on: keyDef(id).on}]" :data-key="id" :aria-pressed="keyDef(id).pressed" :title="keyDef(id).title" :aria-label="keyDef(id).title" @pointerdown.prevent @mousedown.prevent @click="keyDef(id).act()"><f7-icon v-if="keyDef(id).icon" :f7="keyDef(id).icon" :size="16"/><template v-else><span v-if="keyDef(id).shift" class="remote-key-mod">⇧</span>{{ keyDef(id).label }}</template></button></template>
         </div>
         <!-- In the phone keyboard's place: pages of keys, swiped sideways. -->
-        <div v-if="panel" class="remote-panel" @pointerdown.stop>
+        <div v-if="panel" class="remote-panel" :class="{'beside-rail': rail}" @pointerdown.stop>
           <div ref="pagesEl" class="remote-pages" @scroll.passive="pageScroll">
             <div v-for="pg in PAGES" :key="pg.id" class="remote-page-grid" :class="['cols-' + pg.cols, 'page-' + pg.id]">
               <button v-for="k in pg.keys" :key="k.label" type="button" class="remote-pkey" @pointerdown.prevent @mousedown.prevent @click="press(k)">{{ ct(k.label) }}</button>
@@ -2062,7 +2062,8 @@ function keyUp(e) {
 .remote-rail .remote-desk.active {border-color:#0a84ff;}
 .remote-stage .remote-rail .remote-rail-group {justify-content:flex-start;gap:6px;flex:0 0 auto;}
 .remote-rail-label {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left;}
-.remote-area.beside-rail, .remote-keys.beside-rail {margin-right:172px;}
+/* Everything under the bar leaves the rail its room. */
+.remote-area.beside-rail, .remote-keys.beside-rail, .remote-compose.beside-rail, .remote-clip.beside-rail, .remote-panel.beside-rail {margin-right:172px;}
 .remote-away {position:absolute;top:6px;left:6px;font-size:9px;line-height:1;padding:2px 4px;border-radius:4px;background:rgba(0,0,0,.7);color:#ffd60a;}
 .remote-thumb.active {border-color:#0a84ff;background:rgba(10,132,255,.18);color:#fff;}
 .remote-actions {display:flex;gap:4px;}
