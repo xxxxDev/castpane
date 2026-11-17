@@ -242,7 +242,7 @@
         <!-- On a phone: the keys a phone's keyboard lacks in one capsule, a page at a time
              sideways, with the keyboard's own round button beside it; ⇧ ⌃ ⌥ ⌘ hold for the
              next key. Always there, so the keyboard can be called up from it. -->
-        <div v-if="isTouch && appMode !== 'home' && (appMode !== 'os' || osTyping)" class="remote-keys remote-keys-touch" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
+        <div v-if="isTouch && appMode !== 'home' && (appMode !== 'os' || osTyping)" class="remote-keys remote-keys-touch" :class="{'over-dock': dockOpen}" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
           <!-- As set in Settings › Remote › Key row (js/remotePrefs.js): a round button at most at
                the left, two at the right, four pages of keys between; any key in any of them. -->
           <template v-for="id in rowKeys.left" :key="'l' + id"><button v-if="keyDef(id)" type="button" :class="['remote-round', keyDef(id).cls, {on: keyDef(id).on}]" :data-key="id" :aria-pressed="keyDef(id).pressed" :title="keyDef(id).title" :aria-label="keyDef(id).title" @pointerdown.prevent @mousedown.prevent @click="keyDef(id).act()"><f7-icon :f7="keyDef(id).icon" :size="18"/></button></template>
@@ -2085,6 +2085,8 @@ function keyUp(e) {
 .remote-keys::-webkit-scrollbar {display:none;}
 /* The phone's row: one capsule of keys, paged sideways, and the keyboard's round button. */
 .remote-keys.remote-keys-touch {position:relative;gap:8px;padding:8px 12px 12px;overflow:visible;background:#000;border-top:0;}
+/* The Dock open: the row over its layer, so its button puts the Dock away again. */
+.remote-keys.remote-keys-touch.over-dock {z-index:29;}
 .remote-keys-box {flex:1;min-width:0;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;}
 .remote-keys-track {display:flex;height:44px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;}
 .remote-keys-track::-webkit-scrollbar {display:none;}
