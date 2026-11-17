@@ -35,7 +35,7 @@
     <div v-if="!shown.length" class="cp-desk-empty">{{ ct('從左側的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。') }}</div>
     <!-- The Mac's Dock at the left, as on the Remote home: its apps (a dot beside those running); a tap brings up the app's window here. -->
     <div class="cp-dock" role="toolbar" :aria-label="ct('Dock')">
-      <button v-for="a in dockApps" :key="a.bundle" type="button" class="cp-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="pick(a)">
+      <button v-for="a in dockApps" :key="a.bundle" type="button" class="cp-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="pick(a)" @contextmenu.prevent="$emit('appMenu', a, $event)">
         <img v-if="icons[a.bundle]" :src="icons[a.bundle]" alt=""/><span v-else>{{ (a.name || '?').slice(0, 1) }}</span>
       </button>
       <!-- Then, as the Mac's Dock: the windows put in it, the folders and files kept there, the Trash. -->
@@ -56,10 +56,21 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
 const props = defineProps({ name: { type: String, default: '' }, machine: { type: String, default: '' }, windows: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, dockApps: { type: Array, default: () => [] }, others: { type: Array, default: () => [] }, trash: { type: Boolean, default: false }, snaps: { type: Object, default: () => ({}) } });
-const emit = defineEmits(['home', 'all', 'desktop', 'open', 'app', 'closeWindow', 'minimize', 'live', 'other', 'trash']);
+const emit = defineEmits(['home', 'all', 'desktop', 'open', 'app', 'closeWindow', 'minimize', 'live', 'other', 'trash', 'appMenu']);
 const deskEl = ref(null), focused = ref(null);
 // The windows in the Mac's Dock, as its Dock shows them after its apps.
-const inDock = computed(() => props.windows.filter((w) => w.minimized));
+// Put in the Dock here, or brought out of it, before the Mac's next list says so: taken as done
+// at once (a window put in the Dock and still in front here was made live again, and so
+// brought back out on the Mac), forgotten when the list agrees or after a few seconds.
+const hidden = ref(new Map()), restored = ref(new Map());
+const isMin = (w) => hidden.value.has(w.id) || (w.minimized && !restored.value.has(w.id));
+function mark(map, id, on) { const m = new Map(map.value);if (on) m.set(id, Date.now());else m.delete(id);map.value = m; }
+watch(() => props.windows, (list) => {
+  const now = Date.now(), by = new Map(list.map((w) => [w.id, w]));
+  for (const [id, at] of hidden.value) if (by.get(id)?.minimized || !by.has(id) || now - at > 8000) mark(hidden, id, false);
+  for (const [id, at] of restored.value) if ((by.has(id) && !by.get(id).minimized) || !by.has(id) || now - at > 8000) mark(restored, id, false);
+});
+const inDock = computed(() => props.windows.filter(isMin));
 // The windows open here: {id, x, y, w, h, z, max}, kept for this Mac on this device.
 const KEY = () => 'castpane-desk-' + (props.machine || 'local');
 function read() { try { const v = JSON.parse(localStorage.getItem(KEY()) || '[]');return Array.isArray(v) ? v.filter((o) => Number.isFinite(o?.id)) : []; } catch { return []; } }
@@ -69,13 +80,15 @@ function keep() { try { localStorage.setItem(KEY(), JSON.stringify(placed.value)
 let top = Math.max(1, ...placed.value.map((o) => o.z || 1));
 // Those of the Mac's windows still there (and not in its Dock); one gone is forgotten.
 const byId = computed(() => new Map(props.windows.map((w) => [w.id, w])));
-const shown = computed(() => placed.value.filter((o) => byId.value.get(o.id) && !byId.value.get(o.id).minimized).map((o) => ({ ...o, win: byId.value.get(o.id) })));
+const shown = computed(() => placed.value.filter((o) => byId.value.get(o.id) && !isMin(byId.value.get(o.id))).map((o) => ({ ...o, win: byId.value.get(o.id) })));
 // Coming in to windows kept from before: the top one is live at once, not left a thumbnail.
 let entered = false;
 watch(shown, (l) => { if (entered || !l.length) return;entered = true;if (focused.value === null) focused.value = l.reduce((a, b) => ((b.z || 0) > (a.z || 0) ? b : a)).id; }, { immediate: true });
 watch(byId, (m) => { const left = placed.value.filter((o) => m.has(o.id));if (left.length !== placed.value.length) { placed.value = left;keep(); } });
 // A window brought here, cascaded from the last one, sized to its own shape within the desk.
 function place(win) {
+  // Out of the Dock: shown here at once; made live, the Mac brings it out.
+  if (isMin(win)) { mark(hidden, win.id, false);mark(restored, win.id, true); }
   const have = placed.value.find((o) => o.id === win.id);
   if (have) { raise(have);return; }
   const box = deskEl.value?.getBoundingClientRect() || { width: 1200, height: 800 };
@@ -91,10 +104,10 @@ function update(id, patch) { placed.value = placed.value.map((o) => (o.id === id
 function raise(o) { focused.value = o.id;if (o.z !== top) { update(o.id, { z: ++top });keep(); } }
 function toggleMax(o) { update(o.id, { max: !o.max });keep(); }
 function close(o) { emit('closeWindow', o.win);placed.value = placed.value.filter((x) => x.id !== o.id);keep(); }
-function minimize(o) { emit('minimize', o.win); }
+function minimize(o) { mark(restored, o.id, false);mark(hidden, o.id, true);if (focused.value === o.id) focused.value = null;emit('minimize', o.win); }
 // A Dock app: its window used last comes here, or the app is started (the page opens it).
 function pick(a) {
-  const w = props.windows.find((x) => x.bundle === a.bundle && !x.minimized) || props.windows.find((x) => x.bundle === a.bundle);
+  const w = props.windows.find((x) => x.bundle === a.bundle && !isMin(x)) || props.windows.find((x) => x.bundle === a.bundle);
   if (w) place(w);else emit('app', a);
 }
 defineExpose({ place });

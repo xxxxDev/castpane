@@ -59,6 +59,34 @@ enum Apps {
     }
 
     /// Starts (or brings forward) the app with this bundle id, if it is one `list` gives.
+    /// Presses the app's menu item for ⌘N with no other modifier (File › New Window, New Finder
+    /// Window…), as a person would from its menu bar; false when it has none enabled.
+    nonisolated static func pressNewWindow(_ pid: pid_t) -> Bool {
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 1)
+        func children(_ e: AXUIElement) -> [AXUIElement] {
+            var v: CFTypeRef?
+            return AXUIElementCopyAttributeValue(e, kAXChildrenAttribute as CFString, &v) == .success ? (v as? [AXUIElement] ?? []) : []
+        }
+        func attr(_ e: AXUIElement, _ name: String) -> CFTypeRef? {
+            var v: CFTypeRef?
+            return AXUIElementCopyAttributeValue(e, name as CFString, &v) == .success ? v : nil
+        }
+        guard let bar = attr(app, kAXMenuBarAttribute) else { return false }
+        // The menus after the app's own (File first), a menu's items one level down.
+        for top in children(bar as! AXUIElement).dropFirst(2).prefix(4) {
+            for menu in children(top) {
+                for item in children(menu) {
+                    guard (attr(item, kAXMenuItemCmdCharAttribute) as? String)?.uppercased() == "N",
+                          (attr(item, kAXMenuItemCmdModifiersAttribute) as? Int) ?? -1 == 0,
+                          (attr(item, kAXEnabledAttribute) as? Bool) == true else { continue }
+                    return AXUIElementPerformAction(item, kAXPressAction as CFString) == .success
+                }
+            }
+        }
+        return false
+    }
+
     @MainActor static func launch(_ bundle: String) -> Bool {
         // The copy that was listed, not whichever one macOS would pick for the bundle id.
         guard let url = found().first(where: { $0.id == bundle })?.url else { return false }

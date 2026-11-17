@@ -117,6 +117,23 @@ actor Session {
         }
     }
 
+    /// A new window of an app, as its Dock menu's New Window: brought forward (started if it is
+    /// not running, which opens its first window), then its menu item with ⌘N pressed, off the
+    /// main thread (an app slow to answer Accessibility waits there, a second at most a call).
+    private static let newWindowQueue = DispatchQueue(label: "castpane.new-window")
+    nonisolated static func newWindow(_ link: Link, _ bundle: String) {
+        newWindowQueue.async {
+            let running = DispatchQueue.main.sync { MainActor.assumeIsolated { NSRunningApplication.runningApplications(withBundleIdentifier: bundle).first } }
+            guard let app = running else {
+                let ok = DispatchQueue.main.sync { MainActor.assumeIsolated { Apps.launch(bundle) } }
+                link.send(json: ["t": "launched", "bundle": bundle, "ok": ok]); return
+            }
+            DispatchQueue.main.sync { _ = app.activate() }
+            for _ in 0..<20 where !app.isActive { Thread.sleep(forTimeInterval: 0.1) }
+            link.send(json: ["t": "launched", "bundle": bundle, "ok": Apps.pressNewWindow(app.processIdentifier), "newWindow": true])
+        }
+    }
+
     /// The Dock's folders and files, read on a queue of their own (an item on a network disk
     /// gone can take long to check): while a reading is still going, the last one read is used.
     private static let dockReadQueue = DispatchQueue(label: "castpane.dock-read")
@@ -411,8 +428,9 @@ actor Session {
         case let .icons(bundles):
             let link = self.link
             Task { @MainActor in link.send(json: ["t": "icons", "icons": Apps.icons(bundles)]) }
-        case let .launch(bundle):
+        case let .launch(bundle, newWindow):
             let link = self.link
+            if newWindow { Self.newWindow(link, bundle);break }
             Task { @MainActor in link.send(json: ["t": "launched", "bundle": bundle, "ok": Apps.launch(bundle)]) }
         case let .fit(id, width, height): queued { await self.fit(CGWindowID(id), CGSize(width: width, height: height)) }
         case .unfit: queued { await self.unfit() }

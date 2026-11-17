@@ -5,7 +5,7 @@
   <div :class="docked ? 'remote-dock-rail' : 'remote-dock-layer'" @pointerdown.self="docked || $emit('close')">
     <div class="remote-dock" role="toolbar" :aria-label="ct('Dock')">
       <div v-if="!apps.length && !windows.length" class="remote-dock-empty">{{ ct('正在讀取…') }}</div>
-      <button v-for="a in apps" :key="a.bundle" type="button" class="remote-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="$emit('app', a)">
+      <button v-for="a in apps" :key="a.bundle" type="button" class="remote-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="$emit('app', a)" @contextmenu.prevent="$emit('appMenu', a, $event)">
         <img v-if="icons[a.bundle]" :src="icons[a.bundle]" alt=""/>
         <span v-else class="remote-dock-letter">{{ (a.name || '?').slice(0, 1) }}</span>
       </button>
@@ -30,7 +30,7 @@ import { ct } from '../js/text.js';
 // others: the folders and files kept at the Dock's right ({name, kind}), opened by their
 // place; trash: whether the Mac offers its Trash (a Mac from before sends neither).
 defineProps({ apps: { type: Array, default: () => [] }, windows: { type: Array, default: () => [] }, others: { type: Array, default: () => [] }, trash: { type: Boolean, default: false }, icons: { type: Object, default: () => ({}) }, docked: { type: Boolean, default: false } });
-defineEmits(['app', 'window', 'other', 'trash', 'close']);
+defineEmits(['app', 'appMenu', 'window', 'other', 'trash', 'close']);
 </script>
 <style>
 .remote-dock-layer {position:absolute;inset:0;z-index:28;}

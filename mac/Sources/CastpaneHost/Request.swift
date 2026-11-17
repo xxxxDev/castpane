@@ -43,7 +43,7 @@ enum Request: Equatable, Sendable {
     case clipboardSet(String)
     case apps
     case icons([String])
-    case launch(String)
+    case launch(String, newWindow: Bool = false)
     /// A window made `width` × `height` points (the device's shape); `unfit` puts it back.
     case fit(id: Int, width: Int, height: Int)
     case unfit
@@ -121,8 +121,11 @@ enum Request: Equatable, Sendable {
             let bundles = list.compactMap { $0 as? String }.filter { $0.utf8.count <= 200 }
             return .icons(bundles)
         case "launch":
-            guard let b = bundleID(msg["bundle"]) else { return .invalid(t) }
-            return .launch(b)
+            // A new window of an app running (its ⌘N), a JSON boolean only.
+            guard let b = bundleID(msg["bundle"]),
+                  msg["newWindow"] == nil || (msg["newWindow"] as? NSNumber).map({ CFGetTypeID($0) == CFBooleanGetTypeID() }) == true
+            else { return .invalid(t) }
+            return .launch(b, newWindow: (msg["newWindow"] as? NSNumber)?.boolValue ?? false)
         case "quit":
             // A JSON true or false only: a number would pass as a Bool here.
             let force = msg["force"]

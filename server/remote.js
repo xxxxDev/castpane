@@ -103,7 +103,9 @@ const MESSAGES = {
     return m.trash === true ? { trash: true } : null;
   },
   icons: (m) => (Array.isArray(m.bundles) && m.bundles.length <= 40 && m.bundles.every((b) => typeof b === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(b)) ? { bundles: m.bundles } : null),
-  launch: (m) => (typeof m.bundle === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(m.bundle) ? { bundle: m.bundle } : null),
+  // newWindow: a new window of the app (its ⌘N), a boolean only.
+  launch: (m) => (typeof m.bundle === 'string' && /^[A-Za-z0-9._-]{1,200}$/.test(m.bundle) && (m.newWindow === undefined || typeof m.newWindow === 'boolean')
+    ? { bundle: m.bundle, ...(m.newWindow === true ? { newWindow: true } : {}) } : null),
   fit: (m) => (int(m.id, 0, 0xffffffff) && int(m.width, 240, 8000) && int(m.height, 240, 8000) ? { id: m.id, width: m.width, height: m.height } : null),
   // The Mac's password for its lock screen: passed on once, never logged or kept.
   unlock: (m) => (typeof m.s === 'string' && m.s.length >= 1 && m.s.length <= 256 && m.s.isWellFormed() ? { s: m.s } : null),
