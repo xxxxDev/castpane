@@ -2064,6 +2064,7 @@ function keyUp(e) {
 .remote-rail-label {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left;}
 /* Everything under the bar leaves the rail its room. */
 .remote-area.beside-rail, .remote-keys.beside-rail, .remote-compose.beside-rail, .remote-clip.beside-rail, .remote-panel.beside-rail {margin-right:172px;}
+.remote-compose.beside-rail {margin-right:184px;}
 .remote-away {position:absolute;top:6px;left:6px;font-size:9px;line-height:1;padding:2px 4px;border-radius:4px;background:rgba(0,0,0,.7);color:#ffd60a;}
 .remote-thumb.active {border-color:#0a84ff;background:rgba(10,132,255,.18);color:#fff;}
 .remote-actions {display:flex;gap:4px;}
