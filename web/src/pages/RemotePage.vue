@@ -1498,7 +1498,9 @@ function watchPicture(w, tried) {
 // 320 wide, blurred on a phone's card. Small on purpose, as Safari closes a page whose
 // pictures and canvases take too much: 600 wide (a card is about 240 points), JPEG, the last
 // 8, for this session only, and the canvas used to make one emptied at once (Safari frees a
-// canvas's memory late, and a page past its limit is closed).
+// canvas's memory late, and a page past its limit is closed). CastpaneOS keeps them up to
+// 1800 wide, as its windows are that large: it is offered only to a computer (osAvailable:
+// no touch, 1024 wide or more), whose browser has room for 8 of them.
 const snaps = reactive({});
 function snapCurrent() {
   try {
