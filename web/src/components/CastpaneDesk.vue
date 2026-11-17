@@ -13,10 +13,17 @@
       <button type="button" class="cp-desk-tool" @click="$emit('all')"><f7-icon f7="square_grid_2x2" :size="14"/><span>{{ ct('所有 App') }}</span></button>
       <button type="button" class="cp-desk-tool" @click="$emit('desktop')"><f7-icon f7="desktopcomputer" :size="14"/><span>{{ ct('整個螢幕') }}</span></button>
     </div>
-    <div v-for="o in shown" :key="o.id" class="cp-win" :class="{focus: focused === o.id, max: o.max}" :data-id="o.id"
-         :style="o.max ? {zIndex: o.z} : {left: o.x + 'px', top: o.y + 'px', width: o.w + 'px', height: o.h + 'px', zIndex: o.z}"
+    <div v-for="o in (phone ? phoneShown : shown)" :key="o.id" class="cp-win" :class="{focus: focused === o.id, max: o.max && !phone, 'cp-phone': phone, 'cp-over': phone && o.id === pv.over}" :data-id="o.id"
+         :style="phone ? phoneStyle(o) : o.max ? {zIndex: o.z} : {left: o.x + 'px', top: o.y + 'px', width: o.w + 'px', height: o.h + 'px', zIndex: o.z}"
          @pointerdown="raise(o)">
-      <div class="cp-win-bar" @pointerdown="dragStart($event, o)" @dblclick="toggleMax(o)">
+      <!-- A phone: as an iPad's, the window's ••• in the middle of its bar gives full screen, split, Slide Over. -->
+      <div v-if="phone" class="cp-win-bar" @pointerdown="overDown($event, o)" @pointermove="overMove" @pointerup="overUp" @pointercancel="overUp">
+        <img v-if="icons[o.win.bundle]" :src="icons[o.win.bundle]" alt=""/>
+        <b>{{ o.win.app || o.win.title }}</b>
+        <span class="cp-win-title">{{ o.win.title && o.win.title !== o.win.app ? o.win.title : '' }}</span>
+        <button type="button" class="cp-win-more" :title="ct('多工處理')" :aria-label="ct('多工處理')" @pointerdown.stop @click="moreOf = moreOf === o.id ? null : o.id"><span></span><span></span><span></span></button>
+      </div>
+      <div v-else class="cp-win-bar" @pointerdown="dragStart($event, o)" @dblclick="toggleMax(o)">
         <button type="button" class="cp-light close" :title="ct('關閉視窗')" :aria-label="ct('關閉視窗')" @pointerdown.stop @click="close(o)"></button>
         <button type="button" class="cp-light minimize" :title="ct('縮到 Dock')" :aria-label="ct('縮到 Dock')" @pointerdown.stop @click="minimize(o)"></button>
         <button type="button" class="cp-light zoom" :title="ct('放大')" :aria-label="ct('放大')" @pointerdown.stop @click="toggleMax(o)"></button>
@@ -30,11 +37,39 @@
         <div v-else class="cp-win-blank"><img v-if="icons[o.win.bundle]" :src="icons[o.win.bundle]" alt=""/></div>
       </div>
       <!-- Resized from any edge or corner, as a Mac window is; the corner bottom right marked. -->
-      <template v-if="!o.max"><div v-for="e in EDGES" :key="e" :class="['cp-win-edge', 'cp-edge-' + e, {'cp-win-grip': e === 'se'}]" @pointerdown.stop="resizeStart($event, o, e)"></div></template>
+      <template v-if="!o.max && !phone"><div v-for="e in EDGES" :key="e" :class="['cp-win-edge', 'cp-edge-' + e, {'cp-win-grip': e === 'se'}]" @pointerdown.stop="resizeStart($event, o, e)"></div></template>
     </div>
-    <div v-if="!shown.length" class="cp-desk-empty">{{ ct('從左側的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。') }}</div>
+    <div v-if="!shown.length" class="cp-desk-empty">{{ phone ? ct('點下方的橫條叫出 Dock，打開 App。') : ct('從左側的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。') }}</div>
+    <template v-if="phone">
+      <!-- Split: the bar between the two, dragged to share the room. -->
+      <div v-if="pv.second" class="cp-split" :style="{top: (box.top + box.h * ph.ratio - 9) + 'px'}" @pointerdown="splitDown" @pointermove="splitMove" @pointerup="splitUp" @pointercancel="splitUp"><span></span></div>
+      <!-- Slide Over pushed off the right edge: its tab brings it back. -->
+      <button v-if="pv.overId && ph.overHidden" type="button" class="cp-over-tab" :aria-label="ct('滑動置前')" @click="showOver"></button>
+      <!-- The window's ••• menu. -->
+      <div v-if="moreOf !== null" class="cp-more-layer" @pointerdown.self="moreOf = null">
+        <div class="cp-more-menu" :style="moreStyle">
+          <button type="button" class="full" @click="arrange('full')"><f7-icon f7="rectangle" :size="16"/>{{ ct('全螢幕') }}</button>
+          <button type="button" class="split" @click="arrange('split')"><f7-icon f7="square_split_1x2" :size="16"/>{{ ct('分割顯示') }}</button>
+          <button type="button" class="over" @click="arrange('over')"><f7-icon f7="square_on_square" :size="16"/>{{ ct('滑動置前') }}</button>
+          <button type="button" class="minimize" @click="arrange('minimize')"><f7-icon f7="minus_square" :size="16"/>{{ ct('縮到 Dock') }}</button>
+          <button type="button" class="close-window" @click="arrange('close')"><f7-icon f7="xmark_square" :size="16"/>{{ ct('關閉視窗') }}</button>
+        </div>
+      </div>
+      <!-- The App Switcher: every window open here, a tap brings one full screen. -->
+      <div v-if="switcher" class="cp-switcher" @pointerdown.self="switcher = false">
+        <div v-for="o in shown" :key="'s' + o.id" class="cp-switch-card" :data-id="o.id" @click="fromSwitcher(o)">
+          <div class="cp-switch-name"><img v-if="icons[o.win.bundle]" :src="icons[o.win.bundle]" alt=""/>{{ o.win.app || o.win.title }}</div>
+          <div class="cp-switch-pic"><img v-if="snaps[o.id] || o.win.thumb" :src="snaps[o.id] || o.win.thumb" alt="" draggable="false"/></div>
+          <button type="button" class="cp-switch-close" :aria-label="ct('關閉視窗')" @click.stop="close(o)"><f7-icon f7="xmark" :size="12"/></button>
+        </div>
+        <div v-if="!shown.length" class="cp-switch-empty">{{ ct('沒有開著的視窗') }}</div>
+      </div>
+      <div v-if="dockOpen" class="cp-dock-backdrop" @pointerdown="dockOpen = false"></div>
+      <!-- The home bar: a tap or a slide up gives the Dock; slid further up, the App Switcher. -->
+      <div class="cp-homebar" @pointerdown="barDown" @pointermove="barMove" @pointerup="barUp" @pointercancel="barCancel"><span></span></div>
+    </template>
     <!-- The Mac's Dock at the left, as on the Remote home: its apps (a dot beside those running); a tap brings up the app's window here. -->
-    <div class="cp-dock" role="toolbar" :aria-label="ct('Dock')">
+    <div v-show="!phone || dockOpen" class="cp-dock" :class="{row: phone}" role="toolbar" :aria-label="ct('Dock')">
       <button v-for="a in dockApps" :key="a.bundle" type="button" class="cp-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="held ? (held = false) : pick(a)" @contextmenu.prevent="dockContext($event, a)" @pointerdown="holdDown($event, a)" @pointermove="holdMove" @pointerup="holdEnd" @pointercancel="holdEnd">
         <img v-if="icons[a.bundle]" :src="icons[a.bundle]" alt="" draggable="false"/><span v-else>{{ (a.name || '?').slice(0, 1) }}</span>
       </button>
@@ -49,13 +84,16 @@
       <button v-if="trash" type="button" class="cp-dock-app cp-dock-trash" :title="ct('垃圾桶')" :aria-label="ct('垃圾桶')" @click="$emit('trash')">
         <span class="cp-dock-glyph"><f7-icon f7="trash" :size="26"/></span>
       </button>
+      <button v-if="phone" type="button" class="cp-dock-app cp-dock-switch" :title="ct('所有視窗')" :aria-label="ct('所有視窗')" @click="dockOpen = false;switcher = true">
+        <span class="cp-dock-glyph"><f7-icon f7="rectangle_stack" :size="24"/></span>
+      </button>
     </div>
   </div>
 </template>
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
-const props = defineProps({ name: { type: String, default: '' }, machine: { type: String, default: '' }, windows: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, dockApps: { type: Array, default: () => [] }, others: { type: Array, default: () => [] }, trash: { type: Boolean, default: false }, snaps: { type: Object, default: () => ({}) } });
+const props = defineProps({ name: { type: String, default: '' }, machine: { type: String, default: '' }, windows: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, dockApps: { type: Array, default: () => [] }, others: { type: Array, default: () => [] }, trash: { type: Boolean, default: false }, snaps: { type: Object, default: () => ({}) }, phone: { type: Boolean, default: false } });
 const emit = defineEmits(['home', 'all', 'desktop', 'open', 'app', 'closeWindow', 'minimize', 'live', 'other', 'trash', 'appMenu']);
 const deskEl = ref(null), focused = ref(null);
 // The windows in the Mac's Dock, as its Dock shows them after its apps.
@@ -90,6 +128,7 @@ function place(win) {
   // Out of the Dock: shown here at once; made live, the Mac brings it out.
   if (isMin(win)) { mark(hidden, win.id, false);mark(restored, win.id, true); }
   const have = placed.value.find((o) => o.id === win.id);
+  if (props.phone) toSlot(win.id);
   if (have) { raise(have);return; }
   const box = deskEl.value?.getBoundingClientRect() || { width: 1200, height: 800 };
   const room = { w: box.width - 40, h: box.height - 140 };
@@ -109,6 +148,7 @@ function close(o) { emit('closeWindow', o.win);placed.value = placed.value.filte
 function minimize(o) { mark(restored, o.id, false);mark(hidden, o.id, true);if (focused.value === o.id) focused.value = null;emit('minimize', o.win); }
 // A Dock app: its window used last comes here, or the app is started (the page opens it).
 function pick(a) {
+  dockOpen.value = false;
   const w = props.windows.find((x) => x.bundle === a.bundle && !isMin(x)) || props.windows.find((x) => x.bundle === a.bundle);
   if (w) place(w);else emit('app', a);
 }
@@ -136,7 +176,10 @@ function dockContext(e, a) {
 }
 onBeforeUnmount(() => clearTimeout(holdTimer));
 // The windows on show and not in front, the top ones first, with their body's width.
-function behind() { return shown.value.filter((o) => o.id !== focused.value).sort((a, b) => (b.z || 0) - (a.z || 0)).map((o) => ({ id: o.id, width: o.max ? (deskEl.value?.clientWidth || o.w) : o.w })); }
+function behind() {
+  if (props.phone) return phoneShown.value.filter((o) => o.id !== focused.value && !(o.id === pv.value.overId && ph.value.overHidden)).map((o) => ({ id: o.id, width: Math.round(parseFloat(phoneStyle(o).width) || 300) }));
+  return shown.value.filter((o) => o.id !== focused.value).sort((a, b) => (b.z || 0) - (a.z || 0)).map((o) => ({ id: o.id, width: o.max ? (deskEl.value?.clientWidth || o.w) : o.w }));
+}
 defineExpose({ place, behind });
 // The window in front is live: the page lays its picture over this window's body, told again as
 // the window moves or is resized (the corner that resizes it sits just outside).
@@ -150,7 +193,7 @@ function liveRect() {
 watch([focused, placed], () => nextTick(() => emit('live', liveRect())), { deep: true });
 // The desk itself moved or resized (the browser window, the sidebar folded or opened): told again.
 let sized = null;
-watch(deskEl, (el) => { sized?.disconnect();sized = null;if (el && typeof ResizeObserver !== 'undefined') { sized = new ResizeObserver(() => { fitIn();emit('live', liveRect()); });sized.observe(el); } });
+watch(deskEl, (el) => { sized?.disconnect();sized = null;if (el && typeof ResizeObserver !== 'undefined') { sized = new ResizeObserver(() => { measure();fitIn();emit('live', liveRect()); });sized.observe(el); } });
 // Each window kept within the desk as it is now (one placed on a wider screen, or before the
 // phone turned): no wider than it. On a phone's narrow desk wholly in the room right of the
 // Dock; on a wider one only within the limits a drag has (partly off an edge is left so).
@@ -206,6 +249,122 @@ function dragMove(e) {
 }
 function dragEnd() { removeEventListener('pointermove', dragMove);if (drag) keep();drag = null; }
 onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
+
+// ---- A phone: as an iPad's multitasking ----
+// One window full screen, or two split top and bottom, and one more in Slide Over, floating at the
+// right; the others open behind, in the App Switcher. Kept for this Mac on this device.
+const PH_KEY = () => 'castpane-phone-desk-' + (props.machine || 'local');
+function readPh() { try { const v = JSON.parse(localStorage.getItem(PH_KEY()) || '{}');return { main: v.main ?? null, second: v.second ?? null, over: v.over ?? null, overHidden: !!v.overHidden, ratio: Number.isFinite(v.ratio) ? v.ratio : 0.5 }; } catch { return { main: null, second: null, over: null, overHidden: false, ratio: 0.5 }; } }
+const ph = ref(readPh());
+watch(() => props.machine, () => { ph.value = readPh(); });
+function keepPh() { try { localStorage.setItem(PH_KEY(), JSON.stringify(ph.value)); } catch { /* this time only */ } }
+function setPh(patch) { ph.value = { ...ph.value, ...patch };keepPh(); }
+// The slots as they can be now: a window gone or in the Dock leaves its slot, the main one taken
+// by the window used last.
+const pv = computed(() => {
+  const ids = new Set(shown.value.map((o) => o.id)), byZ = [...shown.value].sort((a, b) => (b.z || 0) - (a.z || 0));
+  const overId = ids.has(ph.value.over) ? ph.value.over : null;
+  let main = ids.has(ph.value.main) && ph.value.main !== overId ? ph.value.main : null;
+  let second = ids.has(ph.value.second) && ph.value.second !== overId && ph.value.second !== main ? ph.value.second : null;
+  if (main === null && second !== null) { main = second;second = null; }
+  if (main === null) main = byZ.find((o) => o.id !== overId)?.id ?? null;
+  return { main, second, overId, over: overId !== null && !ph.value.overHidden ? overId : null };
+});
+const phoneShown = computed(() => shown.value.filter((o) => o.id === pv.value.main || o.id === pv.value.second || o.id === pv.value.over));
+// The desk's size, for the boxes; read again as it changes.
+const deskSize = ref({ w: 390, h: 700 });
+function measure() { const b = deskEl.value?.getBoundingClientRect();if (b?.width) deskSize.value = { w: b.width, h: b.height }; }
+watch(deskEl, () => nextTick(measure));
+// The room under the desk's bar and over the home bar.
+const box = computed(() => ({ top: 40, h: Math.max(200, deskSize.value.h - 40 - 22), w: deskSize.value.w }));
+function phoneStyle(o) {
+  const b = box.value, px = (n) => Math.round(n) + 'px';
+  if (o.id === pv.value.over) { const w = Math.min(b.w * 0.72, 340), h = b.h * 0.62;return { left: px(b.w - w - 8), top: px(b.top + 28), width: px(w), height: px(h), zIndex: focused.value === o.id ? 20 : 9050 }; }
+  if (pv.value.second !== null && (o.id === pv.value.main || o.id === pv.value.second)) {
+    const first = o.id === pv.value.main, cut = b.h * ph.value.ratio;
+    return { left: '0px', top: px(first ? b.top : b.top + cut + 4), width: px(b.w), height: px(first ? cut - 4 : b.h - cut - 4), zIndex: 10 };
+  }
+  return { left: '0px', top: px(b.top), width: px(b.w), height: px(b.h), zIndex: 10 };
+}
+// A window brought here goes where the finger is: in Slide Over or the split's second half when
+// that is the one in front, otherwise full screen (the split kept, its first half replaced).
+function toSlot(id) {
+  const v = pv.value;
+  if (id === v.main || id === v.second) return;
+  if (id === v.overId) { setPh({ overHidden: false });return; }
+  if (v.second !== null && focused.value === v.second) setPh({ second: id });
+  else setPh({ main: id });
+}
+const moreOf = ref(null);
+const moreStyle = computed(() => {
+  const o = shown.value.find((x) => x.id === moreOf.value);if (!o) return {};
+  const st = phoneStyle(o), left = parseFloat(st.left) + parseFloat(st.width) / 2 - 100;
+  return { left: Math.max(8, Math.min(left, deskSize.value.w - 208)) + 'px', top: (parseFloat(st.top) + 40) + 'px' };
+});
+function arrange(how) {
+  const o = shown.value.find((x) => x.id === moreOf.value);moreOf.value = null;if (!o) return;
+  const v = pv.value, id = o.id;
+  // The next window for a slot left empty: the one used last, not on show.
+  const spare = (not) => [...shown.value].sort((a, b) => (b.z || 0) - (a.z || 0)).find((x) => !not.includes(x.id))?.id ?? null;
+  if (how === 'close') return close(o);
+  if (how === 'minimize') return minimize(o);
+  if (how === 'full') { setPh({ main: id, second: null, over: v.overId === id ? null : ph.value.over });focused.value = id;return; }
+  if (how === 'over') {
+    const main = id === v.main ? (v.second ?? spare([id])) : v.main;
+    setPh({ over: id, overHidden: false, main, second: id === v.main || id === v.second ? null : v.second });focused.value = id;return;
+  }
+  // Split: this window and another, the one in front first.
+  if (id === v.main || id === v.second) {
+    if (v.second !== null) return;
+    const other = spare([id, v.overId]);
+    if (other === null) { dockOpen.value = true;splitWanted = id;return; }
+    setPh({ main: id, second: other });
+  } else setPh({ second: id, over: v.overId === id ? null : ph.value.over });
+  focused.value = id;
+}
+// Split chosen with no other window open: the next app opened from the Dock takes the other half.
+let splitWanted = null;
+watch(() => shown.value.map((o) => o.id).join(), () => {
+  if (splitWanted === null) return;
+  const fresh = shown.value.find((o) => o.id !== splitWanted && o.id === pv.value.main);
+  if (fresh && shown.value.some((o) => o.id === splitWanted)) { setPh({ main: splitWanted, second: fresh.id });focused.value = fresh.id;splitWanted = null; }
+});
+function showOver() { setPh({ overHidden: false });focused.value = pv.value.overId; }
+// Slide Over moved by its bar: pushed off to the right, it hides there.
+let overDrag = null;
+function overDown(e, o) {
+  if (o.id !== pv.value.over) return;
+  overDrag = { id: o.id, x: e.clientX, el: e.currentTarget.parentElement };
+  capture(e);
+}
+function overMove(e) { if (overDrag) overDrag.el.style.transform = `translateX(${Math.max(-40, e.clientX - overDrag.x)}px)`; }
+function overUp(e) {
+  if (!overDrag) return;
+  const dx = e.clientX - overDrag.x;overDrag.el.style.transform = '';
+  if (dx > 70) { setPh({ overHidden: true });if (focused.value === overDrag.id) focused.value = pv.value.main; }
+  overDrag = null;
+}
+// The split's bar dragged: the halves at a quarter of the room at least.
+let splitting = null;
+function splitDown(e) { splitting = { y: e.clientY, r: ph.value.ratio };capture(e); }
+function splitMove(e) { if (splitting) ph.value = { ...ph.value, ratio: Math.min(0.75, Math.max(0.25, splitting.r + (e.clientY - splitting.y) / box.value.h)) }; }
+function splitUp() { if (splitting) keepPh();splitting = null; }
+// The home bar: a tap or a short slide up opens the Dock, a long one the App Switcher.
+const dockOpen = ref(false), switcher = ref(false);
+let bar = null;
+function barDown(e) { bar = { y: e.clientY };capture(e); }
+function capture(e) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* the pointer gone already */ } }
+function barMove() { /* followed on lifting */ }
+function barUp(e) {
+  if (!bar) return;
+  const dy = e.clientY - bar.y;bar = null;
+  if (dy < -160) { dockOpen.value = false;switcher.value = true; } else { switcher.value = false;dockOpen.value = !dockOpen.value || dy < -20; }
+}
+function barCancel() { bar = null; }
+function fromSwitcher(o) { switcher.value = false;setPh({ main: o.id, second: pv.value.second === o.id ? null : ph.value.second, over: pv.value.overId === o.id ? null : ph.value.over });focused.value = o.id; }
+// Coming in on a phone: the window full screen is the live one.
+watch(() => props.phone && pv.value.main, (m) => { if (props.phone && m !== null && m !== false && (focused.value === null || !phoneShown.value.some((o) => o.id === focused.value))) focused.value = m; }, { immediate: true });
+watch(pv, () => nextTick(() => emit('live', liveRect())));
 </script>
 <style>
 .cp-desk {position:relative;flex:1;min-height:0;overflow:hidden;background:radial-gradient(1200px 700px at 30% 20%, #253048, #0e1117 70%);-webkit-user-select:none;user-select:none;}
@@ -282,5 +441,37 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
   .remote-stage .cp-dock-app, .cp-dock-app img, .cp-dock-app span, .cp-dock-glyph {width:40px;height:40px;}
   .cp-dock-thumb {width:40px !important;height:30px !important;}
 }
+
+/* A phone, as an iPad's multitasking. */
+.cp-win.cp-phone {border-radius:0;box-shadow:none;}
+.cp-win.cp-phone .cp-win-bar {border-radius:0;justify-content:flex-start;position:relative;cursor:default;}
+.cp-win.cp-phone .cp-win-body {border-radius:0;}
+.cp-win.cp-over {border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.7), 0 0 0 .5px rgba(255,255,255,.25);transition:transform .2s;}
+.cp-win.cp-over .cp-win-bar {border-radius:14px 14px 0 0;cursor:grab;}
+.cp-win.cp-over .cp-win-body {border-radius:0 0 14px 14px;}
+.remote-stage .cp-win-more {position:absolute;left:50%;top:0;transform:translateX(-50%);width:56px;height:100%;margin:0;padding:0;border:0;background:none;display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;}
+.cp-win-more span {width:5px;height:5px;border-radius:3px;background:rgba(255,255,255,.75);}
+.cp-win.cp-phone .cp-win-bar b {max-width:calc(50% - 60px);}
+.cp-win.cp-phone .cp-win-title {display:none;}
+.cp-split {position:absolute;left:0;right:0;height:18px;z-index:9001;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:ns-resize;}
+.cp-split span {width:56px;height:5px;border-radius:3px;background:rgba(255,255,255,.7);box-shadow:0 0 0 1px rgba(0,0,0,.4);}
+.remote-stage .cp-over-tab {position:absolute;right:0;top:120px;z-index:9050;width:14px;height:72px;margin:0;padding:0;border:0;border-radius:8px 0 0 8px;background:rgba(255,255,255,.35);cursor:pointer;}
+.cp-more-layer {position:absolute;inset:0;z-index:9700;}
+.cp-more-menu {position:absolute;width:200px;padding:6px;border-radius:14px;background:rgba(44,44,46,.97);box-shadow:0 10px 40px rgba(0,0,0,.6);display:flex;flex-direction:column;}
+.remote-stage .cp-more-menu button {display:flex;align-items:center;gap:10px;width:100%;height:42px;margin:0;padding:0 12px;border:0;border-radius:9px;background:none;color:#fff;font-size:15px;text-align:left;cursor:pointer;}
+.remote-stage .cp-more-menu button.close-window {color:#ff6961;}
+.cp-homebar {position:absolute;left:0;right:0;bottom:0;height:22px;z-index:9001;display:flex;align-items:center;justify-content:center;touch-action:none;}
+.cp-homebar span {width:134px;height:5px;border-radius:3px;background:rgba(255,255,255,.7);}
+.cp-dock.row {left:8px;right:8px;top:auto;bottom:28px;transform:none;flex-direction:row;max-height:none;overflow-x:auto;overflow-y:hidden;z-index:9060;}
+.cp-dock.row .cp-dock-sep {width:1px;height:auto;margin:4px 2px;}
+.cp-dock-backdrop {position:absolute;inset:0;z-index:9055;}
+.cp-switcher {position:absolute;inset:0;z-index:9600;background:rgba(10,10,12,.92);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);display:grid;grid-template-columns:1fr 1fr;align-content:start;gap:18px 14px;padding:56px 16px 24px;overflow-y:auto;}
+.cp-switch-card {position:relative;min-width:0;cursor:pointer;}
+.cp-switch-name {display:flex;align-items:center;gap:6px;margin-bottom:6px;color:#fff;font-size:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.cp-switch-name img {width:18px;height:18px;}
+.cp-switch-pic {aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:#1c1c1e;}
+.cp-switch-pic img {width:100%;height:100%;object-fit:contain;object-position:top center;}
+.remote-stage .cp-switch-close {position:absolute;right:-6px;top:16px;width:24px;height:24px;margin:0;padding:0;border:0;border-radius:12px;background:rgba(80,80,84,.95);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.cp-switch-empty {grid-column:1 / -1;margin-top:30vh;text-align:center;color:#9a9a9f;}
 .cp-dock-app.running::after {content:'';position:absolute;left:-6px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:2px;background:#ddd;}
 </style>
