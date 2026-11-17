@@ -158,21 +158,24 @@ function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openM
         if (!save()) { list = list.filter((x) => x !== member); return refused('join-not-saved'); }
         audit({ source: 'members', action: 'join', member: id, name: member.name, ip });
         send({ t: 'joined', id, secret });
-        return welcome(id, m.name);
+        return welcome(id, m.name, m.direct === 1);
       }
       if (m?.t === 'hello' && typeof m.id === 'string' && typeof m.secret === 'string') {
         const member = list.find((x) => x.id === m.id);
         if (!member || !sameHash(member.hash, sha(m.secret))) return refused('hello-refused');
         send({ t: 'welcome' });
-        return welcome(member.id, m.name);
+        return welcome(member.id, m.name, m.direct === 1);
       }
       out('no hello');
     }
-    function welcome(id, name) {
+    // direct: it makes the page's direct link itself (server/memberLink.js), said in its hello;
+    // one that does not is never sent what sets a link up.
+    function welcome(id, name, direct = false) {
       const member = list.find((x) => x.id === id);
       if (name !== undefined && cleanName(name) !== member.name) { member.name = cleanName(name); save(); }
       links.get(id)?.close('replaced');
       link = makeLink(id, ws, send, out);
+      link.direct = direct;
       links.set(id, link);
     }
   }
@@ -242,6 +245,7 @@ function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openM
     },
     list: () => list.map((m) => ({ id: m.id, name: m.name, local: false, online: links.has(m.id), running: !!links.get(m.id)?.running })),
     has: (id) => list.some((m) => m.id === id),
+    direct: (id) => !!links.get(id)?.direct,
     name: (id) => list.find((m) => m.id === id)?.name || '',
     // false: no such Mac. Throws when the list could not be saved (nothing changes then).
     remove(id) {

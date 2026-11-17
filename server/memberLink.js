@@ -20,7 +20,7 @@ const UPLINK_BACKLOG = 16 * 1024 * 1024;
 const STOPPED_MS = 5 * 60 * 1000;
 // A frame from the hub is a page's message, never larger than this (remote.js).
 const FRAME_MAX = 2 * 1024 * 1024;
-// A frame from this Mac's capture core (remote.js keeps the same bound).
+// A frame from this Mac's capture core (the core's own bound; the hub takes at most 8 MiB).
 const CORE_MAX = 64 * 1024 * 1024;
 const LINK_MESSAGES = new Set(['rtc-offer', 'rtc-candidate', 'rtc-close', 'echo']);
 
@@ -202,7 +202,8 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     if (clean.t.startsWith('clipboard-')) {
       if (Date.now() - s.lastClipboard < 1000) { busy(s); return true; }
       s.lastClipboard = Date.now();
-      if (mayAudit()) audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: s.by, via: config?.hub || '', ...(clean.s ? { chars: clean.s.length } : {}) });
+      // Every one in the log (at most one a second already), not under the opens' cap.
+      audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: s.by, via: config?.hub || '', ...(clean.s ? { chars: clean.s.length } : {}) });
     }
     // A password try at most every 3 seconds on this Mac too, each in its log (without it).
     if (clean.t === 'unlock') {
@@ -223,7 +224,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     const sock = new WebSocket(memberUrl(config.hub), { handshakeTimeout: timeoutMs, maxPayload: 2 * 1024 * 1024 });
     ws = sock;
     let welcomed = false;
-    sock.on('open', () => sendJson(sock, { t: 'hello', id: config.id, secret: config.secret, name: name() }));
+    sock.on('open', () => sendJson(sock, { t: 'hello', id: config.id, secret: config.secret, name: name(), direct: 1 }));
     // A link the hub no longer has, with nothing said about it (a restart behind a tunnel),
     // stayed "connected" here and never came back: a ping each while, and no answer by the
     // next one ends it, so it connects again.
@@ -287,7 +288,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
         let over = false;
         const done = (e, v) => { over = true; clearTimeout(timer); try { sock.close(); } catch { /* gone */ } if (e) reject(e); else resolve(v); };
         const timer = setTimeout(() => done(Object.assign(new Error('The other Mac did not answer'), { status: 504, code: 'NO_ANSWER' })), timeoutMs);
-        sock.on('open', () => sendJson(sock, { t: 'join', code, name: name() }));
+        sock.on('open', () => sendJson(sock, { t: 'join', code, name: name(), direct: 1 }));
         sock.on('message', (raw) => {
           let m; try { m = JSON.parse(raw.toString()); } catch { return; }
           if (m?.t === 'refused') return done(Object.assign(new Error('The code was not accepted: it is wrong, used or out of date'), { status: 403, code: 'REFUSED' }));

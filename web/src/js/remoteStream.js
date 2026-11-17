@@ -80,18 +80,35 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
         sendSocket({ t: 'key-frame' });
         // What was pressed may have been lost with the link: the page lets go of it again.
         onState('direct-lost');
+        // Its candidates no longer taken (a member could name any address to be tried).
+        try { pc.close(); } catch {}
       };
       dc.onmessage = (e) => {
         const m = new Uint8Array(e.data), flags = m[0];
+        // As the server takes them: a piece that says more follows is a whole one, and a message
+        // is at most 8 MiB (a frame through the hub is no larger).
+        if (((flags & 1) && m.length < 1 + 60 * 1024) || inLength + m.length > 8 * 1024 * 1024) { inParts = [];inLength = 0;try { dc.close(); } catch {} return; }
         inParts.push(m.subarray(1));inLength += m.length - 1;
         if (flags & 1) return;
         let whole = inParts[0];
         if (inParts.length > 1) { whole = new Uint8Array(inLength);let o = 0;for (const p of inParts) { whole.set(p, o);o += p.length; } }
         inParts = [];inLength = 0;
-        if (!inputDirect && !held) { held = [];sendSocket({ t: 'echo', n: 0 }); }
+        if (!inputDirect && !held) {
+          held = [];sendSocket({ t: 'echo', n: 0 });
+          // Its answer lost (the Mac too busy, or one that never answers): the link is let go.
+          setTimeout(() => { if (held && !inputDirect) { try { dc.close(); } catch {} } }, 5000);
+        }
         // Another Mac's link brings only its video and echoes: its other messages come by the
         // hub, which checks them (server/members.js).
-        if (flags & 2) { const s = new TextDecoder().decode(whole);if (!machine || s.startsWith('{"t":"echo",')) text(s); }
+        if (flags & 2) {
+          const s = new TextDecoder().decode(whole);
+          if (!machine) text(s);
+          else {
+            // Taken apart once, only an echo with its number kept (a key given twice is no way in).
+            let o = null;try { o = JSON.parse(s); } catch {}
+            if (o && o.t === 'echo' && Number.isSafeInteger(o.n)) text(JSON.stringify({ t: 'echo', n: o.n }));
+          }
+        }
         else video(whole.byteOffset || whole.byteLength !== whole.buffer.byteLength ? whole.slice().buffer : whole.buffer);
       };
       pc.oniceconnectionstatechange = () => { if (direct && (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed')) { try { dc.close(); } catch {} } };

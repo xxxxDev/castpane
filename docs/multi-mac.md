@@ -3,7 +3,8 @@
 One Castpane, the **hub**, lists other Macs beside its own on the Remote page. Each other Mac,
 a **member**, runs Castpane too, joins the hub once with a one-time code, and from then on
 keeps one connection *out* to the hub. A member needs no address, tunnel or account of its
-own; it shows its screen only through the hub, to the hub's admins.
+own; it shows its screen only to the hub's admins, through the hub (or, with the direct link,
+its video straight to the page that the hub let in).
 
 ## Joining
 
@@ -40,7 +41,9 @@ ways, each prefixed with `n` (4 bytes), so nothing from an earlier session is mi
 
 - The page's messages go through the same allow-list as for the hub's own capture core.
 - What comes from a member is checked before it reaches the page: JSON objects of the
-  capture core's known types only, and thumbnails only as `data:image/…;base64` URLs.
+  capture core's known types only, and thumbnails only as `data:image/…;base64` URLs. On a
+  direct link only its video and echoes come straight to the page, which takes nothing else
+  there (an echo rebuilt from its number), and at most 8 MiB a message.
 - One viewer at a time, across all Macs.
 - The member's menu shows the viewer. **Stop Sharing Now** ends the session, and the hub may
   not open another for five minutes; **Pause** stops sharing until it resumes. Either way the
@@ -50,15 +53,22 @@ ways, each prefixed with `n` (4 bytes), so nothing from an earlier session is mi
   and unlock try in its own log.
 - Sessions are in both Macs' logs and Activity: on the hub with the member's name, on the
   member with the hub's address.
-- **The direct link** (docs/protocol.md) reaches the member itself: the page's offer, ICE
-  candidates and echoes go through the hub (checked there) to the member, which makes the
-  link and answers through the hub (checked there too: `rtc-answer`, `rtc-candidate`,
-  `rtc-none`, `echo`). While it is open, only the member's video and the answers to echoes on
-  it come by the link; every other message from the member still comes through the hub and
-  its checks. The page's input then goes straight to the member, which checks it as it checks
-  the hub's (the same allow-list, a rate of 600 a second, one large message a second, only the
-  clipboard large; the clipboard and unlock tries in its own log), so those uses are in the
-  member's log only, not the hub's. A bad message on the link ends the link, not the session.
+- **The direct link** (docs/protocol.md) reaches the member itself, when the member says in
+  its hello that it can (`direct: 1`; a member on an older version is answered by the hub, and
+  the page stays on the socket). The page's offer, ICE candidates and echoes go through the
+  hub (checked there) to the member, which makes the link and answers through the hub
+  (checked there too: `rtc-answer`, `rtc-candidate`, `rtc-none`, `echo`). While it is open,
+  only the member's video and the answers to echoes on it come by the link; every other
+  message from the member still comes through the hub and its checks. The page's input then
+  goes straight to the member, which checks it as it checks the hub's: the same allow-list,
+  600 a second (more ends the link, not the session), one large message a second (one too soon
+  is answered busy), only the clipboard large, its capture core at most 4 MiB behind. The
+  clipboard, unlock tries, force quits and the link's opening are in the member's log; the
+  hub's Activity shows the session's opening and end only. A bad message on the link ends the
+  link, not the session.
+- The member, asked for a link, opens a UDP port for that session and asks the STUN servers
+  the page chose; through the link and its candidates it learns the viewing device's public
+  and local addresses, as the hub's own link does.
 
 ## Limits on the hub's side
 
@@ -69,5 +79,6 @@ ways, each prefixed with `n` (4 bytes), so nothing from an earlier session is mi
 - At most 8 connections from one address may wait to say hello; past 64 in all, the oldest waiting is let go.
 - At most 32 members. A member's messages are limited in number (1000 a second), size (2 MiB)
   and bytes (64 MB a second); what it says reaches a page only rebuilt from known fields, and
-  never faster than the page reads it.
+  never faster than the page reads it. Its video on a direct link is bounded by the link
+  instead (8 MiB a message on the page).
 - A `members.json` that is not this account's private file is set aside and not trusted.

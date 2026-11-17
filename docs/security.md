@@ -158,8 +158,10 @@ unreadable, so the server refuses to start in that state instead of making a new
   identity is the one in that offer, so only the page that signed in can reach it; everything
   sent on it is checked as on the socket. For a Mac that joined this one, the offer goes
   through this Mac to that one, which makes the link; only its video comes by it, its other
-  messages still through this Mac's checks, and the page's input on it is checked and logged
-  on that Mac (docs/multi-mac.md).
+  messages still through this Mac's checks (the page takes nothing else from it on the link),
+  and the page's input on it is checked and logged on that Mac, not this one; that Mac opens
+  its own UDP port, asks the chosen STUN servers and learns the viewing device's addresses
+  (docs/multi-mac.md). A Mac on an older version is never asked.
 - While a session has one, the Mac listens on a UDP port (each network interface) for that
   session; before, it only made outgoing connections. Only STUN from unknown addresses is
   looked at there, and it closes with the session.

@@ -460,6 +460,12 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
       // up is passed on to it, checked here first. Its echoes too, so the one that says all sent
       // by the socket has arrived comes from that Mac.
       if (member) {
+        // A Mac on an older version knows none of this: the hub answers for it, as without a link.
+        if (!members.direct?.(machine)) {
+          if (msg.t === 'echo' && Number.isSafeInteger(msg.n)) sendJson({ t: 'echo', n: msg.n });
+          else if (msg.t === 'rtc-offer') sendJson({ t: 'rtc-none' });
+          return;
+        }
         let clean = null;
         if (msg.t === 'rtc-offer' && typeof msg.sdp === 'string' && msg.sdp.length <= 16384) clean = { t: 'rtc-offer', sdp: msg.sdp, stun: msg.stun === 'both' ? 'both' : 'cloudflare' };
         else if (msg.t === 'rtc-candidate' && typeof msg.candidate === 'string' && msg.candidate.length <= 1024 && typeof msg.mid === 'string' && msg.mid.length <= 64) clean = { t: 'rtc-candidate', candidate: msg.candidate, mid: msg.mid };
