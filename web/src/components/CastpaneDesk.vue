@@ -7,11 +7,11 @@
        bar button opens it alone, full size. -->
   <div ref="deskEl" class="cp-desk" @pointerdown.self="focused = null">
     <div class="cp-desk-top">
-      <button type="button" class="cp-desk-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="$emit('home')"><f7-icon f7="chevron_left" :size="16"/></button>
+      <button type="button" class="cp-desk-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="$emit('home')"><f7-icon f7="chevron_left" :size="18"/></button>
       <b class="cp-desk-name">{{ name }}</b>
       <span class="cp-desk-space"></span>
-      <button type="button" class="cp-desk-tool" @click="$emit('all')"><f7-icon f7="square_grid_2x2" :size="14"/><span>{{ ct('所有 App') }}</span></button>
-      <button type="button" class="cp-desk-tool" @click="$emit('desktop')"><f7-icon f7="desktopcomputer" :size="14"/><span>{{ ct('整個螢幕') }}</span></button>
+      <button type="button" class="cp-desk-tool" @click="$emit('all')"><f7-icon f7="square_grid_2x2" :size="15"/><span>{{ ct('所有 App') }}</span></button>
+      <button type="button" class="cp-desk-tool" @click="$emit('desktop')"><f7-icon f7="desktopcomputer" :size="15"/><span>{{ ct('整個螢幕') }}</span></button>
     </div>
     <div v-for="o in shown" :key="o.id" class="cp-win" :class="{focus: focused === o.id, max: o.max}" :data-id="o.id"
          :style="o.max ? {zIndex: o.z} : {left: o.x + 'px', top: o.y + 'px', width: o.w + 'px', height: o.h + 'px', zIndex: o.z}"
@@ -58,6 +58,8 @@ import { ct } from '../js/text.js';
 const props = defineProps({ name: { type: String, default: '' }, machine: { type: String, default: '' }, windows: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, dockApps: { type: Array, default: () => [] }, others: { type: Array, default: () => [] }, trash: { type: Boolean, default: false }, snaps: { type: Object, default: () => ({}) } });
 const emit = defineEmits(['home', 'all', 'desktop', 'open', 'app', 'closeWindow', 'minimize', 'live', 'other', 'trash', 'appMenu']);
 const deskEl = ref(null), focused = ref(null);
+// The desk's bar, as tall as the Remote home's (no window goes under it).
+const BAR = 54;
 // The windows in the Mac's Dock, as its Dock shows them after its apps.
 // Put in the Dock here, or brought out of it, before the Mac's next list says so: taken as done
 // at once (a window put in the Dock and still in front here was made live again, and so
@@ -99,7 +101,7 @@ function place(win) {
   const narrow = box.width < 600;
   let w = narrow ? box.width - 80 : Math.min(room.w * 0.6, 760), h = w / ratio;
   if (h > room.h * (narrow ? 0.85 : 0.75)) { h = room.h * (narrow ? 0.85 : 0.75);w = h * ratio; }
-  const o = { id: win.id, x: narrow ? 70 + n * 4 : 100 + n * 36, y: narrow ? 50 + n * 24 : 54 + n * 30, w: Math.round(Math.max(narrow ? 240 : 260, w)), h: Math.round(Math.max(narrow ? 160 : 180, h) + 30), z: ++top, max: false };
+  const o = { id: win.id, x: narrow ? 70 + n * 4 : 100 + n * 36, y: narrow ? BAR + 10 + n * 24 : BAR + 14 + n * 30, w: Math.round(Math.max(narrow ? 240 : 260, w)), h: Math.round(Math.max(narrow ? 160 : 180, h) + 30), z: ++top, max: false };
   placed.value = [...placed.value, o];focused.value = o.id;keep();
 }
 function update(id, patch) { placed.value = placed.value.map((o) => (o.id === id ? { ...o, ...patch } : o)); }
@@ -169,7 +171,7 @@ function fitIn() {
     w = Math.min(w, Math.max(240, Math.floor(b.width - left - 4)));
     if (narrow) { if (x + w > b.width) x = Math.max(left, Math.floor(b.width - w));if (x < left) x = left; }
     else x = Math.min(Math.max(x, -w + 80), Math.floor(b.width - 80));
-    y = Math.max(40, Math.min(y, Math.floor(b.height - 60)));
+    y = Math.max(BAR, Math.min(y, Math.floor(b.height - 60)));
     if (x === o.x && y === o.y && w === o.w) return o;
     changed = true;return { ...o, x, y, w, h };
   });
@@ -193,14 +195,14 @@ function resizeStart(e, o, edge = 'se') {
 function dragMove(e) {
   if (!drag) return;
   const b = bounds(), dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
-  if (drag.kind === 'move') update(drag.id, { x: Math.round(Math.min(Math.max(drag.ox + dx, -drag.ow + 80), b.w - 80)), y: Math.round(Math.min(Math.max(drag.oy + dy, 40), b.h - 60)) });
+  if (drag.kind === 'move') update(drag.id, { x: Math.round(Math.min(Math.max(drag.ox + dx, -drag.ow + 80), b.w - 80)), y: Math.round(Math.min(Math.max(drag.oy + dy, BAR), b.h - 60)) });
   else {
     // Each side that moves keeps the window at least 240 × 160, within the desk and under its bar.
     const d = drag.edge, p = {};
     if (d.includes('e')) p.w = Math.round(Math.max(240, Math.min(drag.ow + dx, b.w - drag.ox)));
     if (d.includes('s')) p.h = Math.round(Math.max(160, Math.min(drag.oh + dy, b.h - drag.oy)));
     if (d.includes('w')) { const x = Math.min(Math.max(drag.ox + dx, 0), drag.ox + drag.ow - 240);p.x = Math.round(x);p.w = Math.round(drag.ow + drag.ox - x); }
-    if (d.includes('n')) { const y = Math.min(Math.max(drag.oy + dy, 40), drag.oy + drag.oh - 160);p.y = Math.round(y);p.h = Math.round(drag.oh + drag.oy - y); }
+    if (d.includes('n')) { const y = Math.min(Math.max(drag.oy + dy, BAR), drag.oy + drag.oh - 160);p.y = Math.round(y);p.h = Math.round(drag.oh + drag.oy - y); }
     update(drag.id, p);
   }
 }
@@ -209,14 +211,14 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
 </script>
 <style>
 .cp-desk {position:relative;flex:1;min-height:0;overflow:hidden;background:radial-gradient(1200px 700px at 30% 20%, #253048, #0e1117 70%);-webkit-user-select:none;user-select:none;}
-.cp-desk-top {position:absolute;left:0;right:0;top:0;z-index:9000;height:40px;display:flex;align-items:center;gap:10px;padding:0 12px;background:rgba(20,20,22,.8);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.08);}
-.remote-stage .cp-desk-back {width:28px;height:28px;margin:0;padding:0;border:0;border-radius:14px;background:rgba(255,255,255,.12);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.cp-desk-name {font-size:14px;color:#fff;}
+.cp-desk-top {position:absolute;left:0;right:0;top:0;z-index:9000;height:54px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(0,0,0,.92);}
+.remote-stage .cp-desk-back {flex:0 0 auto;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:17px;background:rgba(255,255,255,.12);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.cp-desk-name {min-width:0;font-size:18px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cp-desk-space {flex:1;}
-.remote-stage .cp-desk-tool {display:inline-flex;align-items:center;gap:6px;width:auto;height:28px;margin:0;padding:0 12px;border:0;border-radius:14px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;cursor:pointer;}
+.remote-stage .cp-desk-tool {flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;width:auto;height:34px;margin:0;padding:0 14px;border:0;border-radius:17px;background:rgba(255,255,255,.12);color:#fff;font-size:14px;cursor:pointer;}
 .cp-win {position:absolute;display:flex;flex-direction:column;border-radius:12px;background:#1c1c1e;box-shadow:0 18px 50px rgba(0,0,0,.55), 0 0 0 .5px rgba(255,255,255,.18);}
 .cp-win.focus {box-shadow:0 24px 70px rgba(0,0,0,.7), 0 0 0 1px rgba(10,132,255,.6);}
-.cp-win.max {left:0 !important;top:40px !important;right:0;bottom:0;width:auto !important;height:auto !important;border-radius:0;}
+.cp-win.max {left:0 !important;top:54px !important;right:0;bottom:0;width:auto !important;height:auto !important;border-radius:0;}
 .cp-win-bar {flex:0 0 auto;height:30px;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:7px;padding:0 10px;background:rgba(40,40,44,.96);color:#fff;font-size:13px;cursor:grab;touch-action:none;}
 .remote-stage .cp-light {width:12px;height:12px;margin:0;padding:0;border:0;border-radius:6px;cursor:pointer;}
 .remote-stage .cp-light.close {background:#ff5f57;}
@@ -247,7 +249,7 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
 .cp-edge-se {right:-8px;bottom:-8px;cursor:nwse-resize;}
 .cp-win-grip::after {content:'';position:absolute;right:2px;bottom:2px;width:8px;height:8px;border-right:2px solid rgba(255,255,255,.4);border-bottom:2px solid rgba(255,255,255,.4);}
 .cp-desk-empty {position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);color:#9a9a9f;font-size:14px;}
-.cp-dock {position:absolute;left:12px;top:calc(50% + 20px);transform:translateY(-50%);z-index:9000;display:flex;flex-direction:column;gap:8px;max-height:calc(100% - 80px);overflow-y:auto;scrollbar-width:none;padding:10px 8px;border-radius:22px;background:rgba(40,40,44,.6);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px rgba(255,255,255,.25), 0 10px 40px rgba(0,0,0,.5);}
+.cp-dock {position:absolute;left:12px;top:calc(50% + 27px);transform:translateY(-50%);z-index:9000;display:flex;flex-direction:column;gap:8px;max-height:calc(100% - 94px);overflow-y:auto;scrollbar-width:none;padding:10px 8px;border-radius:22px;background:rgba(40,40,44,.6);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px rgba(255,255,255,.25), 0 10px 40px rgba(0,0,0,.5);}
 .remote-stage .cp-dock-app {position:relative;flex:0 0 auto;width:48px;height:48px;margin:0;padding:0;border:0;background:none;cursor:pointer;}
 .cp-dock-app img {width:48px;height:48px;}
 .cp-dock-app span {display:flex;width:48px;height:48px;align-items:center;justify-content:center;border-radius:11px;background:#3a3a3c;color:#fff;font-weight:600;}

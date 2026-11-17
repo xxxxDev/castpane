@@ -10,6 +10,8 @@
       <div class="remote-home-name">{{ name }}</div>
       <button v-if="os" type="button" class="remote-home-all remote-home-os" @click="$emit('os')"><f7-icon f7="rectangle_on_rectangle" :size="15"/>CastpaneOS</button>
       <button type="button" class="remote-home-all" @click="allOpen = true"><f7-icon f7="square_grid_2x2" :size="15"/>{{ ct('所有 App') }}</button>
+      <!-- A computer: the whole screen a button beside them (a phone has its wide one, in reach of a thumb). -->
+      <button type="button" class="remote-home-all remote-home-screen" @click="$emit('desktop')"><f7-icon f7="desktopcomputer" :size="15"/>{{ ct('整個螢幕') }}</button>
     </div>
     <!-- Under the bar: the Mac's Dock at the left (the page's slot), the apps beside it. -->
     <div class="remote-home-body">
@@ -159,6 +161,11 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-home-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-home-card.launching .remote-home-shot, .remote-home-app.launching .remote-home-icon {opacity:.5;animation:remote-home-pulse 1s ease-in-out infinite alternate;}
 @keyframes remote-home-pulse {to {opacity:1;}}
+.remote-stage .remote-home-screen {display:none;}
+@media (hover: hover) and (pointer: fine) {
+  .remote-stage .remote-home-screen {display:inline-flex;}
+  .remote-stage .remote-home-desktop {display:none !important;}
+}
 .remote-stage .remote-home-desktop {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;margin:4px 0 0;padding:0;border:0;border-radius:100px;color:#fff;font-size:15px;cursor:pointer;}
 .remote-stage .remote-home-app {display:flex;flex-direction:column;align-items:center;gap:5px;width:auto;height:auto;margin:0;padding:0;border:0;background:none;color:#ddd;font-size:12px;cursor:pointer;}
 .remote-home-icon {width:56px;height:56px;border-radius:13px;display:flex;align-items:center;justify-content:center;overflow:hidden;}

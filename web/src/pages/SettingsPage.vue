@@ -3,7 +3,7 @@
     <f7-navbar large :title="t('tabSettings')">
       <!-- Without a tab bar: back to Remote. -->
       <!-- In the bar's left slot: placed after the title as plain content, it sat at the right. -->
-      <template #nav-left><f7-nav-left v-if="currentUser?.role === 'admin'"><f7-link class="settings-back-link" icon-f7="chevron_left" :aria-label="ct('遠端')" :title="ct('遠端')" @click="setActiveTab('view-remote')"/></f7-nav-left></template>
+      <template #nav-left><f7-nav-left v-if="currentUser?.role === 'admin' && !desktop"><f7-link class="settings-back-link" icon-f7="chevron_left" :aria-label="ct('遠端')" :title="ct('遠端')" @click="setActiveTab('view-remote')"/></f7-nav-left></template>
     </f7-navbar>
 
     <!-- Remote, the Castpane account, its security, then the system. -->

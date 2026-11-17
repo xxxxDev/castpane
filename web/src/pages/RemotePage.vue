@@ -34,7 +34,7 @@
         <!-- The bar: every window, the Desktop first, as Sill's bar of thumbnails. -->
         <!-- The Mac's desktops first, then the windows on the one picked: whole
              screens, each desktop, full-screen apps, the Dock. -->
-        <div v-if="appMode !== 'home' && appMode !== 'os'" class="remote-head" :class="{collapsed: headFolded && appMode === 'desktop'}">
+        <div v-if="appMode !== 'home' && appMode !== 'os'" ref="headEl" class="remote-head" :class="{collapsed: headFolded && appMode === 'desktop'}">
         <!-- Back to the apps at the top left, the size and place an app's own bar has it. -->
         <div v-if="appMode === 'desktop'" class="remote-apphead remote-desktop-head">
           <button type="button" class="remote-apphead-back remote-desktop-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goHome"><f7-icon f7="chevron_left" :size="18"/></button>
@@ -43,7 +43,7 @@
           <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
           <div class="remote-actions">
             <!-- The screens, desktops and windows fold away for a bigger picture. -->
-            <button type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headFolded ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
+            <button type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="isTouch ? (headFolded ? 'chevron_down' : 'chevron_up') : (headFolded ? 'sidebar_right' : 'chevron_right')" :size="16"/></button>
             <button v-if="isTouch && view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
             <!-- A computer: the picture's size, and what the bottom bar used to hold. -->
             <template v-if="!isTouch">
@@ -70,10 +70,10 @@
             </template>
           </div>
         </div>
-        <div v-if="appMode === 'desktop' && groups.length > 1 && !headFolded" class="remote-desks" role="tablist">
+        <div v-if="appMode === 'desktop' && isTouch && groups.length > 1 && !headFolded" class="remote-desks" role="tablist">
           <button v-for="g in groups" :key="g.key" type="button" class="remote-desk" :class="{active: g.key === groupKey, current: g.current}" @click="groupKey = g.key">{{ g.label }}<span class="remote-desk-count">{{ g.items.length }}</span></button>
         </div>
-        <div v-if="appMode === 'desktop' && !headFolded" class="remote-bar">
+        <div v-if="appMode === 'desktop' && isTouch && !headFolded" class="remote-bar">
           <div v-if="!headFolded" class="remote-thumbs" role="tablist">
             <button v-for="w in shownItems" :key="w.kind + w.id" type="button" class="remote-thumb" :class="{active: current && current.kind === w.kind && current.id === w.id}" :title="w.app ? w.app + ' · ' + w.title : w.title" @click="show(w)">
               <img v-if="w.thumb" :src="w.thumb" alt=""/><f7-icon v-else :f7="w.kind === 'display' ? 'desktopcomputer' : 'macwindow'" :size="20"/>
@@ -133,6 +133,20 @@
         </div>
         </div>
 
+        <!-- A computer: the screens, desktops and windows in a column at the right of the picture. -->
+        <div v-if="rail" class="remote-rail" :style="{top: headH + 'px'}" role="tablist">
+          <!-- Its groups (the screens, each desktop, the Dock) as headings, the one picked open with its windows under it. -->
+          <template v-for="g in (groups.length > 1 ? groups : [{key: groupKey, items: shownItems}])" :key="'g' + g.key">
+          <button v-if="groups.length > 1" type="button" class="remote-desk remote-rail-group" :class="{active: g.key === groupKey, current: g.current}" :aria-expanded="g.key === groupKey" @click="groupKey = g.key"><f7-icon :f7="g.key === groupKey ? 'chevron_down' : 'chevron_right'" :size="11"/><span class="remote-rail-label">{{ g.label }}</span><span class="remote-desk-count">{{ g.items.length }}</span></button>
+          <template v-if="groups.length <= 1 || g.key === groupKey">
+          <button v-for="w in g.items" :key="w.kind + w.id" type="button" class="remote-thumb" :class="{active: current && current.kind === w.kind && current.id === w.id}" :title="w.app ? w.app + ' · ' + w.title : w.title" @click="show(w)">
+            <img v-if="w.thumb" :src="w.thumb" alt=""/><f7-icon v-else :f7="w.kind === 'display' ? 'desktopcomputer' : 'macwindow'" :size="20"/>
+            <span>{{ w.kind === 'display' ? (w.all ? ct('所有螢幕') : ct('桌面') + (w.title.match(/\d+$/) ? ' ' + w.title.match(/\d+$/)[0] : '')) : (w.app || w.title) }}</span>
+            <small v-if="w.kind === 'window' && w.here === false" class="remote-away">{{ ct('不在畫面上') }}</small>
+          </button>
+          </template>
+          </template>
+        </div>
         <!-- The Mac at its lock screen: its password asked here and typed into it. The Mac
              is locked again when the viewer leaves. -->
         <div v-if="macLocked && !unlockOpen" class="remote-locked" @pointerdown.stop>
@@ -182,7 +196,7 @@
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
         <button v-if="!isTouch && macWindows && appMode !== 'home' && appMode !== 'os' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :style="dockFoot ? {'--dock-foot': dockFoot + 'px'} : null" @app-menu="openDockMenu" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @other="(i, o) => { dockOpen = false;openDockOther(i, o); }" @trash="dockOpen = false;openDockTrash()" @close="dockOpen = false"/>
-        <div v-show="(appMode !== 'home' && appMode !== 'os') || (appMode === 'os' && osLive)" ref="area" class="remote-area" :class="{'cp-live': appMode === 'os', 'cp-waiting': appMode === 'os' && !hasPicture, 'cp-typing': osTyping}" :style="appMode === 'os' && osLive ? osBox : null" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
+        <div v-show="(appMode !== 'home' && appMode !== 'os') || (appMode === 'os' && osLive)" ref="area" class="remote-area" :class="{'beside-rail': rail, 'cp-live': appMode === 'os', 'cp-waiting': appMode === 'os' && !hasPicture, 'cp-typing': osTyping}" :style="appMode === 'os' && osLive ? osBox : null" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
@@ -258,7 +272,7 @@
         </div>
         <!-- A computer: the same keys as the phone's row (Settings › Remote › Key row, kept on the
              account), in one line, the room being there; its own keyboard needs no button. -->
-        <div v-if="!isTouch && keyboardOpen" class="remote-keys" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
+        <div v-if="!isTouch && keyboardOpen" class="remote-keys" :class="{'beside-rail': rail}" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
           <template v-for="id in deskKeys" :key="id"><button v-if="keyDef(id)" type="button" :class="['remote-key', keyDef(id).cls, {on: keyDef(id).on}]" :data-key="id" :aria-pressed="keyDef(id).pressed" :title="keyDef(id).title" :aria-label="keyDef(id).title" @pointerdown.prevent @mousedown.prevent @click="keyDef(id).act()"><f7-icon v-if="keyDef(id).icon" :f7="keyDef(id).icon" :size="16"/><template v-else><span v-if="keyDef(id).shift" class="remote-key-mod">⇧</span>{{ keyDef(id).label }}</template></button></template>
         </div>
         <!-- In the phone keyboard's place: pages of keys, swiped sideways. -->
@@ -737,6 +751,12 @@ const headCollapsed = ref(localGet('castpane-remote-head') === 'folded');
 // Held sideways with the keyboard up there is little height left: the bar of windows folds
 // away for that time, or the picture has almost none.
 const keyboardSideways = ref(false), headFolded = computed(() => headCollapsed.value || keyboardSideways.value);
+// A computer's whole screen: its list at the right, under the bar (its height followed).
+const rail = computed(() => !isTouch && appMode.value === 'desktop' && !headFolded.value);
+const headEl = ref(null), headH = ref(48);
+let headSized = null;
+watch(headEl, (el) => { headSized?.disconnect();headSized = null;if (el && typeof ResizeObserver !== 'undefined') { headSized = new ResizeObserver(() => { headH.value = el.offsetHeight; });headSized.observe(el); } });
+onBeforeUnmount(() => headSized?.disconnect());
 function toggleHead() { headCollapsed.value = !headCollapsed.value;localSet('castpane-remote-head', headCollapsed.value ? 'folded' : 'open');menuOpen.value = false;settingsOpen.value = false; }
 const MODES = [{ id: 'direct', label: '直接點', icon: 'hand_draw' }, { id: 'trackpad', label: '觸控板', icon: 'rectangle_on_rectangle' }, { id: 'pointer', label: '游標', icon: 'cursor_rays' }];
 // The Mac's pointer is drawn in the picture only where it is what points: a trackpad or the
@@ -1633,7 +1653,7 @@ let osFitted = null, osWaitStart = null;
 const osTyping = computed(() => appMode.value === 'os' && isTouch && keyboardOpen.value);
 const osDesk = ref(null);
 const osBox = computed(() => {
-  const r = osTyping.value && osDesk.value ? { left: osDesk.value.left, top: osDesk.value.top + 40, width: osDesk.value.width, height: osDesk.value.height - 40 } : osLive.value?.rect;
+  const r = osTyping.value && osDesk.value ? { left: osDesk.value.left, top: osDesk.value.top + 54, width: osDesk.value.width, height: osDesk.value.height - 54 } : osLive.value?.rect;
   return r ? { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' } : null;
 });
 let osFitTimer = 0;
@@ -2033,6 +2053,16 @@ function keyUp(e) {
 .remote-thumb img {width:76px;height:44px;object-fit:cover;border-radius:6px;background:#111;}
 .remote-thumb span {max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-thumb {position:relative;}
+.remote-rail {position:absolute;right:0;bottom:0;z-index:1;width:172px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;padding:8px;overflow-y:auto;scrollbar-width:none;background:rgba(28,28,30,.96);border-left:1px solid rgba(255,255,255,.08);}
+.remote-rail::-webkit-scrollbar {display:none;}
+.remote-rail .remote-thumb {width:100%;box-sizing:border-box;}
+.remote-rail .remote-thumb img {width:100%;height:auto;aspect-ratio:16/10;}
+.remote-rail .remote-thumb span {max-width:100%;}
+.remote-stage .remote-rail .remote-desk {justify-content:space-between;width:100%;box-sizing:border-box;}
+.remote-rail .remote-desk.active {border-color:#0a84ff;}
+.remote-stage .remote-rail .remote-rail-group {justify-content:flex-start;gap:6px;flex:0 0 auto;}
+.remote-rail-label {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left;}
+.remote-area.beside-rail, .remote-keys.beside-rail {margin-right:172px;}
 .remote-away {position:absolute;top:6px;left:6px;font-size:9px;line-height:1;padding:2px 4px;border-radius:4px;background:rgba(0,0,0,.7);color:#ffd60a;}
 .remote-thumb.active {border-color:#0a84ff;background:rgba(10,132,255,.18);color:#fff;}
 .remote-actions {display:flex;gap:4px;}
@@ -2165,6 +2195,11 @@ function keyUp(e) {
 .remote-btn:disabled {opacity:.35;cursor:default;}
 .remote-head-stats {align-self:center;margin-right:6px;}
 .remote-apphead {display:flex;align-items:center;gap:6px;padding:4px 8px;}
+/* A computer: every bar as the Remote home's (its height, back button, name at the left, buttons). */
+.remote-stage:not(.touch) .remote-apphead {gap:8px;padding:10px 16px;background:rgba(0,0,0,.92);}
+.remote-stage:not(.touch) .remote-apphead-title {text-align:left;font-size:18px;}
+.remote-stage:not(.touch) .remote-apphead .remote-btn {width:34px;height:34px;border-radius:17px;background:rgba(255,255,255,.12);}
+.remote-stage:not(.touch) .remote-apphead .remote-btn.size {width:auto;padding:0 12px;}
 /* Back to the home: a round button, as the home's own back to the Macs. */
 .remote-stage .remote-apphead-back {flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:17px;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;}
 .remote-apphead-title {flex:1;min-width:0;text-align:center;font-size:15px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
