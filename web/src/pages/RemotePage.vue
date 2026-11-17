@@ -156,7 +156,7 @@
         </div>
         <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
         <!-- CastpaneOS: on a computer, the Mac's windows as windows of this page (components/CastpaneDesk.vue). -->
-        <CastpaneDesk v-if="appMode === 'os'" :phone="deviceKind() === 'phone'" @app-menu="openDockMenu" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :snaps="snaps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="osAllOpen = true;askIcons(true)" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
+        <CastpaneDesk v-if="appMode === 'os'" @app-menu="openDockMenu" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :snaps="snaps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="osAllOpen = true;askIcons(true)" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
         <!-- A Dock app's menu (right click), over everything. -->
         <div v-if="dockMenu" class="remote-dock-menu-layer" @pointerdown.self="dockMenu = null" @contextmenu.prevent="$event.pointerType && $event.pointerType !== 'mouse' ? null : (dockMenu = null)">
           <div class="remote-home-menu remote-dock-menu" :style="{left: dockMenu.x + 'px', top: dockMenu.y + 'px'}">
@@ -182,7 +182,7 @@
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
         <button v-if="!isTouch && macWindows && appMode !== 'home' && appMode !== 'os' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" @app-menu="openDockMenu" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @other="(i, o) => { dockOpen = false;openDockOther(i, o); }" @trash="dockOpen = false;openDockTrash()" @close="dockOpen = false"/>
-        <div v-show="(appMode !== 'home' && appMode !== 'os') || (appMode === 'os' && osLive)" ref="area" class="remote-area" :class="{'cp-live': appMode === 'os', 'cp-waiting': appMode === 'os' && !hasPicture, 'cp-typing': osTyping, 'cp-glide': osGlide && !osTyping}" :style="appMode === 'os' && osLive ? osBox : null" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
+        <div v-show="(appMode !== 'home' && appMode !== 'os') || (appMode === 'os' && osLive)" ref="area" class="remote-area" :class="{'cp-live': appMode === 'os', 'cp-waiting': appMode === 'os' && !hasPicture, 'cp-typing': osTyping}" :style="appMode === 'os' && osLive ? osBox : null" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
@@ -1588,10 +1588,11 @@ async function openWindow(w, keepOrder = false, tried = new Set()) {
   show(w);
   watchPicture(w, tried);
 }
-// CastpaneOS: by touch on any screen; with a mouse, 1024 wide or more. Its windows' pictures
+// CastpaneOS: by touch on a tablet (not a phone, too small for a desk of windows); with a
+// mouse, 1024 wide or more. Its windows' pictures
 // read again every five seconds while it is up and shown (a list takes the Mac about half a
 // second of work).
-const osAvailable = computed(() => typeof window !== 'undefined' && (isTouch || window.innerWidth >= 1024));
+const osAvailable = computed(() => typeof window !== 'undefined' && (isTouch ? deviceKind() !== 'phone' : window.innerWidth >= 1024));
 const deskRef = ref(null), machineId = ref(''), osLive = ref(null), osAllOpen = ref(false);
 // The Mac's list has come for this connection (its home stops saying it is loading).
 const listed = ref(false);
@@ -1599,7 +1600,7 @@ const listed = ref(false);
 // box only moved when the window is dragged or resized. None in front: the picture stops.
 function osFocus(f) {
   if (appMode.value !== 'os') return;
-  osDesk.value = f?.desk || null;osGlide.value = !!f?.glide;
+  osDesk.value = f?.desk || null;
   if (!f) { if (osLive.value) { snapCurrent();link?.send({ t: 'stop' });current.value = null;hasPicture.value = false; } osLive.value = null;return; }
   const changed = osLive.value?.id !== f.win.id;
   osLive.value = { id: f.win.id, rect: f.rect };
@@ -1626,7 +1627,7 @@ let osFitted = null, osWaitStart = null;
 // Typing by touch on the desk: the window in front over the whole desk below its bar, with the
 // key row, zoomed to the field as an app alone is; back in its window when the keyboard goes.
 const osTyping = computed(() => appMode.value === 'os' && isTouch && keyboardOpen.value);
-const osDesk = ref(null), osGlide = ref(false);
+const osDesk = ref(null);
 const osBox = computed(() => {
   const r = osTyping.value && osDesk.value ? { left: osDesk.value.left, top: osDesk.value.top + 40, width: osDesk.value.width, height: osDesk.value.height - 40 } : osLive.value?.rect;
   return r ? { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' } : null;
@@ -2045,8 +2046,6 @@ function keyUp(e) {
 .remote-home-menu.remote-dock-menu {position:fixed;}
 .remote-stage .remote-area.cp-live.cp-waiting {background:transparent;}
 /* Over the desk's Dock as well (its taps are the Mac's while typing). */
-/* A phone's window gliding to its slot: its picture with it. */
-.remote-stage .remote-area.cp-live.cp-glide {transition:left .3s cubic-bezier(.2,.8,.2,1), top .3s cubic-bezier(.2,.8,.2,1), width .3s cubic-bezier(.2,.8,.2,1), height .3s cubic-bezier(.2,.8,.2,1);}
 .remote-stage .remote-area.cp-live.cp-typing {z-index:9100;border-radius:0;background:#000;}
 .remote-stage .remote-area.cp-live.cp-waiting .remote-notice {top:auto;bottom:14px;left:50%;right:auto;transform:translateX(-50%);height:auto;flex-direction:row;gap:8px;padding:6px 12px;border-radius:16px;background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);}
 .remote-stage .remote-area.cp-live.cp-waiting .remote-notice p {margin:0;font-size:12px;}
