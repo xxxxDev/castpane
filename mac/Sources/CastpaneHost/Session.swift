@@ -585,7 +585,7 @@ actor Session {
         if let f = fitted, kind != "window" || Int(f.id) != id { await unfit() }
         await stop()
         await Self.wakeDisplays()
-        lastStart = (kind, id, maxWidth, fps, bitrate, hevc)
+        lastStart = (kind, id, maxWidth, fps, bitrate, hevc);lastCursor = cursor
         displaysAtStart = Self.displaysSignature()
         do {
             guard let found = try await Catalog.target(kind: kind, id: id) else {
@@ -775,22 +775,31 @@ actor Session {
 
     /// The cut picture of a window kept on it as it moves or changes size, twice a second,
     /// within its display (`display`, global points).
+    private var lastCursor = true
     private var following: Task<Void, Never>?
+    /// Taken partly off its display or to another one: the picture started again, cut anew or
+    /// of the window alone (Catalog.withItsApp). Stopped with the picture.
     private func followCut(_ wid: CGWindowID, display: CGRect) {
         following?.cancel()
         let capture = self.capture
-        following = Task.detached {
+        following = Task.detached { [weak self] in
             var last: CGRect?
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 guard !Task.isCancelled, let f = Catalog.frame(of: wid) else { continue }
                 if f == last { continue }
+                // Out of sight (another desktop, the Dock): left as it is until it is back, not
+                // brought back here by starting again.
+                if !Catalog.isHere(wid) { last = nil;continue }
                 last = f
-                let crop = f.offsetBy(dx: -display.minX, dy: -display.minY).intersection(CGRect(origin: .zero, size: display.size))
-                if crop.isEmpty { continue }
-                if !(await capture.follow(crop)) { return }
+                if !display.contains(f) { await self?.restartCut(wid);return }
+                if !(await capture.follow(f.offsetBy(dx: -display.minX, dy: -display.minY))) { return }
             }
         }
+    }
+    private func restartCut(_ wid: CGWindowID) async {
+        guard target?.windowID == wid, let s = lastStart, s.kind == "window", s.id == Int(wid) else { return }
+        await start(kind: s.kind, id: s.id, maxWidth: s.maxWidth, fps: s.fps, bitrate: s.bitrate, hevc: s.hevc, cursor: lastCursor)
     }
 
     func stop() async {

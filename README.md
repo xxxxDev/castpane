@@ -77,7 +77,9 @@ back, with touch modes made for a small screen.
 - **Made the device's shape.** Tap an app and its window fills the screen, made the shape of
   this device on the Mac, so its text and buttons are the size of the device's own apps, and
   you use it with your finger, with no pointer to move. An app that cannot be that narrow keeps
-  the width it can have and is made as close as it allows. With the keyboard up, the window is
+  the width it can have and is made as close as it allows. What the app opens over its window
+  (an alert, a sheet, a menu) shows in the picture too, cut to the window; another app's dialog,
+  such as a permission prompt, does not. With the keyboard up, the window is
   made the shape of what is left above it. The window goes back as it was when you leave it. An
   app's menu can leave that app at its own size from then on, or turn the fitting off;
   **Settings › System › Apps left at their size** lists them.

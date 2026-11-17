@@ -33,11 +33,10 @@ enum Catalog {
         guard let content = try? await content(), let w = content.windows.first(where: { $0.windowID == windowID }), w.isOnScreen,
               let app = content.applications.first(where: { $0.processID == pid }),
               let frame = frame(of: windowID) else { return nil }
-        let mid = CGPoint(x: frame.midX, y: frame.midY)
-        guard let d = content.displays.first(where: { CGDisplayBounds($0.displayID).contains(mid) }) else { return nil }
+        // Wholly on one display only: one part off it would come out cut and stretched.
+        guard let d = content.displays.first(where: { CGDisplayBounds($0.displayID).contains(frame) }) else { return nil }
         let bounds = CGDisplayBounds(d.displayID)
-        let crop = frame.offsetBy(dx: -bounds.minX, dy: -bounds.minY).intersection(CGRect(origin: .zero, size: bounds.size))
-        guard !crop.isEmpty else { return nil }
+        let crop = frame.offsetBy(dx: -bounds.minX, dy: -bounds.minY)
         var t = Target(filter: SCContentFilter(display: d, including: [app], exceptingWindows: []), frame: frame, size: frame.size,
                        windowID: windowID, pid: pid)
         t.crop = crop;t.display = bounds
