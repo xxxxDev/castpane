@@ -115,6 +115,11 @@ final class ServerSupervisor {
             "LANG": ProcessInfo.processInfo.environment["LANG"] ?? "en_US.UTF-8",
             "TMPDIR": NSTemporaryDirectory(),
             "USER": NSUserName(),
+            // The direct link's native part carries its own OpenSSL, built to read its settings
+            // and load modules from a Homebrew folder a user can write to: none of that is read.
+            "OPENSSL_CONF": "/dev/null",
+            "OPENSSL_MODULES": "/nonexistent/castpane",
+            "OPENSSL_ENGINES": "/nonexistent/castpane",
         ]
         do {
             try child.launch(res.node, [res.start.path], environment: env, directory: res.start.deletingLastPathComponent(),

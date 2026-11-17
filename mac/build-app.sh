@@ -101,7 +101,7 @@ echo "node $node_version from $node_bin"
 
 echo "== server and web"
 if [ -f "$root/server/start.js" ]; then
-  rsync -a --delete --exclude '.DS_Store' --exclude '*.test.*' --exclude 'test/' --exclude 'tests/' "$root/server/" "$app/Contents/Resources/server/"
+  rsync -a --delete --exclude '.DS_Store' --exclude '*.test.*' --exclude 'test/' --exclude 'tests/' --exclude 'node_modules/node-datachannel/build/' "$root/server/" "$app/Contents/Resources/server/"
   echo "server: copied"
   # The direct link's native part (node-datachannel) for the Mac it is built for: npm installed
   # the one for this Mac; the other is fetched at the same version.
@@ -109,12 +109,14 @@ if [ -f "$root/server/start.js" ]; then
   if [ -d "$ndc" ]; then
     want=$([ "$arch" = arm64 ] && echo darwin-arm64 || echo darwin-x64)
     plat="$app/Contents/Resources/server/node_modules/@node-datachannel"
+    # Always the package checked here, also for this Mac's own kind (not what npm installed).
+    rm -rf "$plat/$want"
     if [ ! -d "$plat/$want" ]; then
       ver=$(node -p "require('$ndc/package.json').version")
       tmp=$(mktemp -d)
       # Taken only if it is the very file the lock file names (its sha512).
       sum=$(node -p "(require('$root/server/package-lock.json').packages['node_modules/@node-datachannel/$want']||{}).integrity||''")
-      (cd "$tmp" && npm pack --silent "@node-datachannel/$want@$ver" >/dev/null)
+      (cd "$tmp" && npm pack --silent "@node-datachannel/$want@$ver" >/dev/null) || { rm -rf "$tmp"; echo "error: @node-datachannel/$want could not be fetched" >&2; exit 1; }
       got="sha512-$(openssl dgst -sha512 -binary "$tmp"/*.tgz | base64)"
       if [ -z "$sum" ] || [ "$got" != "$sum" ]; then echo "error: @node-datachannel/$want does not match the lock file" >&2; rm -rf "$tmp"; exit 1; fi
       mkdir -p "$plat/$want" && tar -xzf "$tmp"/*.tgz -C "$plat/$want" --strip-components 1

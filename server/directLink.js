@@ -53,7 +53,8 @@ function createDirect({ sendSignal, onMessage, onOpen, onClose }) {
     ch.onMessage((m) => {
       if (done || typeof m === 'string') return end();
       const flags = m[0];
-      if (!(flags & JSON_KIND)) return end();
+      // A piece that says more follows is a whole one: a stream of tiny ones would never add up.
+      if (!(flags & JSON_KIND) || ((flags & MORE) && m.length < 1 + CHUNK)) return end();
       inParts.push(m.subarray(1)); inLength += m.length - 1;
       if (inLength > MAX_IN) return end();
       if (flags & MORE) return;

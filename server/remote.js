@@ -485,7 +485,7 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
         if (tooSoon) return raw.subarray(0, 24).toString().startsWith('{"t":"clipboard-set"') ? sendJson({ t: 'clipboard-busy' }) : close('too large');
       }
       let msg; try { msg = JSON.parse(raw.toString()); } catch { return close('bad message'); }
-      if (msg && typeof msg === 'object' && !Array.isArray(msg) && (msg.t === 'rtc-offer' || msg.t === 'rtc-candidate' || msg.t === 'echo')) return signal(msg, via);
+      if (!large && msg && typeof msg === 'object' && !Array.isArray(msg) && (msg.t === 'rtc-offer' || msg.t === 'rtc-candidate' || msg.t === 'echo')) return signal(msg, via);
       if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.t !== 'string' || !Object.hasOwn(MESSAGES, msg.t)) return close('unknown message');
       if (large && msg.t !== 'clipboard-set') return close('too large');
       const clean = fromPage(msg);

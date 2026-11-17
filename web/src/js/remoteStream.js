@@ -33,10 +33,13 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
   // The direct link (server/directLink.js): offered once the socket is open; while it is open
   // everything goes and comes that way, and the socket only keeps the session.
-  let pc = null, dc = null, direct = false, inParts = [], inLength = 0;
+  // Input goes the new way only once the server has had all it was sent the old way (an echo by
+  // the socket comes back after them): a mouse-up never overtakes its mouse-down.
+  let pc = null, dc = null, direct = false, inParts = [], inLength = 0, inputDirect = false, held = null;
   const sendSocket = (msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); };
   const send = (msg) => {
-    if (direct && dc?.readyState === 'open') {
+    if (held) { held.push(msg);return; }
+    if (inputDirect && dc?.readyState === 'open') {
       const data = new TextEncoder().encode(JSON.stringify(msg)), CHUNK = 60 * 1024;
       try {
         for (let at = 0; at < data.length || at === 0; at += CHUNK) {
@@ -59,7 +62,14 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
       dc = pc.createDataChannel('castpane', { ordered: true });
       dc.binaryType = 'arraybuffer';
       dc.onopen = () => { direct = true;needKey = true; };
-      dc.onclose = () => { if (!direct) return;direct = false;needKey = true;sendSocket({ t: 'key-frame' }); };
+      dc.onclose = () => {
+        if (!direct) return;
+        direct = false;inputDirect = false;needKey = true;
+        if (held) { const q = held;held = null;for (const m of q) sendSocket(m); }
+        sendSocket({ t: 'key-frame' });
+        // What was pressed may have been lost with the link: the page lets go of it again.
+        onState('direct-lost');
+      };
       dc.onmessage = (e) => {
         const m = new Uint8Array(e.data), flags = m[0];
         inParts.push(m.subarray(1));inLength += m.length - 1;
@@ -67,6 +77,7 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
         let whole = inParts[0];
         if (inParts.length > 1) { whole = new Uint8Array(inLength);let o = 0;for (const p of inParts) { whole.set(p, o);o += p.length; } }
         inParts = [];inLength = 0;
+        if (!inputDirect && !held) { held = [];sendSocket({ t: 'echo', n: 0 }); }
         if (flags & 2) text(new TextDecoder().decode(whole));
         else video(whole.byteOffset || whole.byteLength !== whole.buffer.byteLength ? whole.slice().buffer : whole.buffer);
       };
@@ -117,7 +128,11 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
     if (msg.t === 'rtc-answer') { pc?.setRemoteDescription({ type: 'answer', sdp: msg.sdp }).catch(() => {});return; }
     if (msg.t === 'rtc-candidate') { pc?.addIceCandidate({ candidate: msg.candidate, sdpMid: msg.mid }).catch(() => {});return; }
     if (msg.t === 'rtc-none') return;
-    if (msg.t === 'echo') { if (msg.n === echoN) rtt = Math.round(performance.now() - echoAt);return; }
+    if (msg.t === 'echo') {
+      if (msg.n === 0 && held) { const q = held;held = null;inputDirect = direct;for (const m of q) send(m);return; }
+      if (msg.n === echoN) rtt = Math.round(performance.now() - echoAt);
+      return;
+    }
     if (msg.t === 'config') { config = msg; makeDecoder(); }
     onMessage(msg);
   }

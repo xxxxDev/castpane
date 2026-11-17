@@ -543,6 +543,8 @@ async function connect(m, retried = false) {
   link = openRemote({
     pass, machine: machine === 'local' ? '' : machine, canvas: canvas.value,
     onState(state) {
+      // The direct link gone: keys held down by it are let go (their key-up may have been lost).
+      if (state === 'direct-lost') { for (const code of sentDown) link?.send({ t: 'key', code, down: false, mods: [] });sentDown.clear();held.clear();return; }
       if (state === 'refused') { link = null;streaming.value = false;sessionSet('castpane-remote-pass', null);if (!retried) connect(m, true);else error.value = ct('無法連線，請重新整理頁面後再試。');return; }
       if (state === 'closed' && streaming.value) { saveShot();streaming.value = false;link = null; }
     },
