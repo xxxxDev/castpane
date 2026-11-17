@@ -1256,7 +1256,7 @@ function appsMessage(msg) {
     // answered on the Mac, from the whole screen here or at it; opened then (late).
     if (msg.asking) {
       const name = dockAsked || fileOpening;stopLaunch();fileOpening = '';
-      f7.dialog.create({ title: ct('Mac 上正在詢問權限'), text: ct('macOS 在問 Castpane 能不能打開「{name}」。到整個螢幕或在 Mac 上按「允許」，之後就會打開。').replace('{name}', () => name), buttons: [{ text: ct('好') }, { text: ct('整個螢幕'), bold: true, onClick: goDesktop }] }).open();
+      f7.dialog.create({ title: ct('Mac 上可能正在詢問權限'), text: ct('「{name}」還沒打開：macOS 可能正在問 Castpane 能不能打開它。到整個螢幕或在 Mac 上看看，按「允許」後就會打開。').replace('{name}', () => name), buttons: [{ text: ct('好') }, { text: ct('整個螢幕'), bold: true, onClick: goDesktop }] }).open();
       return;
     }
     if (msg.late) { if (msg.ok) toast(ct('已在 Mac 上打開「{name}」').replace('{name}', () => dockAsked));return; }

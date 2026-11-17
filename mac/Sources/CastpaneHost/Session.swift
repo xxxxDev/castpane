@@ -94,20 +94,43 @@ final class VideoGate: @unchecked Sendable {
 /// touches only `VideoGate`, `Capture` and `Link`, which have locks of their own.
 actor Session {
     private enum Event: Sendable { case hello, request(Request), end }
-    /// Opens a Dock item off the main thread: macOS may first ask on the Mac whether Castpane
-    /// may reach that folder (Downloads, Documents), and the main thread must not wait for that
-    /// answer (everything else stopped). Not opened within three seconds: said, `asking`, and
-    /// the outcome said again when it comes.
+    /// Opens a Dock item on a queue of its own, off the main thread and off Swift's thread pool:
+    /// macOS may first ask on the Mac whether Castpane may reach that folder (Downloads,
+    /// Documents) and the call waits for the answer, however long. One at a time: while one is
+    /// waiting, another is answered `asking` at once rather than queued. Not opened within three
+    /// seconds: said, `asking`, and the outcome said again when it comes (`late`).
+    private static let dockOpenQueue = DispatchQueue(label: "castpane.dock-open")
+    private static let dockOpening = OSAllocatedUnfairLock(initialState: false)
     nonisolated static func openOffMain(_ link: Link, _ open: @escaping @Sendable () -> Bool) {
+        guard dockOpening.withLock({ busy in if busy { return false }; busy = true; return true }) else {
+            link.send(json: ["t": "dock-opened", "ok": false, "asking": true]); return
+        }
         let first = OSAllocatedUnfairLock(initialState: true)
         let claim: @Sendable () -> Bool = { first.withLock { was in defer { was = false }; return was } }
-        Task.detached {
+        dockOpenQueue.async {
             let ok = open()
+            dockOpening.withLock { $0 = false }
             if claim() { link.send(json: ["t": "dock-opened", "ok": ok]) } else { link.send(json: ["t": "dock-opened", "ok": ok, "late": true]) }
         }
-        Task.detached {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
             if claim() { link.send(json: ["t": "dock-opened", "ok": false, "asking": true]) }
+        }
+    }
+
+    /// The Dock's folders and files, read on a queue of their own (an item on a network disk
+    /// gone can take long to check): while a reading is still going, the last one read is used.
+    private static let dockReadQueue = DispatchQueue(label: "castpane.dock-read")
+    private static let dockRead = OSAllocatedUnfairLock<(busy: Bool, last: [[String: String]])>(initialState: (false, []))
+    nonisolated static func sendDock(_ link: Link) {
+        let start = dockRead.withLock { state -> [[String: String]]? in if state.busy { return state.last }; state.busy = true; return nil }
+        let send: @Sendable ([[String: String]]) -> Void = { others in
+            DispatchQueue.main.async { MainActor.assumeIsolated { link.send(json: ["t": "dock", "apps": Apps.dock(), "others": others, "trash": true]) } }
+        }
+        if let cached = start { send(cached); return }
+        dockReadQueue.async {
+            let others = Apps.dockOthers().map { ["name": $0.name, "kind": $0.folder ? "folder" : "file"] }
+            dockRead.withLock { $0 = (false, others) }
+            send(others)
         }
     }
 
@@ -396,13 +419,9 @@ actor Session {
         case let .close(id): queued { await self.close(CGWindowID(id)) }
         case let .minimize(id): queued { await self.minimize(CGWindowID(id)) }
         case .dock:
-            let link = self.link
-            Task.detached {
-                // The folders and files at the Dock's right by name and kind only (no path),
-                // then the Trash; opened by their place with dock-open. Read off the main thread.
-                let others = Apps.dockOthers().map { ["name": $0.name, "kind": $0.folder ? "folder" : "file"] }
-                await MainActor.run { link.send(json: ["t": "dock", "apps": Apps.dock(), "others": others, "trash": true]) }
-            }
+            // The folders and files at the Dock's right by name and kind only (no path), then
+            // the Trash; opened by their place with dock-open.
+            Self.sendDock(link)
         case let .dockOpen(index, name):
             Self.openOffMain(link) { Apps.openDockOther(index, name: name) }
         case .dockOpenTrash:
