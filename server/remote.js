@@ -20,6 +20,7 @@ const { audit } = require('./services/audit');
 const { resolveClientIp } = require('./services/clientIp');
 const { sessionCookie } = require('./services/sessionCookie');
 const { vetFromMember } = require('./members');
+const { createDirect } = require('./directLink');
 
 const HOME = () => process.env.CASTPANE_HOME || path.join(os.homedir(), 'Library', 'Application Support', 'Castpane');
 const PASS_MS = 8 * 60 * 60 * 1000;
@@ -362,18 +363,25 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
   async function serve(ws, { principal, token, pass, machine = 'local', ip }) {
     // One viewer at a time: a new page takes over from the last one.
     if (current) current.close('replaced');
-    let host = null, closed = false, timer = null, dropping = false, video = 0, checking = false;
+    let host = null, closed = false, timer = null, dropping = false, video = 0, checking = false, direct = null;
     const started = Date.now();
     const member = machine !== 'local';
     const me = { close: (reason) => close(reason), username: principal.username, userId: principal.id, token, since: new Date(started).toISOString(), ...(member ? { machine: members.name(machine) } : {}) };
     const seen = { userId: principal.id, token };
     current = me; last = seen;
     const sendJson = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
+    // To the page: by the direct link once it is open (server/directLink.js), else its socket.
+    const pending = () => (direct?.open ? direct.buffered() : ws.bufferedAmount);
+    const out = (kind, data) => {
+      if (direct?.open && direct.send(kind, data)) return;
+      if (ws.readyState === 1) { if (kind === 2) ws.send(data, { binary: true }); else ws.send(data); }
+    };
     function close(reason = 'closed') {
       if (closed) return;
       closed = true; clearInterval(timer); if (current === me) current = null;
       // A viewer who left by themselves is not signed out by a later Pause.
       if (reason.startsWith('page') && last === seen) last = null;
+      try { direct?.close(); } catch { /* gone */ }
       try { host?.destroy(); } catch { /* gone */ }
       sendJson({ t: 'closed', reason }); try { ws.close(); } catch { /* gone */ }
       audit({ source: 'remote', action: 'end', username: principal.username, reason, seconds: Math.round((Date.now() - started) / 1000), frames: video, ...(member ? { member: machine, machine: me.machine } : {}) });
@@ -417,25 +425,53 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
         if (kind === 1) {
           // Another Mac's words are checked before the page sees them (server/members.js),
           // and it cannot pile them up behind a page that is not reading.
-          if (member && ws.bufferedAmount > 16 * 1024 * 1024) return close('page behind');
+          if (member && pending() > 16 * 1024 * 1024) return close('page behind');
           const text = member ? vetFromMember(payload.toString('utf8')) : payload.toString('utf8');
-          if (text !== null && ws.readyState === 1) ws.send(text);
+          if (text !== null) out(1, text);
         }
         else if (kind === 2 && payload.length > 9) {
           // Behind on the page's side: drop until the next key frame, and ask for one, so
           // the picture never decodes from a frame it is missing.
           const key = (payload[0] & 1) === 1;
-          if (ws.bufferedAmount > 4 * 1024 * 1024) { if (!dropping) { dropping = true; host.write(frame(1, Buffer.from('{"t":"key-frame"}'))); } continue; }
+          if (pending() > 4 * 1024 * 1024) { if (!dropping) { dropping = true; host.write(frame(1, Buffer.from('{"t":"key-frame"}'))); } continue; }
           if (dropping && !key) continue;
           dropping = false; video++;
-          if (ws.readyState === 1) ws.send(payload, { binary: true });
+          out(2, payload);
         }
       }
       if (buf.length) { pieces = [buf]; held = buf.length; buf = Buffer.alloc(0); }
     });
     host.on('close', () => close('host closed')); host.on('error', () => close('host error'));
     let windowStart = Date.now(), count = 0, lastClipboard = 0, lastLarge = 0, lastUnlock = 0;
-    ws.on('message', (raw, binary) => {
+    ws.on('message', (raw, binary) => pageMessage(raw, binary, 'socket'));
+    // The direct link, offered by the page over this socket and only for this Mac; its frames
+    // and answers then go that way. A link that closes leaves the socket carrying everything,
+    // from a key frame (frames on the way were lost).
+    const keyFrame = () => { try { host?.write(frame(1, Buffer.from('{"t":"key-frame"}'))); } catch { /* gone */ } };
+    function signal(msg, via) {
+      if (msg.t === 'echo') {
+        // A round trip measured by the page, answered the way it came.
+        if (!Number.isSafeInteger(msg.n)) return;
+        const answer = JSON.stringify({ t: 'echo', n: msg.n });
+        return via === 'direct' ? direct?.send(1, answer) : sendJson({ t: 'echo', n: msg.n });
+      }
+      if (via !== 'socket' || member) return;
+      if (msg.t === 'rtc-offer') {
+        if (direct || typeof msg.sdp !== 'string' || msg.sdp.length > 16384) return;
+        direct = createDirect({
+          sendSignal: sendJson,
+          onMessage: (buf) => pageMessage(buf, false, 'direct'),
+          onOpen: () => { dropping = false; keyFrame(); },
+          onClose: () => { if (!closed) keyFrame(); },
+        });
+        if (!direct) return sendJson({ t: 'rtc-none' });
+        direct.offer(msg.sdp);
+      } else if (msg.t === 'rtc-candidate') {
+        if (!direct || typeof msg.candidate !== 'string' || msg.candidate.length > 1024 || typeof msg.mid !== 'string' || msg.mid.length > 64) return;
+        direct.candidate(msg.candidate, msg.mid);
+      }
+    }
+    function pageMessage(raw, binary, via) {
       if (closed) return;
       if (binary) return close('binary from page');
       if (Date.now() - windowStart > 1000) { windowStart = Date.now(); count = 0; }
@@ -449,6 +485,7 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
         if (tooSoon) return raw.subarray(0, 24).toString().startsWith('{"t":"clipboard-set"') ? sendJson({ t: 'clipboard-busy' }) : close('too large');
       }
       let msg; try { msg = JSON.parse(raw.toString()); } catch { return close('bad message'); }
+      if (msg && typeof msg === 'object' && !Array.isArray(msg) && (msg.t === 'rtc-offer' || msg.t === 'rtc-candidate' || msg.t === 'echo')) return signal(msg, via);
       if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.t !== 'string' || !Object.hasOwn(MESSAGES, msg.t)) return close('unknown message');
       if (large && msg.t !== 'clipboard-set') return close('too large');
       const clean = fromPage(msg);
@@ -472,7 +509,7 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
       if (clipboard) audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: principal.username, ...(clean.s ? { chars: clean.s.length } : {}), ...(member ? { member: machine, machine: me.machine } : {}) });
       // A force quit loses what was not saved: who did it, and to which app, is kept.
       if (clean.t === 'quit' && clean.force) audit({ source: 'remote', action: 'force-quit', bundle: clean.bundle, username: principal.username, ...(member ? { member: machine, machine: me.machine } : {}) });
-    });
+    }
     // Still an active admin, still this sign-in, pass not run out.
     timer = setInterval(async () => {
       if (checking || closed) return; checking = true;

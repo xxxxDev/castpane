@@ -166,6 +166,8 @@ const english = {
 "收起側欄":"Hide the column",
 "展開側欄":"Show the column",
 "視窗":"Windows",
+"直連":"direct",
+"中繼":"relayed",
 "打開後，整個螢幕的視窗列表除了顯示器，也依桌面列出全螢幕 App 和每個視窗（電腦在右側欄，手機和平板在上方）。只影響這台裝置。":"Besides the displays, the whole screen’s list shows the desktops with their full-screen apps and every window (in the column at the right on a computer, at the top on a phone or tablet). This device only.",
 "「{name}」還沒結束":"“{name}” has not quit",
 "它可能正在 Mac 上詢問（例如要不要存檔），可以到整個螢幕回答。":"It may be asking something on the Mac (whether to save, perhaps): answer it from the whole screen.",

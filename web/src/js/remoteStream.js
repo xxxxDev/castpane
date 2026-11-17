@@ -31,7 +31,49 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
   // page's automatic size reads to tell a device that cannot keep up.
   const sentAt = new Map();let lagSum = 0, lagCount = 0, queueMax = 0;
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
-  const send = (msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); };
+  // The direct link (server/directLink.js): offered once the socket is open; while it is open
+  // everything goes and comes that way, and the socket only keeps the session.
+  let pc = null, dc = null, direct = false, inParts = [], inLength = 0;
+  const sendSocket = (msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); };
+  const send = (msg) => {
+    if (direct && dc?.readyState === 'open') {
+      const data = new TextEncoder().encode(JSON.stringify(msg)), CHUNK = 60 * 1024;
+      try {
+        for (let at = 0; at < data.length || at === 0; at += CHUNK) {
+          const end = Math.min(data.length, at + CHUNK), piece = new Uint8Array(1 + end - at);
+          piece[0] = (end < data.length ? 1 : 0) | 2;piece.set(data.subarray(at, end), 1);dc.send(piece);
+          if (!data.length) break;
+        }
+        return;
+      } catch { /* closing: the socket below */ }
+    }
+    sendSocket(msg);
+  };
+  // The time a message takes there and back, by whichever way is in use.
+  let echoN = 0, echoAt = 0, rtt = 0;
+  const echoTimer = setInterval(() => { if (closed) return clearInterval(echoTimer);echoAt = performance.now();send({ t: 'echo', n: ++echoN }); }, 2000);
+  function offerDirect() {
+    if (typeof RTCPeerConnection === 'undefined' || machine) return;
+    try {
+      pc = new RTCPeerConnection({ iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }] });
+      dc = pc.createDataChannel('castpane', { ordered: true });
+      dc.binaryType = 'arraybuffer';
+      dc.onopen = () => { direct = true;needKey = true; };
+      dc.onclose = () => { if (!direct) return;direct = false;needKey = true;sendSocket({ t: 'key-frame' }); };
+      dc.onmessage = (e) => {
+        const m = new Uint8Array(e.data), flags = m[0];
+        inParts.push(m.subarray(1));inLength += m.length - 1;
+        if (flags & 1) return;
+        let whole = inParts[0];
+        if (inParts.length > 1) { whole = new Uint8Array(inLength);let o = 0;for (const p of inParts) { whole.set(p, o);o += p.length; } }
+        inParts = [];inLength = 0;
+        if (flags & 2) text(new TextDecoder().decode(whole));
+        else video(whole.byteOffset || whole.byteLength !== whole.buffer.byteLength ? whole.slice().buffer : whole.buffer);
+      };
+      pc.onicecandidate = (e) => { if (e.candidate?.candidate) sendSocket({ t: 'rtc-candidate', candidate: e.candidate.candidate, mid: e.candidate.sdpMid || '0' }); };
+      pc.createOffer().then((o) => pc.setLocalDescription(o)).then(() => sendSocket({ t: 'rtc-offer', sdp: pc.localDescription.sdp })).catch(() => {});
+    } catch { pc = null; }
+  }
 
   function makeDecoder() {
     try { decoder?.close(); } catch {}
@@ -62,21 +104,30 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
   const hevc = () => !!config?.codec?.startsWith('hvc1');
   function codecFailed() { const was = config;config = null;try { decoder?.close(); } catch {} decoder = null;if (was) onCodecFailed(); }
 
-  ws.onopen = () => { opened = true; onState('open'); };
-  ws.onclose = () => { closed = true; try { decoder?.close(); } catch {} onState(opened ? 'closed' : 'refused'); };
+  ws.onopen = () => { opened = true; onState('open'); offerDirect(); };
+  ws.onclose = () => { closed = true; try { decoder?.close(); } catch {} try { pc?.close(); } catch {} onState(opened ? 'closed' : 'refused'); };
   ws.onmessage = (e) => {
-    if (typeof e.data === 'string') {
-      let msg; try { msg = JSON.parse(e.data); } catch { return; }
-      if (msg.t === 'config') { config = msg; makeDecoder(); }
-      onMessage(msg);
-      return;
-    }
-    const data = new Uint8Array(e.data);
+    if (typeof e.data === 'string') return text(e.data);
+    // A frame still coming by the socket once the direct link is open: let go (counted shown).
+    if (direct) { send({ t: 'ack' });return; }
+    video(e.data);
+  };
+  function text(s) {
+    let msg; try { msg = JSON.parse(s); } catch { return; }
+    if (msg.t === 'rtc-answer') { pc?.setRemoteDescription({ type: 'answer', sdp: msg.sdp }).catch(() => {});return; }
+    if (msg.t === 'rtc-candidate') { pc?.addIceCandidate({ candidate: msg.candidate, sdpMid: msg.mid }).catch(() => {});return; }
+    if (msg.t === 'rtc-none') return;
+    if (msg.t === 'echo') { if (msg.n === echoN) rtt = Math.round(performance.now() - echoAt);return; }
+    if (msg.t === 'config') { config = msg; makeDecoder(); }
+    onMessage(msg);
+  }
+  function video(buffer) {
+    const data = new Uint8Array(buffer);
     if (!decoder || decoder.state !== 'configured' || data.length < 10) { send({ t: 'ack' }); return; }
     const key = (data[0] & 1) === 1;
     if (needKey && !key) { send({ t: 'ack' }); return; }
     needKey = false;
-    const view = new DataView(e.data);
+    const view = new DataView(buffer);
     const timestamp = Number(view.getBigUint64(1));
     bytes += data.length;
     if (sentAt.size > 30) sentAt.clear();
@@ -85,14 +136,14 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
     catch { needKey = true; send({ t: 'ack' }); send({ t: 'key-frame' }); }
     const now = performance.now();
     if (now - statsAt >= 1000) {
-      onStats({ fps: Math.round(frames * 1000 / (now - statsAt)), mbps: +(bytes * 8 / 1e6 / ((now - statsAt) / 1000)).toFixed(1), lag: lagCount ? Math.round(lagSum / lagCount) : 0, queue: queueMax, width: canvas.width });
+      onStats({ fps: Math.round(frames * 1000 / (now - statsAt)), mbps: +(bytes * 8 / 1e6 / ((now - statsAt) / 1000)).toFixed(1), lag: lagCount ? Math.round(lagSum / lagCount) : 0, queue: queueMax, width: canvas.width, rtt, direct });
       frames = 0; bytes = 0; statsAt = now; lagSum = 0; lagCount = 0; queueMax = 0;
     }
-  };
+  }
   return {
     send,
     get closed() { return closed; },
-    close() { closed = true; try { ws.close(); } catch {} try { decoder?.close(); } catch {} },
+    close() { closed = true; clearInterval(echoTimer); try { pc?.close(); } catch {} try { ws.close(); } catch {} try { decoder?.close(); } catch {} },
   };
 }
 

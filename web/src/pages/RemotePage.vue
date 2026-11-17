@@ -40,7 +40,7 @@
           <button type="button" class="remote-apphead-back remote-desktop-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goHome"><f7-icon f7="chevron_left" :size="18"/></button>
           <div class="remote-apphead-title">{{ ct('整個螢幕') }}</div>
           <!-- At the right of the bar, as an app's: the picture's numbers, then its buttons. -->
-          <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
+          <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps<template v-if="stats.rtt"> · {{ stats.rtt }} ms · {{ stats.direct ? ct('直連') : ct('中繼') }}</template></span>
           <div class="remote-actions">
             <!-- The screens, desktops and windows fold away for a bigger picture. -->
             <button v-if="isTouch" type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headFolded ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
@@ -86,7 +86,7 @@
         <div v-if="appMode === 'app'" class="remote-apphead">
           <button type="button" class="remote-apphead-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goHome"><f7-icon f7="chevron_left" :size="18"/></button>
           <div class="remote-apphead-title">{{ appTitle }}</div>
-          <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps</span>
+          <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps<template v-if="stats.rtt"> · {{ stats.rtt }} ms · {{ stats.direct ? ct('直連') : ct('中繼') }}</template></span>
           <button v-if="view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
           <button v-if="!isTouch" type="button" class="remote-btn keyboard" :class="{on: keyboardOpen}" :title="ct('鍵盤')" @pointerdown.prevent @mousedown.prevent @click="toggleKeyboard"><f7-icon f7="keyboard" :size="18"/></button>
           <button type="button" class="remote-btn more" :class="{on: menuOpen}" :title="ct('更多')" @pointerdown.prevent @mousedown.prevent @click="menuOpen = !menuOpen;settingsOpen = false"><f7-icon f7="ellipsis" :size="18"/></button>
@@ -325,7 +325,7 @@ function sendUnlock() {
   clearTimeout(unlockTimer);
   unlockTimer = setTimeout(() => { if (unlockBusy.value) { unlockBusy.value = false;unlockError.value = ct('Mac 沒有回應，請再試一次'); } }, 12000);
 }
-const hasPicture = ref(false), notice = ref(''), permission = ref(''), stats = reactive({ fps: 0, mbps: 0 });
+const hasPicture = ref(false), notice = ref(''), permission = ref(''), stats = reactive({ fps: 0, mbps: 0, rtt: 0, direct: false });
 const keyHint = ref(false), keyboardOpen = ref(false), settingsOpen = ref(false), menuOpen = ref(false), held = reactive(new Set());
 const canvas = ref(null), area = ref(null), typing = ref(null);
 const clipOpen = ref(false), panel = ref(false), pageNo = ref(0), pagesEl = ref(null), compose = ref(false), composeText = ref(''), composeField = ref(null);

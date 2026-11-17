@@ -103,6 +103,26 @@ echo "== server and web"
 if [ -f "$root/server/start.js" ]; then
   rsync -a --delete --exclude '.DS_Store' --exclude '*.test.*' --exclude 'test/' --exclude 'tests/' "$root/server/" "$app/Contents/Resources/server/"
   echo "server: copied"
+  # The direct link's native part (node-datachannel) for the Mac it is built for: npm installed
+  # the one for this Mac; the other is fetched at the same version.
+  ndc="$app/Contents/Resources/server/node_modules/node-datachannel"
+  if [ -d "$ndc" ]; then
+    want=$([ "$arch" = arm64 ] && echo darwin-arm64 || echo darwin-x64)
+    plat="$app/Contents/Resources/server/node_modules/@node-datachannel"
+    if [ ! -d "$plat/$want" ]; then
+      ver=$(node -p "require('$ndc/package.json').version")
+      tmp=$(mktemp -d)
+      # Taken only if it is the very file the lock file names (its sha512).
+      sum=$(node -p "(require('$root/server/package-lock.json').packages['node_modules/@node-datachannel/$want']||{}).integrity||''")
+      (cd "$tmp" && npm pack --silent "@node-datachannel/$want@$ver" >/dev/null)
+      got="sha512-$(openssl dgst -sha512 -binary "$tmp"/*.tgz | base64)"
+      if [ -z "$sum" ] || [ "$got" != "$sum" ]; then echo "error: @node-datachannel/$want does not match the lock file" >&2; rm -rf "$tmp"; exit 1; fi
+      mkdir -p "$plat/$want" && tar -xzf "$tmp"/*.tgz -C "$plat/$want" --strip-components 1
+      rm -rf "$tmp"
+    fi
+    for other in "$plat"/*; do [ "$(basename "$other")" = "$want" ] || rm -rf "$other"; done
+    echo "server: direct link for $want"
+  fi
 else
   echo "note: $root/server/start.js is not there yet; the app is built without the server"
 fi
