@@ -127,6 +127,8 @@ const english = {
 "Castpane 帳號":"Castpane account",
 "已停用":"Disabled",
 "安全":"Security",
+"Mac 上正在詢問權限":"The Mac is asking for permission",
+"macOS 在問 Castpane 能不能打開「{name}」。到整個螢幕或在 Mac 上按「允許」，之後就會打開。":"macOS is asking whether Castpane may open “{name}”. Choose Allow, from the whole screen or at the Mac, and it opens.",
 "單獨全畫面":"Alone, full size",
 "從下面的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。":"Open an app from the Dock below: its window comes here, to drag and resize.",
 "已在 Mac 上打開「{name}」":"Opened “{name}” on the Mac",

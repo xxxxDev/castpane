@@ -1252,6 +1252,14 @@ function appsMessage(msg) {
     dockApps.value = msg.apps || [];dockOthers.value = Array.isArray(msg.others) ? msg.others : [];dockTrash.value = msg.trash === true;
     askIconsFor(dockApps.value.map((a) => a.bundle));
   } else if (msg.t === 'dock-opened') {
+    // The Mac asking first whether Castpane may reach that folder (Downloads, Documents…):
+    // answered on the Mac, from the whole screen here or at it; opened then (late).
+    if (msg.asking) {
+      const name = dockAsked || fileOpening;stopLaunch();fileOpening = '';
+      f7.dialog.create({ title: ct('Mac 上正在詢問權限'), text: ct('macOS 在問 Castpane 能不能打開「{name}」。到整個螢幕或在 Mac 上按「允許」，之後就會打開。').replace('{name}', () => name), buttons: [{ text: ct('好') }, { text: ct('整個螢幕'), bold: true, onClick: goDesktop }] }).open();
+      return;
+    }
+    if (msg.late) { if (msg.ok) toast(ct('已在 Mac 上打開「{name}」').replace('{name}', () => dockAsked));return; }
     const file = fileOpening;fileOpening = '';
     if (!msg.ok && (launching.value === FINDER || file)) { stopLaunch();toast(ct('這個項目打不開，Dock 可能已經變了')); }
     else if (msg.ok && file) toast(ct('已在 Mac 上打開「{name}」').replace('{name}', () => file));
@@ -1295,7 +1303,9 @@ const FINDER = 'com.apple.finder';
 // (titled with the folder's name) is shown at once. A file opens in its own app: said, as
 // there is no Finder window to wait for.
 let fileOpening = '';
+let dockAsked = '';
 function openFromDock(request, name, kind = 'folder') {
+  dockAsked = name;
   const finder = items.value.filter((x) => x.kind === 'window' && x.bundle === FINDER);
   link?.send({ t: 'dock-open', ...request });
   const open = kind === 'folder' && finder.find((x) => x.title === name);

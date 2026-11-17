@@ -312,7 +312,7 @@ const SHAPES = {
   launched: (m) => (str(m.bundle, 200) ? { bundle: m.bundle, ok: bool(m.ok) ?? false } : null),
   quit: (m) => (str(m.bundle, 200) ? { bundle: m.bundle, ok: bool(m.ok) ?? false } : null),
   dock: (m) => (Array.isArray(m.apps) ? pick({ apps: m.apps.slice(0, 300).map(app).filter(Boolean), others: Array.isArray(m.others) ? m.others.slice(0, 64).map(other) : undefined, trash: bool(m.trash) }) : null),
-  'dock-opened': (m) => ({ ok: bool(m.ok) ?? false }),
+  'dock-opened': (m) => ({ ok: bool(m.ok) ?? false, ...(m.asking === true ? { asking: true } : {}), ...(m.late === true ? { late: true } : {}) }),
   fitted: (m) => (int(m.id) !== undefined ? pick({ id: m.id, ok: bool(m.ok) ?? false, width: int(m.width), height: int(m.height) }) : null),
   'clipboard-busy': () => ({}),
 };

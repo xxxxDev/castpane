@@ -94,6 +94,23 @@ final class VideoGate: @unchecked Sendable {
 /// touches only `VideoGate`, `Capture` and `Link`, which have locks of their own.
 actor Session {
     private enum Event: Sendable { case hello, request(Request), end }
+    /// Opens a Dock item off the main thread: macOS may first ask on the Mac whether Castpane
+    /// may reach that folder (Downloads, Documents), and the main thread must not wait for that
+    /// answer (everything else stopped). Not opened within three seconds: said, `asking`, and
+    /// the outcome said again when it comes.
+    nonisolated static func openOffMain(_ link: Link, _ open: @escaping @Sendable () -> Bool) {
+        let first = OSAllocatedUnfairLock(initialState: true)
+        let claim: @Sendable () -> Bool = { first.withLock { was in defer { was = false }; return was } }
+        Task.detached {
+            let ok = open()
+            if claim() { link.send(json: ["t": "dock-opened", "ok": ok]) } else { link.send(json: ["t": "dock-opened", "ok": ok, "late": true]) }
+        }
+        Task.detached {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if claim() { link.send(json: ["t": "dock-opened", "ok": false, "asking": true]) }
+        }
+    }
+
 
     nonisolated let link: Link
     private nonisolated let token: String
@@ -380,18 +397,16 @@ actor Session {
         case let .minimize(id): queued { await self.minimize(CGWindowID(id)) }
         case .dock:
             let link = self.link
-            Task { @MainActor in
+            Task.detached {
                 // The folders and files at the Dock's right by name and kind only (no path),
-                // then the Trash; opened by their place with dock-open.
+                // then the Trash; opened by their place with dock-open. Read off the main thread.
                 let others = Apps.dockOthers().map { ["name": $0.name, "kind": $0.folder ? "folder" : "file"] }
-                link.send(json: ["t": "dock", "apps": Apps.dock(), "others": others, "trash": true])
+                await MainActor.run { link.send(json: ["t": "dock", "apps": Apps.dock(), "others": others, "trash": true]) }
             }
         case let .dockOpen(index, name):
-            let link = self.link
-            Task { @MainActor in link.send(json: ["t": "dock-opened", "ok": Apps.openDockOther(index, name: name)]) }
+            Self.openOffMain(link) { Apps.openDockOther(index, name: name) }
         case .dockOpenTrash:
-            let link = self.link
-            Task { @MainActor in link.send(json: ["t": "dock-opened", "ok": Apps.openTrash()]) }
+            Self.openOffMain(link) { Apps.openTrash() }
         case let .quit(bundle, force):
             let link = self.link
             Task { @MainActor in

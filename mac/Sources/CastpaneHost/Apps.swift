@@ -91,7 +91,8 @@ enum Apps {
     /// its order: those with a local file URL to something that exists, at most 64. Other
     /// tiles (a web link, a spacer, Recent Applications) have none and are left out. The page
     /// gets their names and kinds only, never a path, and opens one by its place here.
-    @MainActor static func dockOthers() -> [(name: String, folder: Bool, url: URL)] {
+    // Not on the main thread: a Dock item on a network disk can take a while to check.
+    nonisolated static func dockOthers() -> [(name: String, folder: Bool, url: URL)] {
         let tiles = CFPreferencesCopyAppValue("persistent-others" as CFString, "com.apple.dock" as CFString) as? [[String: Any]] ?? []
         var out: [(name: String, folder: Bool, url: URL)] = []
         for tile in tiles {
@@ -115,14 +116,14 @@ enum Apps {
     /// Finder shows a folder, a file opens in its app, as a double click would: an app or a
     /// script kept there runs). Only if it is still the one the page saw there, by its name:
     /// the Dock may have changed since, or a disk gone, and another item be at that place.
-    @MainActor static func openDockOther(_ index: Int, name: String) -> Bool {
+    nonisolated static func openDockOther(_ index: Int, name: String) -> Bool {
         let others = dockOthers()
         guard others.indices.contains(index), others[index].name == name else { return false }
         return NSWorkspace.shared.open(others[index].url)
     }
 
     /// Opens the Trash in the Finder.
-    @MainActor static func openTrash() -> Bool {
+    nonisolated static func openTrash() -> Bool {
         guard let url = try? FileManager.default.url(for: .trashDirectory, in: .userDomainMask, appropriateFor: nil, create: false) else { return false }
         return NSWorkspace.shared.open(url)
     }
