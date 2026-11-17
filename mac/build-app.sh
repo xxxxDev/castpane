@@ -135,7 +135,7 @@ else
   echo "note: $root/web/dist is not built yet; the app is built without the web app"
 fi
 cp "$root/LICENSE" "$app/Contents/Resources/LICENSE" 2>/dev/null || true
-cp "$root/docs/THIRD-PARTY-LICENSES.txt" "$app/Contents/Resources/THIRD-PARTY-LICENSES.txt" 2>/dev/null || true
+cp "$root/docs/THIRD-PARTY-LICENSES.txt" "$app/Contents/Resources/THIRD-PARTY-LICENSES.txt"
 
 if [ "$identity" = "-" ]; then echo "== sign (ad hoc, hardened runtime)"; else echo "== sign (with the signing identity, hardened runtime)"; fi
 entitlements="$here/node.entitlements"
