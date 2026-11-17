@@ -155,6 +155,9 @@ watch(deskEl, (el) => { sized?.disconnect();sized = null;if (el && typeof Resize
 // phone turned): no wider than it. On a phone's narrow desk wholly in the room right of the
 // Dock; on a wider one only within the limits a drag has (partly off an edge is left so).
 // Heights are left: the keyboard up while the phone turns would have made them short for good.
+// Only when its width changes (turned, another screen): the keyboard coming up takes height for a
+// while, and the windows stay as they were.
+let fitWidth = 0;
 function fitIn() {
   const b = deskEl.value?.getBoundingClientRect();if (!b?.width || Math.round(b.width) === fitWidth) return;
   fitWidth = Math.round(b.width);
