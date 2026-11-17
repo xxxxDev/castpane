@@ -156,7 +156,8 @@
         </div>
         <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
         <!-- CastpaneOS: on a computer, the Mac's windows as windows of this page (components/CastpaneDesk.vue). -->
-        <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :snaps="snaps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="goHome();allAppsAsked++" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
+        <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :snaps="snaps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="osAllOpen = true;askIcons(true)" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
+        <AppsPanel v-if="appMode === 'os' && osAllOpen" class="cp-apps" :apps="apps" :icons="icons" :launching="launching" @close="osAllOpen = false" @pick="(a) => { osAllOpen = false;openApp(a); }"/>
         <RemoteHome v-if="appMode === 'home'" :os="osAvailable" @os="goOs" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
           <template #dock><RemoteDock v-if="macWindows" docked :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="openApp" @window="openWindow" @other="openDockOther" @trash="openDockTrash"/></template>
         </RemoteHome>
@@ -277,6 +278,7 @@ import { adminProblem, withAdminAgain } from '../js/adminAgain.js';
 import { passkeysWork, passkeyAgain, cancelled } from '../js/passkeys.js';
 import { viewportBroken } from '../js/visibleHeight.js';
 import RemoteHome from '../components/RemoteHome.vue';
+import AppsPanel from '../components/AppsPanel.vue';
 import CastpaneDesk from '../components/CastpaneDesk.vue';
 import { deskWindows, keyLayout, rereadAccount } from '../js/remotePrefs.js';
 import RemoteWindows from '../components/RemoteWindows.vue';
@@ -658,7 +660,9 @@ watch(groups, (gs) => {
   const holding = current.value && gs.find((g) => g.items.some((w) => w.kind === current.value.kind && w.id === current.value.id));
   groupKey.value = (holding || gs.find((g) => g.current) || gs[0])?.key || '';
 });
-function list() { link?.send({ t: 'list' }); }
+// On CastpaneOS's desk the windows not in front show the Mac's pictures large: as sharp as
+// the largest it sends.
+function list() { link?.send(appMode.value === 'os' ? { t: 'list', thumb: 800 } : { t: 'list' }); }
 function show(w) {
   const same = current.value?.kind === w.kind && current.value?.id === w.id;
   hasPicture.value = hasPicture.value && same;
@@ -1414,14 +1418,15 @@ const allAppsAsked = ref(0);
 // captured alone): started, then offered the whole screen at once rather than waited for.
 const WHOLE_SCREEN_ONLY = new Set(['com.apple.systempreferences']);
 function openApp(a) {
-  if (LAUNCHERS.has(a.bundle)) { if (appMode.value !== 'home') goHome();allAppsAsked.value++;return; }
+  if (LAUNCHERS.has(a.bundle)) { if (appMode.value === 'os') { osAllOpen.value = true;askIcons(true);return; } if (appMode.value !== 'home') goHome();allAppsAsked.value++;return; }
   if (WHOLE_SCREEN_ONLY.has(a.bundle)) {
     link?.send({ t: 'launch', bundle: a.bundle });
     f7.dialog.create({ title: ct('「{name}」只能在整個螢幕操作').replace('{name}', () => a.name), text: ct('macOS 不讓它的視窗單獨顯示。它已在 Mac 上打開，可以到整個螢幕使用。'), buttons: [{ text: ct('取消') }, { text: ct('整個螢幕'), bold: true, onClick: goDesktop }] }).open();
     return;
   }
   const w = recentWindows.value.find((x) => x.bundle === a.bundle);
-  if (w) return openWindow(w);
+  // On CastpaneOS's desk the app's window comes up there, not alone.
+  if (w) return appMode.value === 'os' ? deskRef.value?.place(w) : openWindow(w);
   // Not open, or open with no window: started (or asked for a window), then shown once it has one.
   link?.send({ t: 'launch', bundle: a.bundle });
   waitForWindow(a.bundle);
@@ -1528,28 +1533,34 @@ async function openWindow(w, keepOrder = false, tried = new Set()) {
 // CastpaneOS, a computer's only (a mouse and the room): its windows' pictures read again every
 // five seconds while it is up and shown (a list takes the Mac about half a second of work).
 const osAvailable = computed(() => !isTouch && typeof window !== 'undefined' && window.innerWidth >= 1024);
-const deskRef = ref(null), machineId = ref(''), osLive = ref(null);
+const deskRef = ref(null), machineId = ref(''), osLive = ref(null), osAllOpen = ref(false);
 // The desk's window in front, live over its body: its picture started when it changes, the
 // box only moved when the window is dragged or resized. None in front: the picture stops.
 function osFocus(f) {
   if (appMode.value !== 'os') return;
   if (!f) { if (osLive.value) { snapCurrent();link?.send({ t: 'stop' });current.value = null;hasPicture.value = false; } osLive.value = null;return; }
-  const changed = osLive.value?.id !== f.win.id, before = osLive.value?.rect;
+  const changed = osLive.value?.id !== f.win.id;
   osLive.value = { id: f.win.id, rect: f.rect };
   // The Mac's window made the shape of this one's body (no bands around its picture), then its
-  // picture started; made again once a resize has settled.
+  // picture started; made again once a resize has settled. Measured against the size it was
+  // last made, not the step before: a drag's last small steps once cancelled the refit, and the
+  // picture was left stretched over the larger window.
+  const refit = async () => {
+    const size = { width: f.rect.width, height: f.rect.height };
+    if (await fitTo(f.win) && osLive.value?.id === f.win.id) { osFitted = size;show(f.win); }
+  };
+  if (changed) { clearTimeout(osFitTimer);snapCurrent();resetView();hasPicture.value = false;osFitted = null;nextTick(refit);return; }
+  if (osFitted && Math.abs(osFitted.width - f.rect.width) <= 2 && Math.abs(osFitted.height - f.rect.height) <= 2) { clearTimeout(osFitTimer);return; }
   clearTimeout(osFitTimer);
-  if (changed) { snapCurrent();resetView();hasPicture.value = false;nextTick(async () => { await fitTo(f.win);if (osLive.value?.id === f.win.id) show(f.win); });return; }
-  if (before && (Math.abs(before.width - f.rect.width) > 2 || Math.abs(before.height - f.rect.height) > 2)) {
-    osFitTimer = setTimeout(async () => { if (osLive.value?.id === f.win.id && await fitTo(f.win)) show(f.win); }, 600);
-  }
+  osFitTimer = setTimeout(() => { if (osLive.value?.id === f.win.id) refit(); }, 600);
 }
+let osFitted = null;
 let osFitTimer = 0;
 onBeforeUnmount(() => clearTimeout(osFitTimer));
 let osTimer = 0;
 function goOs() {
   goHome();
-  appMode.value = 'os';
+  appMode.value = 'os';osAllOpen.value = false;list();
   clearInterval(osTimer);osTimer = setInterval(() => { if (appMode.value === 'os' && document.visibilityState === 'visible') list();else if (appMode.value !== 'os') clearInterval(osTimer); }, 5000);
 }
 onBeforeUnmount(() => clearInterval(osTimer));

@@ -69,6 +69,9 @@ let top = Math.max(1, ...placed.value.map((o) => o.z || 1));
 // Those of the Mac's windows still there (and not in its Dock); one gone is forgotten.
 const byId = computed(() => new Map(props.windows.map((w) => [w.id, w])));
 const shown = computed(() => placed.value.filter((o) => byId.value.get(o.id) && !byId.value.get(o.id).minimized).map((o) => ({ ...o, win: byId.value.get(o.id) })));
+// Coming in to windows kept from before: the top one is live at once, not left a thumbnail.
+let entered = false;
+watch(shown, (l) => { if (entered || !l.length) return;entered = true;if (focused.value === null) focused.value = l.reduce((a, b) => ((b.z || 0) > (a.z || 0) ? b : a)).id; }, { immediate: true });
 watch(byId, (m) => { const left = placed.value.filter((o) => m.has(o.id));if (left.length !== placed.value.length) { placed.value = left;keep(); } });
 // A window brought here, cascaded from the last one, sized to its own shape within the desk.
 function place(win) {
