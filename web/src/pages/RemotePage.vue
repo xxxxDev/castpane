@@ -521,7 +521,7 @@ async function connect(m, retried = false) {
   let pass;
   try { pass = await getPass(retried); } catch (e) { return f7.dialog.alert(adminProblem(e) || e.message); }
   if (!pass) return;
-  streaming.value = true;listed.value = false;macLocked.value = false;unlockOpen.value = false;unlockBusy.value = false;unlockError.value = '';hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;
+  streaming.value = true;listed.value = false;listAsked = 0;macLocked.value = false;unlockOpen.value = false;unlockBusy.value = false;unlockError.value = '';hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;
   startApps(m);
   await nextTick();
   link = openRemote({
@@ -562,7 +562,7 @@ function onMessage(msg) {
     if (msg.ok) unlockOpen.value = false;
     else { unlockError.value = msg.busy ? ct('試太快了，請等幾秒再試') : ct('沒有解鎖：密碼可能不對，請再試一次');nextTick(() => unlockField.value?.focus()); }
   } else if (msg.t === 'list') {
-    items.value = msg.items || [];listed.value = true;
+    items.value = msg.items || [];listed.value = true;listAsked = 0;
     if (bigWanted) { bigWanted = false;for (const w of items.value) if (w.kind === 'window' && w.thumb && recentWindows.value.some((r) => r.id === w.id)) bigThumbs[w.id] = w.thumb; }
     if (appMode.value !== 'desktop') { appsListed();return; }
     if (!current.value && items.value.length) {
@@ -619,6 +619,7 @@ function onMessage(msg) {
     current.value = null;hasPicture.value = false;osLive.value = null;list();
   } else if (msg.t === 'error') {
     notice.value = msg.message === 'not-running' ? ct('Castpane 沒有在執行') : msg.where === 'host' ? ct('Castpane 沒有回應，請稍後再試') : msg.message === 'gone' ? ct('這個視窗已經關閉') : msg.message;
+    if (msg.where === 'list') listAsked = 0;
     if (msg.where === 'start') list();
   } else if (msg.t === 'stopped' && appMode.value === 'os') {
     // On CastpaneOS's desk a window closed or put in the Dock only stops its own picture.
@@ -670,7 +671,14 @@ watch(groups, (gs) => {
 });
 // On CastpaneOS's desk the windows not in front show the Mac's pictures large: as sharp as
 // the largest it sends.
-function list() { link?.send(appMode.value === 'os' ? { t: 'list', thumb: 800 } : { t: 'list' }); }
+// One at a time: a list takes the Mac a while (a picture of each window), and asking again
+// before it answers only made each one slower (6 seconds and it is asked anyway).
+let listAsked = 0;
+function list() {
+  if (!link || Date.now() - listAsked < 6000) return;
+  listAsked = Date.now();
+  link.send(appMode.value === 'os' ? { t: 'list', thumb: 800 } : { t: 'list' });
+}
 function show(w) {
   const same = current.value?.kind === w.kind && current.value?.id === w.id;
   hasPicture.value = hasPicture.value && same;
@@ -1586,7 +1594,7 @@ onBeforeUnmount(() => clearTimeout(osFitTimer));
 let osTimer = 0;
 function goOs() {
   goHome();
-  appMode.value = 'os';osAllOpen.value = false;list();
+  appMode.value = 'os';osAllOpen.value = false;listAsked = 0;list();
   clearInterval(osTimer);osTimer = setInterval(() => { if (appMode.value === 'os' && document.visibilityState === 'visible') list();else if (appMode.value !== 'os') clearInterval(osTimer); }, 5000);
 }
 onBeforeUnmount(() => clearInterval(osTimer));
@@ -1667,7 +1675,7 @@ const bigThumbs = reactive({});
 let bigWanted = false;
 async function openSwitcher() {
   snapCurrent();
-  bigWanted = true;link?.send({ t: 'list', thumb: 720 });
+  bigWanted = true;listAsked = Date.now();link?.send({ t: 'list', thumb: 720 });
   const now = current.value && recentWindows.value.find((w) => w.id === current.value.id);
   switcherCards.value = [...recentWindows.value.filter((w) => w !== now).reverse(), ...(now ? [now] : [])];
   switcherPhase.value = 'enter';switcherOpen.value = true;

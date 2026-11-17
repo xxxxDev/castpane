@@ -95,10 +95,21 @@ enum Catalog {
                           "thumb": await thumbAll(content.displays, union, thumbWidth) ?? ""])
         }
         let desks = Spaces.desks()
+        let shown = windows(content)
+        // The windows' thumbnails taken all at once rather than one after the other (each can
+        // take a good part of a second): the list came in seconds with a few windows.
+        let thumbs = await withTaskGroup(of: (Int, String?).self) { group in
+            for (i, w) in shown.enumerated() {
+                let filter = Unchecked(SCContentFilter(desktopIndependentWindow: w)), size = w.frame.size
+                group.addTask { (i, await thumb(filter.value, size, thumbWidth)) }
+            }
+            var out = [String?](repeating: nil, count: shown.count)
+            for await (i, t) in group { out[i] = t }
+            return out
+        }
         // Which windows are in the Dock: asked once for each app that has a window here.
         var minimized: [pid_t: Set<CGWindowID>] = [:]
-        for w in windows(content) {
-            let filter = SCContentFilter(desktopIndependentWindow: w)
+        for (index, w) in shown.enumerated() {
             // Its desktop: number (per display), full screen, the one shown now; none in the Dock.
             var desk: [String: Any] = [:]
             if let id = Spaces.of(w.windowID), let d = desks[id] {
@@ -116,7 +127,7 @@ enum Catalog {
                           "here": w.isOnScreen, "desk": desk, "dock": regular, "minimized": inDock,
                           "bundle": w.owningApplication?.bundleIdentifier ?? "",
                           "width": Int(w.frame.width), "height": Int(w.frame.height),
-                          "thumb": await thumb(filter, w.frame.size, thumbWidth) ?? ""])
+                          "thumb": thumbs[index] ?? ""])
         }
         return items
     }
