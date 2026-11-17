@@ -174,7 +174,8 @@ Liquid Glass, which the snapshots do not draw.
 ## Requirements
 
 - **The Mac:** macOS 14 or later, Apple silicon or Intel (one release image for each).
-  Screen Recording and Accessibility permission for Castpane.
+  Screen Recording and Accessibility permission for Castpane; optionally Files and Folders for
+  the folders kept in the Dock, to open them from a phone.
 - **To build it:** the Command Line Tools (Swift 6) and Node.js 22.18 or later.
 - **The viewer:** a browser with WebCodecs (current Chrome, Edge, Safari 17 and later), over
   **HTTPS**. Browsers allow the video decoder, passkeys and the installable app only on HTTPS
@@ -207,7 +208,8 @@ open mac/build/Castpane.app
 The setup assistant first asks what this Mac is for. For the Mac you connect to, it then:
 
 1. makes your Castpane account;
-2. asks for Screen Recording and Accessibility (Castpane offers to restart after the first);
+2. asks for Screen Recording and Accessibility (Castpane offers to restart after the first),
+   and, if you want, the folders kept in the Dock;
 3. asks how to connect: a quick tunnel, your own domain or Tailscale;
 4. shows the address and a QR code. Open it on the phone, sign in, and use **Share › Add to
    Home Screen** for the app.

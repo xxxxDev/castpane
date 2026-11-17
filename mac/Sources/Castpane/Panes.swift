@@ -63,7 +63,8 @@ struct PermissionRow: View {
 struct DockFoldersRow: View {
     @ViewState private var result: [String: Bool]? = DockFolders.kept
     @ViewState private var asking = false
-    @ViewState private var names: [String] = DockFolders.list().map(\.name)
+    // Read off the main thread: a Dock folder on a network disk gone can take long to check.
+    @ViewState private var names: [String] = []
 
     private var allowed: Bool { guard let r = result, !names.isEmpty else { return false }; return names.allSatisfy { r[$0] == true } }
 
@@ -96,6 +97,7 @@ struct DockFoldersRow: View {
             }
         }
         .glassCard()
+        .task { names = await Task.detached { DockFolders.list().map(\.name) }.value }
     }
 }
 

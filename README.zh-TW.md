@@ -164,7 +164,8 @@ App 的面板和按鈕是 Liquid Glass 玻璃效果，截圖裡畫不出來。
 ## 需求
 
 - **Mac：** macOS 14 以上，Apple 晶片或 Intel 都可以（各有一個 dmg）。
-  Castpane 需要「螢幕錄製」和「輔助使用」權限。
+  Castpane 需要「螢幕錄製」和「輔助使用」權限；Dock 上的資料夾要從手機打開的話，
+  可另外允許「檔案與檔案夾」。
 - **編譯：** Command Line Tools（Swift 6）和 Node.js 22.18 以上。
 - **觀看端：** 支援 WebCodecs 的瀏覽器（新版 Chrome、Edge、Safari 17 以上），
   而且要走 **HTTPS**。瀏覽器只在 HTTPS 上（或在 Mac 本機的 `127.0.0.1`）
@@ -197,7 +198,8 @@ open mac/build/Castpane.app
 設定精靈會先問這台 Mac 的用途。選「你要連的這台」，接著會：
 
 1. 建立你的 Castpane 帳號；
-2. 要求「螢幕錄製」和「輔助使用」權限（開好第一個後，Castpane 會提議重新啟動）；
+2. 要求「螢幕錄製」和「輔助使用」權限（開好第一個後，Castpane 會提議重新啟動），
+   也可以一併允許 Dock 上的資料夾；
 3. 問你怎麼連線：快速通道、自己的網域或 Tailscale；
 4. 顯示網址和 QR code。在手機上打開、登入，
    再用 **分享 › 加入主畫面** 安裝 App。

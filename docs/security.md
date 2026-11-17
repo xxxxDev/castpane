@@ -157,7 +157,8 @@ unreadable, so the server refuses to start in that state instead of making a new
 - **Other programs running as you.** Any process under your macOS account that is not
   sandboxed can read `host.token` and connect to `host.sock`, which lets it watch your screen
   and post clicks and keys through the capture core, which holds your Screen Recording and
-  Accessibility permissions. It can also read `local.token` and Castpane's databases. The
+  Accessibility permissions (and, if you allowed them, the Dock's folders under Files and
+  Folders, which it opens only by their place in the Dock). It can also read `local.token` and Castpane's databases. The
   token files keep out other users and sandboxed apps, not code you already run. Only run
   software you trust, and keep untrusted tools in a sandbox that denies access to this folder.
   The same boundary holds Castpane's own parts: the bundled Node that runs the server,

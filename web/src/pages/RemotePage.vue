@@ -156,7 +156,7 @@
         </div>
         <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
         <!-- CastpaneOS: on a computer, the Mac's windows as windows of this page (components/CastpaneDesk.vue). -->
-        <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="goHome();allAppsAsked++" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
+        <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :snaps="snaps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="goHome();allAppsAsked++" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
         <RemoteHome v-if="appMode === 'home'" :os="osAvailable" @os="goOs" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
           <template #dock><RemoteDock v-if="macWindows" docked :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="openApp" @window="openWindow" @other="openDockOther" @trash="openDockTrash"/></template>
         </RemoteHome>
@@ -605,9 +605,14 @@ function onMessage(msg) {
     else if (!msg.editable) keyHint.value = false;
   } else if (msg.t === 'config') {
     hasPicture.value = true;clearTimeout(noPicture);
+  } else if (msg.t === 'error' && appMode.value === 'os' && msg.message === 'gone') {
+    current.value = null;hasPicture.value = false;osLive.value = null;list();
   } else if (msg.t === 'error') {
     notice.value = msg.message === 'not-running' ? ct('Castpane 沒有在執行') : msg.where === 'host' ? ct('Castpane 沒有回應，請稍後再試') : msg.message === 'gone' ? ct('這個視窗已經關閉') : msg.message;
     if (msg.where === 'start') list();
+  } else if (msg.t === 'stopped' && appMode.value === 'os') {
+    // On CastpaneOS's desk a window closed or put in the Dock only stops its own picture.
+    current.value = null;hasPicture.value = false;osLive.value = null;list();
   } else if (msg.t === 'stopped') {
     // An app that opens with a window of its own first (Discord's updater) closes it for its
     // main one: the page follows the app to that window.
@@ -1330,7 +1335,12 @@ function openFromDock(request, name, kind = 'folder') {
 function openDockOther(index, o) { const item = o || dockOthers.value[index];if (item?.name) openFromDock({ index, name: item.name }, item.name, item.kind === 'file' ? 'file' : 'folder'); }
 function openDockTrash() { openFromDock({ trash: true }, ct('垃圾桶')); }
 // A window gone from here (closed, or put in the Dock): the one shown now goes back home.
-function leaveIfShown(w) { if (current.value?.kind === 'window' && current.value.id === w.id) goHome(); }
+function leaveIfShown(w) {
+  if (current.value?.kind !== 'window' || current.value.id !== w.id) return;
+  // On CastpaneOS's desk only that window's picture stops: the desk stays.
+  if (appMode.value === 'os') { link?.send({ t: 'stop' });current.value = null;hasPicture.value = false;osLive.value = null;return; }
+  goHome();
+}
 function minimizeWindow(w) {
   link?.send({ t: 'minimize', id: w.id });
   w.minimized = true;
@@ -1493,8 +1503,9 @@ const snaps = reactive({});
 function snapCurrent() {
   try {
     const c = canvas.value, w = currentWindow.value;
-    if (!c || !w || !hasPicture.value || appMode.value !== 'app' || !c.width) return;
-    const s = document.createElement('canvas');s.width = Math.min(c.width, 600);s.height = Math.round(s.width * c.height / c.width);
+    if (!c || !w || !hasPicture.value || (appMode.value !== 'app' && appMode.value !== 'os') || !c.width) return;
+    // On CastpaneOS's desk the window stays on show, as sharp as its live picture was.
+    const s = document.createElement('canvas');s.width = Math.min(c.width, appMode.value === 'os' ? 1800 : 600);s.height = Math.round(s.width * c.height / c.width);
     s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);
     delete snaps[w.id];snaps[w.id] = s.toDataURL('image/jpeg', 0.8);s.width = s.height = 0;
     for (const k of Object.keys(snaps).slice(0, -8)) delete snaps[k];
@@ -1520,13 +1531,13 @@ const deskRef = ref(null), machineId = ref(''), osLive = ref(null);
 // box only moved when the window is dragged or resized. None in front: the picture stops.
 function osFocus(f) {
   if (appMode.value !== 'os') return;
-  if (!f) { if (osLive.value) { link?.send({ t: 'stop' });current.value = null;hasPicture.value = false; } osLive.value = null;return; }
+  if (!f) { if (osLive.value) { snapCurrent();link?.send({ t: 'stop' });current.value = null;hasPicture.value = false; } osLive.value = null;return; }
   const changed = osLive.value?.id !== f.win.id, before = osLive.value?.rect;
   osLive.value = { id: f.win.id, rect: f.rect };
   // The Mac's window made the shape of this one's body (no bands around its picture), then its
   // picture started; made again once a resize has settled.
   clearTimeout(osFitTimer);
-  if (changed) { resetView();hasPicture.value = false;nextTick(async () => { await fitTo(f.win);if (osLive.value?.id === f.win.id) show(f.win); });return; }
+  if (changed) { snapCurrent();resetView();hasPicture.value = false;nextTick(async () => { await fitTo(f.win);if (osLive.value?.id === f.win.id) show(f.win); });return; }
   if (before && (Math.abs(before.width - f.rect.width) > 2 || Math.abs(before.height - f.rect.height) > 2)) {
     osFitTimer = setTimeout(async () => { if (osLive.value?.id === f.win.id && await fitTo(f.win)) show(f.win); }, 600);
   }

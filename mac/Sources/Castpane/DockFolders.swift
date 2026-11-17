@@ -28,7 +28,12 @@ enum DockFolders {
     static func ask(done: @escaping @Sendable ([String: Bool]) -> Void) {
         DispatchQueue(label: "castpane.dock-folders").async {
             var out: [String: Bool] = [:]
-            for f in list() { out[f.name] = (try? FileManager.default.contentsOfDirectory(atPath: f.url.path)) != nil }
+            for f in list() {
+                // Opening it and reading one entry is enough for macOS to ask (or to say no).
+                var readable = false
+                if let dir = opendir(f.url.path) { _ = readdir(dir);closedir(dir);readable = true }
+                out[f.name] = readable
+            }
             UserDefaults.standard.set(out, forKey: keptKey)
             done(out)
         }

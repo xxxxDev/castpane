@@ -26,13 +26,13 @@
         <button type="button" class="cp-win-full" :title="ct('單獨全畫面')" :aria-label="ct('單獨全畫面')" @pointerdown.stop @click="$emit('open', o.win)"><f7-icon f7="arrow_up_left_arrow_down_right" :size="13"/></button>
       </div>
       <div class="cp-win-body">
-        <img v-if="o.win.thumb" :src="o.win.thumb" alt="" draggable="false"/>
+        <img v-if="snaps[o.id] || o.win.thumb" :src="snaps[o.id] || o.win.thumb" alt="" draggable="false"/>
         <div v-else class="cp-win-blank"><img v-if="icons[o.win.bundle]" :src="icons[o.win.bundle]" alt=""/></div>
       </div>
       <div v-if="!o.max" class="cp-win-grip" @pointerdown.stop="resizeStart($event, o)"></div>
     </div>
     <div v-if="!shown.length" class="cp-desk-empty">{{ ct('從下面的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。') }}</div>
-    <!-- The Mac's Dock: its apps (a dot under those running); a tap brings up the app's window here. -->
+    <!-- The Mac's Dock at the left, as on the Remote home: its apps (a dot beside those running); a tap brings up the app's window here. -->
     <div class="cp-dock" role="toolbar" :aria-label="ct('Dock')">
       <button v-for="a in dockApps" :key="a.bundle" type="button" class="cp-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="pick(a)">
         <img v-if="icons[a.bundle]" :src="icons[a.bundle]" alt=""/><span v-else>{{ (a.name || '?').slice(0, 1) }}</span>
@@ -54,7 +54,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
-const props = defineProps({ name: { type: String, default: '' }, machine: { type: String, default: '' }, windows: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, dockApps: { type: Array, default: () => [] }, others: { type: Array, default: () => [] }, trash: { type: Boolean, default: false } });
+const props = defineProps({ name: { type: String, default: '' }, machine: { type: String, default: '' }, windows: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, dockApps: { type: Array, default: () => [] }, others: { type: Array, default: () => [] }, trash: { type: Boolean, default: false }, snaps: { type: Object, default: () => ({}) } });
 const emit = defineEmits(['home', 'all', 'desktop', 'open', 'app', 'closeWindow', 'minimize', 'live', 'other', 'trash']);
 const deskEl = ref(null), focused = ref(null);
 // The windows in the Mac's Dock, as its Dock shows them after its apps.
@@ -80,7 +80,7 @@ function place(win) {
   let w = Math.min(room.w * 0.6, 760), h = w / ratio;
   if (h > room.h * 0.75) { h = room.h * 0.75;w = h * ratio; }
   const n = placed.value.length % 6;
-  const o = { id: win.id, x: 40 + n * 36, y: 54 + n * 30, w: Math.round(Math.max(260, w)), h: Math.round(Math.max(180, h) + 30), z: ++top, max: false };
+  const o = { id: win.id, x: 100 + n * 36, y: 54 + n * 30, w: Math.round(Math.max(260, w)), h: Math.round(Math.max(180, h) + 30), z: ++top, max: false };
   placed.value = [...placed.value, o];focused.value = o.id;keep();
 }
 function update(id, patch) { placed.value = placed.value.map((o) => (o.id === id ? { ...o, ...patch } : o)); }
@@ -157,14 +157,14 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
 .cp-win-grip {position:absolute;right:-16px;bottom:-16px;z-index:9001;width:22px;height:22px;cursor:nwse-resize;touch-action:none;}
 .cp-win-grip::after {content:'';position:absolute;right:10px;bottom:10px;width:8px;height:8px;border-right:2px solid rgba(255,255,255,.4);border-bottom:2px solid rgba(255,255,255,.4);}
 .cp-desk-empty {position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);color:#9a9a9f;font-size:14px;}
-.cp-dock {position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:9000;display:flex;gap:8px;max-width:calc(100% - 40px);overflow-x:auto;scrollbar-width:none;padding:8px 10px;border-radius:22px;background:rgba(40,40,44,.6);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px rgba(255,255,255,.25), 0 10px 40px rgba(0,0,0,.5);}
+.cp-dock {position:absolute;left:12px;top:calc(50% + 20px);transform:translateY(-50%);z-index:9000;display:flex;flex-direction:column;gap:8px;max-height:calc(100% - 80px);overflow-y:auto;scrollbar-width:none;padding:10px 8px;border-radius:22px;background:rgba(40,40,44,.6);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px rgba(255,255,255,.25), 0 10px 40px rgba(0,0,0,.5);}
 .remote-stage .cp-dock-app {position:relative;flex:0 0 auto;width:48px;height:48px;margin:0;padding:0;border:0;background:none;cursor:pointer;}
 .cp-dock-app img {width:48px;height:48px;}
 .cp-dock-app span {display:flex;width:48px;height:48px;align-items:center;justify-content:center;border-radius:11px;background:#3a3a3c;color:#fff;font-weight:600;}
-.cp-dock-sep {flex:0 0 auto;width:1px;margin:4px 2px;background:rgba(255,255,255,.2);}
+.cp-dock-sep {flex:0 0 auto;height:1px;margin:2px 4px;background:rgba(255,255,255,.2);}
 .cp-dock-glyph {display:flex;width:48px;height:48px;align-items:center;justify-content:center;border-radius:11px;background:rgba(255,255,255,.12);color:#9fc3ff;}
 .cp-dock-trash .cp-dock-glyph {color:#ddd;}
 .cp-dock-thumb {width:48px !important;height:36px !important;margin-top:6px;object-fit:cover;object-position:top;border-radius:5px;background:#000;}
 .cp-dock-badge {position:absolute;right:-4px;bottom:-2px;width:20px !important;height:20px !important;}
-.cp-dock-app.running::after {content:'';position:absolute;left:50%;bottom:-6px;width:4px;height:4px;margin-left:-2px;border-radius:2px;background:#ddd;}
+.cp-dock-app.running::after {content:'';position:absolute;left:-6px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:2px;background:#ddd;}
 </style>

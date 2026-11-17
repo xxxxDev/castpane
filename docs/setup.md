@@ -94,6 +94,11 @@ For the Mac you connect to:
 
    The assistant shows each one's state live, with a button that opens the right pane.
 
+   A third, optional row asks for the **folders kept in the Dock** (Downloads, Documents…),
+   so they open from a phone without macOS asking first on the Mac, where nobody would see
+   it. **Ask Now** reads each of those folders once to make macOS ask (Files and Folders);
+   nothing is read beyond that. Settings › Permissions has the same row.
+
 3. **Connection.** One of the three modes below. To try Castpane from a phone, a quick tunnel
    is the simplest: HTTPS at once, with no account.
 4. **Done.** The address and a QR code. Open it on your phone, sign in, then in Safari use
