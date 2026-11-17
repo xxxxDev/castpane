@@ -172,7 +172,8 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
 .cp-edge-s {bottom:-5px;left:10px;right:10px;height:8px;cursor:ns-resize;}
 .cp-edge-e {right:-5px;top:10px;bottom:10px;width:8px;cursor:ew-resize;}
 .cp-edge-w {left:-5px;top:10px;bottom:10px;width:8px;cursor:ew-resize;}
-.cp-edge-ne, .cp-edge-nw, .cp-edge-se, .cp-edge-sw {width:22px;height:22px;}
+/* 14 wide, 6 of it over the window: clear of the lights and the bar's buttons (10 in). */
+.cp-edge-ne, .cp-edge-nw, .cp-edge-se, .cp-edge-sw {width:14px;height:14px;}
 .cp-edge-ne {right:-8px;top:-8px;cursor:nesw-resize;}
 .cp-edge-sw {left:-8px;bottom:-8px;cursor:nesw-resize;}
 .cp-edge-nw {left:-8px;top:-8px;cursor:nwse-resize;}
