@@ -172,8 +172,10 @@ enum Catalog {
             for w in found where !ThumbMisses.recent(w.windowID) {
                 let filter = Unchecked(SCContentFilter(desktopIndependentWindow: w)), size = w.frame.size, id = w.windowID
                 group.addTask {
-                    let t = await thumb(filter.value, size, width)
+                    var t = await thumb(filter.value, size, width)
                     if t == nil { ThumbMisses.note(id) } else { ThumbMisses.clear(id) }
+                    // Too big to send (a photo 1200 wide): taken again narrower, not left out.
+                    if let big = t, big.utf8.count > 400_000 { t = await thumb(filter.value, size, max(160, width * 3 / 5)) }
                     return t.map { (Int(id), $0) }
                 }
             }
