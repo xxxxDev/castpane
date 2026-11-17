@@ -33,7 +33,8 @@ defineProps({ apps: { type: Array, default: () => [] }, windows: { type: Array, 
 defineEmits(['app', 'appMenu', 'window', 'other', 'trash', 'close']);
 </script>
 <style>
-.remote-dock-layer {position:absolute;inset:0;z-index:28;}
+/* Above the key row when there is one (--dock-foot, its height): all of a long Dock in reach. */
+.remote-dock-layer {position:absolute;inset:0 0 var(--dock-foot, 0px) 0;z-index:28;}
 .remote-dock {position:absolute;left:8px;top:50%;transform:translateY(-50%);max-height:calc(100% - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px 8px;border-radius:36px;background:rgba(28,28,30,.6);border:0;box-shadow:rgba(255,255,255,.4) 2px 2px 2px -2px inset,rgba(255,255,255,.4) -2px -2px 2px -2px inset,rgba(255,255,255,.4) 0 0 1px 0 inset,0 10px 40px rgba(0,0,0,.6);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);}
 .remote-dock::-webkit-scrollbar {display:none;}
 /* Kept open beside the home's cards: a column, so the pill shrinks to the height there is

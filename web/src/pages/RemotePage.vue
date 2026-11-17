@@ -181,7 +181,7 @@
         <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''" :can-quit="mayQuit(windowsOfList[0])" @quit="() => { const w = windowsOfList[0];windowsOf = '';quitApp(w); }" @force-quit="() => { const w = windowsOfList[0];windowsOf = '';forceQuit(w); }"/>
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
         <button v-if="!isTouch && macWindows && appMode !== 'home' && appMode !== 'os' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
-        <RemoteDock v-if="dockOpen" @app-menu="openDockMenu" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @other="(i, o) => { dockOpen = false;openDockOther(i, o); }" @trash="dockOpen = false;openDockTrash()" @close="dockOpen = false"/>
+        <RemoteDock v-if="dockOpen" :style="dockFoot ? {'--dock-foot': dockFoot + 'px'} : null" @app-menu="openDockMenu" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @other="(i, o) => { dockOpen = false;openDockOther(i, o); }" @trash="dockOpen = false;openDockTrash()" @close="dockOpen = false"/>
         <div v-show="(appMode !== 'home' && appMode !== 'os') || (appMode === 'os' && osLive)" ref="area" class="remote-area" :class="{'cp-live': appMode === 'os', 'cp-waiting': appMode === 'os' && !hasPicture, 'cp-typing': osTyping}" :style="appMode === 'os' && osLive ? osBox : null" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
@@ -1371,7 +1371,9 @@ const mayQuit = (w) => macWindows.value && !!w?.bundle && w.bundle.toLowerCase()
 // The windows' sheet, the Dock and a card's menu belong to one Mac and one moment.
 function closeWindowViews() { windowsOf.value = '';dockOpen.value = false;dockApps.value = [];dockOthers.value = [];dockTrash.value = false;cardMenu.value = null; }
 const dockWindows = computed(() => orderedWindows.value.filter((w) => w.minimized));
-function openDock() { dockOpen.value = true;link?.send({ t: 'dock' });list(); }
+// The key row's height, kept clear under the Dock.
+const dockFoot = ref(0);
+function openDock() { dockFoot.value = document.querySelector('.remote-keys-touch')?.offsetHeight || 0;dockOpen.value = true;link?.send({ t: 'dock' });list(); }
 // A folder or file from the Dock (by its place there) or the Trash, opened on the Mac; the
 // Finder window that comes for it is shown: one that was not open before. A file opened in
 // its own app brings none, and is given up on as an app without a window is.
