@@ -35,8 +35,8 @@
     <div v-if="!shown.length" class="cp-desk-empty">{{ ct('從左側的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。') }}</div>
     <!-- The Mac's Dock at the left, as on the Remote home: its apps (a dot beside those running); a tap brings up the app's window here. -->
     <div class="cp-dock" role="toolbar" :aria-label="ct('Dock')">
-      <button v-for="a in dockApps" :key="a.bundle" type="button" class="cp-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="held ? (held = false) : pick(a)" @contextmenu.prevent="$emit('appMenu', a, $event)" @pointerdown="holdDown($event, a)" @pointermove="holdMove" @pointerup="holdEnd" @pointercancel="holdEnd">
-        <img v-if="icons[a.bundle]" :src="icons[a.bundle]" alt=""/><span v-else>{{ (a.name || '?').slice(0, 1) }}</span>
+      <button v-for="a in dockApps" :key="a.bundle" type="button" class="cp-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="held ? (held = false) : pick(a)" @contextmenu.prevent="dockContext($event, a)" @pointerdown="holdDown($event, a)" @pointermove="holdMove" @pointerup="holdEnd" @pointercancel="holdEnd">
+        <img v-if="icons[a.bundle]" :src="icons[a.bundle]" alt="" draggable="false"/><span v-else>{{ (a.name || '?').slice(0, 1) }}</span>
       </button>
       <!-- Then, as the Mac's Dock: the windows put in it, the folders and files kept there, the Trash. -->
       <div v-if="inDock.length || others.length || trash" class="cp-dock-sep" aria-hidden="true"></div>
@@ -115,8 +115,9 @@ function pick(a) {
 // By touch (no right click), a Dock app held half a second gives its menu; the tap after it does nothing.
 let held = false, holdAt = null, holdTimer = 0;
 function holdDown(e, a) {
+  held = false;clearTimeout(holdTimer);holdAt = null;
   if (e.pointerType === 'mouse') return;
-  holdAt = { x: e.clientX, y: e.clientY };held = false;clearTimeout(holdTimer);
+  holdAt = { x: e.clientX, y: e.clientY };
   const el = e.currentTarget;
   holdTimer = setTimeout(() => {
     held = true;holdAt = null;
@@ -126,6 +127,13 @@ function holdDown(e, a) {
 }
 function holdMove(e) { if (holdAt && Math.hypot(e.clientX - holdAt.x, e.clientY - holdAt.y) > 10) { clearTimeout(holdTimer);holdAt = null; } }
 function holdEnd() { clearTimeout(holdTimer);holdAt = null; }
+// The browser's own long-press menu (Android) and the hold give one menu, not two.
+function dockContext(e, a) {
+  clearTimeout(holdTimer);holdAt = null;
+  if (held) return;
+  if (e.pointerType && e.pointerType !== 'mouse') held = true;
+  emit('appMenu', a, e);
+}
 onBeforeUnmount(() => clearTimeout(holdTimer));
 // The windows on show and not in front, the top ones first, with their body's width.
 function behind() { return shown.value.filter((o) => o.id !== focused.value).sort((a, b) => (b.z || 0) - (a.z || 0)).map((o) => ({ id: o.id, width: o.max ? (deskEl.value?.clientWidth || o.w) : o.w })); }
@@ -234,9 +242,9 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
   .cp-edge-e {right:-10px;}
   .cp-edge-w {left:-10px;}
   .cp-edge-ne, .cp-edge-nw, .cp-edge-se, .cp-edge-sw {width:28px;height:28px;}
-  .cp-edge-ne {right:-14px;top:-14px;}
+  .cp-edge-ne {right:-14px;top:-20px;}
   .cp-edge-sw {left:-14px;bottom:-14px;}
-  .cp-edge-nw {left:-14px;top:-14px;}
+  .cp-edge-nw {left:-14px;top:-20px;}
   .cp-edge-se {right:-14px;bottom:-14px;}
 }
 /* A phone's narrow desk: the bar's tools as icons, a smaller Dock. */

@@ -158,7 +158,7 @@
         <!-- CastpaneOS: on a computer, the Mac's windows as windows of this page (components/CastpaneDesk.vue). -->
         <CastpaneDesk v-if="appMode === 'os'" @app-menu="openDockMenu" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :snaps="snaps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="osAllOpen = true;askIcons(true)" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
         <!-- A Dock app's menu (right click), over everything. -->
-        <div v-if="dockMenu" class="remote-dock-menu-layer" @pointerdown.self="dockMenu = null" @contextmenu.prevent="dockMenu = null">
+        <div v-if="dockMenu" class="remote-dock-menu-layer" @pointerdown.self="dockMenu = null" @contextmenu.prevent="$event.pointerType && $event.pointerType !== 'mouse' ? null : (dockMenu = null)">
           <div class="remote-home-menu remote-dock-menu" :style="{left: dockMenu.x + 'px', top: dockMenu.y + 'px'}">
             <button type="button" class="new-window" @click="newWindowOf(dockMenu.a);dockMenu = null">{{ ct('新增視窗') }}</button>
             <button v-if="dockMenu.has" type="button" class="all-windows" @click="allWindowsOf(dockMenu.a);dockMenu = null">{{ ct('顯示所有視窗') }}</button>
