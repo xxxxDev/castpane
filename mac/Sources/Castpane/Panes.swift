@@ -58,6 +58,47 @@ struct PermissionRow: View {
     }
 }
 
+/// The Dock's folders asked for here, at the Mac, so opening one from a phone never waits on a
+/// question nobody sees (DockFolders).
+struct DockFoldersRow: View {
+    @ViewState private var result: [String: Bool]? = DockFolders.kept
+    @ViewState private var asking = false
+    @ViewState private var names: [String] = DockFolders.list().map(\.name)
+
+    private var allowed: Bool { guard let r = result, !names.isEmpty else { return false }; return names.allSatisfy { r[$0] == true } }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: allowed || names.isEmpty ? "checkmark.circle.fill" : "folder.badge.questionmark")
+                .foregroundStyle(allowed || names.isEmpty ? .green : .orange).font(.title2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Folders in the Dock").font(.headline)
+                Text(names.isEmpty ? "The Dock keeps no folders. Nothing to ask."
+                     : "So \(names.joined(separator: ", ")) open from your phone without macOS asking first on this Mac, where nobody sees it. Asked once, here.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if let r = result, !allowed, !names.isEmpty {
+                    let denied = names.filter { r[$0] == false }
+                    if !denied.isEmpty {
+                        Text("Not allowed: \(denied.joined(separator: ", ")). Allow them in System Settings › Privacy & Security › Files and Folders.")
+                            .font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            Spacer()
+            if names.isEmpty || allowed {
+                Text(names.isEmpty ? "" : "Allowed").foregroundStyle(.secondary)
+            } else {
+                Button(asking ? "Asking…" : "Ask Now") {
+                    asking = true
+                    DockFolders.ask { r in DispatchQueue.main.async { result = r;asking = false;names = DockFolders.list().map(\.name) } }
+                }
+                .secondaryButtonStyle().controlSize(.large).disabled(asking)
+            }
+        }
+        .glassCard()
+    }
+}
+
 struct PermissionsPane: View {
     @EnvironmentObject var model: AppModel
     var showNote = true
@@ -68,6 +109,7 @@ struct PermissionsPane: View {
                           granted: model.screenGranted) { model.requestScreen() }
             PermissionRow(title: "Accessibility", detail: "To let your viewer click, scroll and type on this Mac.",
                           granted: model.accessibilityGranted) { model.requestAccessibility() }
+            DockFoldersRow()
             if model.screenNeedsRestart {
                 HStack {
                     Text("macOS applies Screen Recording after Castpane starts again.").font(.callout)
