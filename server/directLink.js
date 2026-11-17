@@ -10,8 +10,9 @@
 
 const CHUNK = 60 * 1024;
 const MAX_IN = 1024 * 1024 + 64 * 1024;
-// Public STUN only (no relay): each side learns the address the internet sees it at.
-const ICE = ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'];
+// Public STUN only (no relay): each side learns the address the internet sees it at. The page
+// picks Cloudflare's and Google's, or Cloudflare's alone (Settings › Remote › Direct link).
+const ICE = { both: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'], cloudflare: ['stun:stun.cloudflare.com:3478'] };
 
 let lib;
 function load() {
@@ -33,11 +34,11 @@ function pieces(kind, buf) {
 
 // sendSignal(msg): to the page over its socket. onMessage(buf): a whole JSON message from the
 // page. onOpen() / onClose(): the link opened, or went (the socket carries everything again).
-function createDirect({ sendSignal, onMessage, onOpen, onClose }) {
+function createDirect({ sendSignal, onMessage, onOpen, onClose, stun = 'both' }) {
   const d = load();
   if (!d) return null;
   let pc;
-  try { pc = new d.PeerConnection('castpane', { iceServers: ICE, maxMessageSize: 256 * 1024 }); } catch { return null; }
+  try { pc = new d.PeerConnection('castpane', { iceServers: ICE[stun] || ICE.cloudflare, maxMessageSize: 256 * 1024 }); } catch { return null; }
   let dc = null, open = false, done = false, inParts = [], inLength = 0;
   pc.onLocalDescription((sdp, type) => { if (!done) sendSignal({ t: 'rtc-answer', sdp, type }); });
   pc.onLocalCandidate((candidate, mid) => { if (!done) sendSignal({ t: 'rtc-candidate', candidate, mid }); });

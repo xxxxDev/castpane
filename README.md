@@ -137,6 +137,13 @@ back, with touch modes made for a small screen.
 - **The clipboard both ways.** Copy the Mac's clipboard to the phone, or paste the phone's
   where the Mac's cursor is in one press. What a password manager marks hidden is never sent;
   each use is in Activity.
+- **A direct link.** Through the tunnel every click and frame goes by Cloudflare, which can be
+  far away; the page and the Mac then try to reach each other directly (WebRTC, finding their
+  way through routers with public STUN), and the picture and your input go that way, the
+  shorter path when Cloudflare's point is far away. When that cannot connect, or stops, the tunnel carries them as before.
+  The picture's numbers show the round trip and which way is in use. **Settings › Remote ›
+  Direct link** picks Cloudflare's and Google's STUN, Cloudflare's alone, or off; see
+  [docs/security.md](docs/security.md).
 - **Stays current.** Each frame shown is acknowledged; the Mac skips frames while a few are
   unshown (more over a slower round trip), so a slow network gives fewer frames, not old
   ones. Quality and resolution are automatic by default: they start from what the device can
@@ -269,6 +276,7 @@ Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 
 The code is under the [MIT License](LICENSE). The Castpane logo (in this README, the app and
 web icons) isn't: see [BRAND.md](BRAND.md). `server/` and `web/` grew from an MIT-licensed
-shared PWA base whose notice is kept in the license file.
+shared PWA base whose notice is kept in the license file. The app bundles other software under
+its own licenses: see [docs/third-party.md](docs/third-party.md).
 
 Made by [V-AX](https://v-ax.com).

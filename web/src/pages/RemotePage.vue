@@ -304,7 +304,7 @@ import { viewportBroken } from '../js/visibleHeight.js';
 import RemoteHome from '../components/RemoteHome.vue';
 import AppsPanel from '../components/AppsPanel.vue';
 import CastpaneDesk from '../components/CastpaneDesk.vue';
-import { deskWindows, keyLayout, rereadAccount, railAuto } from '../js/remotePrefs.js';
+import { deskWindows, keyLayout, rereadAccount, railAuto, directMode } from '../js/remotePrefs.js';
 import RemoteWindows from '../components/RemoteWindows.vue';
 import RemoteDock from '../components/RemoteDock.vue';
 import { trustedPass } from '../js/trust.js';
@@ -541,7 +541,7 @@ async function connect(m, retried = false) {
   startApps(m);
   await nextTick();
   link = openRemote({
-    pass, machine: machine === 'local' ? '' : machine, canvas: canvas.value,
+    pass, machine: machine === 'local' ? '' : machine, canvas: canvas.value, direct: directMode.value,
     onState(state) {
       // The direct link gone: keys held down by it are let go (their key-up may have been lost).
       if (state === 'direct-lost') { for (const code of sentDown) link?.send({ t: 'key', code, down: false, mods: [] });sentDown.clear();held.clear();return; }

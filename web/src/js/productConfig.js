@@ -15,6 +15,7 @@ export const PRODUCT = Object.freeze({
     updateDialog: 'castpane-update-dialog', // updatePrompt.js
     deskWindows: 'castpane-desk-windows', // remotePrefs.js
     railAuto: 'castpane-rail-auto', // remotePrefs.js
+    direct: 'castpane-direct', // remotePrefs.js
     keyLayout: 'castpane-key-layout', // remotePrefs.js
     sidebarFolded: 'castpane-sidebar-folded', // sidebarState.js
     sidebarAuto: 'castpane-sidebar-auto', // sidebarState.js

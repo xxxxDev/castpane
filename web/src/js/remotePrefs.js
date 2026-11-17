@@ -15,6 +15,16 @@ export function setDeskWindows(on) {
 // A computer's whole screen: its column at the right kept at the edge, out while the mouse is on it.
 const RAIL_KEY = PRODUCT.storageKeys.railAuto;
 export const railAuto = ref((() => { try { return localStorage.getItem(RAIL_KEY) === '1'; } catch { return false; } })());
+// The direct link (server/directLink.js), kept on each device: 'both' (Cloudflare's and Google's
+// STUN find each side's address), 'cloudflare' (only Cloudflare's), or 'off' (always the tunnel).
+const DIRECT_KEY = PRODUCT.storageKeys.direct;
+const DIRECT_MODES = ['both', 'cloudflare', 'off'];
+export const directMode = ref((() => { try { const v = localStorage.getItem(DIRECT_KEY);return DIRECT_MODES.includes(v) ? v : 'both'; } catch { return 'both'; } })());
+export function setDirectMode(v) {
+  if (!DIRECT_MODES.includes(v)) return;
+  directMode.value = v;
+  try { localStorage.setItem(DIRECT_KEY, v); } catch {}
+}
 export function setRailAuto(on) {
   railAuto.value = !!on;
   try { localStorage.setItem(RAIL_KEY, on ? '1' : '0'); } catch {}

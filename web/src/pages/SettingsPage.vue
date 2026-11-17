@@ -12,6 +12,7 @@
       <!-- The whole screen lists the Mac's desktops; its windows too only when this is on
            (js/remotePrefs.js). Kept on this device. -->
       <f7-list-item v-if="currentUser?.role === 'admin'" :title="ct('整個螢幕列出所有視窗')" :footer="ct('打開後，整個螢幕的視窗列表除了顯示器，也依桌面列出全螢幕 App 和每個視窗（電腦在右側欄，手機和平板在上方）。只影響這台裝置。')" class="desk-windows-row"><template #media><f7-icon f7="macwindow"/></template><template #after><label class="toggle"><input type="checkbox" :aria-label="ct('整個螢幕列出所有視窗')" :checked="deskWindows" @change="setDeskWindows($event.target.checked)"/><span class="toggle-icon"></span></label></template></f7-list-item>
+      <f7-list-item v-if="currentUser?.role === 'admin'" :title="ct('直連')" :footer="ct('畫面和操作直接在這台裝置和 Mac 之間傳，比經過 Cloudflare 通道快；連不上時自動走通道。找路時用的 STUN 服務會看到兩邊的對外 IP，看不到內容。只影響這台裝置，下次連線生效。')" class="direct-row"><template #media><f7-icon f7="bolt_horizontal"/></template><template #after><select class="settings-select" :aria-label="ct('直連')" :value="directMode" @change="setDirectMode($event.target.value)"><option value="both">{{ ct('Cloudflare 與 Google') }}</option><option value="cloudflare">{{ ct('只用 Cloudflare') }}</option><option value="off">{{ ct('不用直連') }}</option></select></template></f7-list-item>
       <f7-list-item v-if="currentUser?.role === 'admin' && desktop" :title="ct('自動收合整個螢幕的右側欄')" :footer="ct('右側欄平常收在右邊緣，滑鼠移過去才滑出，移開就收回。只影響這台裝置。')" class="rail-auto-row"><template #media><f7-icon f7="sidebar_right"/></template><template #after><label class="toggle"><input type="checkbox" :aria-label="ct('自動收合整個螢幕的右側欄')" :checked="railAuto" @change="setRailAuto($event.target.checked)"/><span class="toggle-icon"></span></label></template></f7-list-item>
       <f7-list-item v-if="currentUser?.role === 'admin'" link :title="ct('不調整視窗的 App')" :after="Object.keys(noFit.never).length ? Object.keys(noFit.never).length + ' ' + ct('個') : ''" class="nofit-row" @click.prevent="f7.views.get('#view-settings').router.navigate('/no-fit/')"><template #media><f7-icon f7="rectangle_dock"/></template></f7-list-item>
       <f7-list-item v-if="currentUser?.role === 'admin'" link :title="ct('按鈕列')" :footer="ct('調整遠端畫面下方按鈕的順序')" class="key-row-row" @click.prevent="go('/key-row/')"><template #media><f7-icon f7="rectangle_split_3x1"/></template></f7-list-item>
@@ -125,7 +126,7 @@ import {
 import { forceAppUpdate } from '../js/pwa-update.js';
 import { isHandheld } from '../js/qrLogin.js';
 import { updateDialog, setUpdateDialog } from '../js/updatePrompt.js';
-import { deskWindows, setDeskWindows, railAuto, setRailAuto } from '../js/remotePrefs.js';
+import { deskWindows, setDeskWindows, railAuto, setRailAuto, directMode, setDirectMode } from '../js/remotePrefs.js';
 import { noFit } from '../js/noFit.js';
 import { trustState, trustThisDevice, untrust } from '../js/trust.js';
 import { sidebarAuto, setSidebarAuto } from '../js/sidebarState.js';
@@ -415,4 +416,5 @@ async function forceUpdate() {
 .logout-row :deep(.item-title) {
   color: #ff3b30;
 }
+.settings-select {max-width:170px;height:32px;padding:0 8px;border:0;border-radius:8px;background:rgba(127,127,127,.18);color:inherit;font-size:14px;}
 </style>

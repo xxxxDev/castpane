@@ -123,6 +123,11 @@ Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用�
   見 [docs/multi-mac.md](docs/multi-mac.md)。
 - **剪貼簿雙向。** 把 Mac 的剪貼簿拷到手機，或一鍵把手機的貼到 Mac 游標的位置。
   密碼工具標為隱藏的內容不會傳出，每次使用都記在「活動」裡。
+- **直連。** 經過通道時，每次點擊和每張畫面都要繞到 Cloudflare 的節點，可能很遠；
+  所以網頁和 Mac 會試著直接連上對方（WebRTC，用公開的 STUN 找出穿過路由器的路），
+  在 Cloudflare 節點很遠時，畫面和操作就走這條較短的路。連不上或中途斷掉時，照舊由通道傳。
+  畫面數字旁會顯示往返時間和目前走哪一條。在「**設定 › 遠端 › 直連**」可以選
+  Cloudflare 與 Google 的 STUN、只用 Cloudflare，或關閉；見 [docs/security.md](docs/security.md)。
 - **畫面保持即時。** 每一格畫面顯示後都會回報；
   有幾格還沒顯示時（來回較慢時多容許幾格），Mac 就先跳過，所以網路慢的時候是格數變少，
   而不是畫面變舊。畫質和解析度預設「自動」：先依裝置挑（手機 1920），
@@ -255,5 +260,6 @@ Apple 開發者簽章和公證（release 改用專案自己的憑證簽名），
 程式碼以 [MIT License](LICENSE) 釋出。
 Castpane 的標誌（本頁、App 和網頁圖示）不在此授權內，見 [BRAND.md](BRAND.md)。
 `server/` 和 `web/` 源自一個 MIT 授權的 PWA 共同基底，其授權聲明保留在授權檔裡。
+App 裡還附了其他軟體，各有自己的授權，見 [docs/third-party.md](docs/third-party.md)。
 
 由 [V-AX](https://v-ax.com) 製作。

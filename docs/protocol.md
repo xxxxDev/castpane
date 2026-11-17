@@ -63,6 +63,24 @@ at each local request; it makes a `local.token` only when there is none, and nev
 On the socket, text frames are JSON in both directions, and binary frames are video from the
 capture core. `POST /api/remote/pass/end` ends the admin's passes.
 
+**The direct link.** Once the socket is open the page may offer a WebRTC data channel over it
+(this Mac only, not a Mac that joined it; one per session; Settings › Remote › Direct link):
+
+| Message | Way | What |
+| --- | --- | --- |
+| `{t:"rtc-offer", sdp, stun}` | page → server, socket only | The page's offer (at most 16 KiB) for one channel labelled `castpane`; `stun` is `both` (Cloudflare's and Google's STUN) or `cloudflare`. |
+| `{t:"rtc-candidate", candidate, mid}` | both ways, socket only | ICE candidates (at most 1 KiB). |
+| `{t:"rtc-answer", sdp, type}` | server → page | The server's answer. |
+| `{t:"rtc-none"}` | server → page | This server has no direct link; the socket carries everything. |
+| `{t:"echo", n}` | page → server → page | A round trip, answered the way it came (`n` a safe integer; `0` marks that the server has had everything sent by the socket before the page's input moves to the channel). |
+
+While the channel is open the capture core's messages and frames, and the page's messages, go
+by it, each cut into pieces of at most 60 KiB: `[flags:1][bytes]`, flags bit 0 "more follows",
+bit 1 "JSON" (else a video frame); a piece saying more follows is always a whole 60 KiB one.
+The page's messages are checked exactly as on the socket (the same list, sizes and rates). If
+the channel closes, or answers no echo for a few seconds, the socket carries everything again
+from a key frame. The socket itself stays for the whole session (sign-in, its checks, the end).
+
 The server adds two messages of its own:
 
 | Message                                                                | When                                                                                                                                                                                                                                                                                  |

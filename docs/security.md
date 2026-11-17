@@ -152,6 +152,25 @@ Everything lives in `~/Library/Application Support/Castpane/` (mode `0700`).
 Losing `data/secrets.json` while the accounts remain would make every two-step secret
 unreadable, so the server refuses to start in that state instead of making a new one.
 
+**The direct link** (Settings › Remote › Direct link, on by default)
+
+- Offered only over the signed-in `/remote` socket, for this Mac, one per session. The
+  channel's DTLS identity is the one in that offer, so only the page that signed in can reach
+  it; everything sent on it is checked as on the socket.
+- While a session has one, the Mac listens on a UDP port (each network interface) for that
+  session; before, it only made outgoing connections. Only STUN from unknown addresses is
+  looked at there, and it closes with the session.
+- To find a way through each side's router, the Mac and the page ask public STUN servers
+  (Cloudflare's, and Google's unless the device is set to Cloudflare only) what address the
+  internet sees. They see both sides' public IP addresses and when a session starts, never
+  what is sent. The Mac's local addresses (LAN, IPv6, VPN) go to the page as candidates over
+  the socket, so through the tunnel too. Set it to off to keep everything in the tunnel.
+- Its native part, node-datachannel (libdatachannel, with its own OpenSSL), is a library
+  loaded by the bundled Node, which is therefore signed without library validation. Its
+  OpenSSL is built to read settings and load modules from a Homebrew folder you can write to;
+  the app starts the server with `OPENSSL_CONF=/dev/null` and module and engine paths that do
+  not exist, so none is read. Its fixes come with node-datachannel's releases.
+
 ## What Castpane cannot stop
 
 - **Other programs running as you.** Any process under your macOS account that is not

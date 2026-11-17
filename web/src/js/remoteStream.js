@@ -21,7 +21,8 @@ export function hevcDecodes() {
 
 // machine: another Mac that joined this one (docs/multi-mac.md), or empty for this Mac.
 // onCodecFailed: an HEVC stream this browser would not decode after all; ask for H.264.
-export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, onState = () => {}, onStats = () => {}, onCodecFailed = () => {} }) {
+// direct: 'both', 'cloudflare' or 'off' (js/remotePrefs.js).
+export function openRemote({ pass, machine = '', canvas, direct: directPref = 'both', onMessage = () => {}, onState = () => {}, onStats = () => {}, onCodecFailed = () => {} }) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const ws = new WebSocket(`${proto}//${location.host}/remote?pass=${encodeURIComponent(pass)}${machine ? `&machine=${encodeURIComponent(machine)}` : ''}`);
   ws.binaryType = 'arraybuffer';
@@ -54,11 +55,19 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
   };
   // The time a message takes there and back, by whichever way is in use.
   let echoN = 0, echoAt = 0, rtt = 0;
-  const echoTimer = setInterval(() => { if (closed) return clearInterval(echoTimer);echoAt = performance.now();send({ t: 'echo', n: ++echoN }); }, 2000);
+  // A link that went quiet (a phone changing networks) is let go after a few seconds without an
+  // answer, and the socket takes over, rather than a frozen picture until the browser notices.
+  let echoAnswered = 0;
+  const echoTimer = setInterval(() => {
+    if (closed) return clearInterval(echoTimer);
+    if (inputDirect && echoN > echoAnswered + 2) { try { dc.close(); } catch {} }
+    echoAt = performance.now();send({ t: 'echo', n: ++echoN });
+  }, 2000);
   function offerDirect() {
-    if (typeof RTCPeerConnection === 'undefined' || machine) return;
+    if (typeof RTCPeerConnection === 'undefined' || machine || directPref === 'off') return;
     try {
-      pc = new RTCPeerConnection({ iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }] });
+      const stun = directPref === 'cloudflare' ? ['stun:stun.cloudflare.com:3478'] : ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'];
+      pc = new RTCPeerConnection({ iceServers: [{ urls: stun }] });
       dc = pc.createDataChannel('castpane', { ordered: true });
       dc.binaryType = 'arraybuffer';
       dc.onopen = () => { direct = true;needKey = true; };
@@ -81,8 +90,9 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
         if (flags & 2) text(new TextDecoder().decode(whole));
         else video(whole.byteOffset || whole.byteLength !== whole.buffer.byteLength ? whole.slice().buffer : whole.buffer);
       };
+      pc.oniceconnectionstatechange = () => { if (direct && (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed')) { try { dc.close(); } catch {} } };
       pc.onicecandidate = (e) => { if (e.candidate?.candidate) sendSocket({ t: 'rtc-candidate', candidate: e.candidate.candidate, mid: e.candidate.sdpMid || '0' }); };
-      pc.createOffer().then((o) => pc.setLocalDescription(o)).then(() => sendSocket({ t: 'rtc-offer', sdp: pc.localDescription.sdp })).catch(() => {});
+      pc.createOffer().then((o) => pc.setLocalDescription(o)).then(() => sendSocket({ t: 'rtc-offer', sdp: pc.localDescription.sdp, stun: directPref === 'cloudflare' ? 'cloudflare' : 'both' })).catch(() => {});
     } catch { pc = null; }
   }
 
@@ -129,7 +139,8 @@ export function openRemote({ pass, machine = '', canvas, onMessage = () => {}, o
     if (msg.t === 'rtc-candidate') { pc?.addIceCandidate({ candidate: msg.candidate, sdpMid: msg.mid }).catch(() => {});return; }
     if (msg.t === 'rtc-none') return;
     if (msg.t === 'echo') {
-      if (msg.n === 0 && held) { const q = held;held = null;inputDirect = direct;for (const m of q) send(m);return; }
+      if (msg.n === 0) { if (held) { const q = held;held = null;inputDirect = direct;echoAnswered = echoN;for (const m of q) send(m); } return; }
+      if (Number.isSafeInteger(msg.n) && msg.n > echoAnswered) echoAnswered = msg.n;
       if (msg.n === echoN) rtt = Math.round(performance.now() - echoAt);
       return;
     }

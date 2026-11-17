@@ -459,9 +459,10 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
       if (msg.t === 'rtc-offer') {
         if (direct || typeof msg.sdp !== 'string' || msg.sdp.length > 16384) return;
         direct = createDirect({
+          stun: msg.stun === 'both' ? 'both' : 'cloudflare',
           sendSignal: sendJson,
           onMessage: (buf) => pageMessage(buf, false, 'direct'),
-          onOpen: () => { dropping = false; keyFrame(); },
+          onOpen: () => { dropping = false; keyFrame(); audit({ source: 'remote', action: 'direct', username: principal.username }); },
           onClose: () => { if (!closed) keyFrame(); },
         });
         if (!direct) return sendJson({ t: 'rtc-none' });
