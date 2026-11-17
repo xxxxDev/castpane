@@ -98,13 +98,17 @@ enum Catalog {
         let shown = windows(content)
         // The windows' thumbnails taken all at once rather than one after the other (each can
         // take a good part of a second): the list came in seconds with a few windows.
+        // Four at a time: many at once made a spike on the Mac, and more of them ran out of time.
         let thumbs = await withTaskGroup(of: (Int, String?).self) { group in
-            for (i, w) in shown.enumerated() {
+            var out = [String?](repeating: nil, count: shown.count), next = 0
+            func add() {
+                guard next < shown.count else { return }
+                let i = next, w = shown[i];next += 1
                 let filter = Unchecked(SCContentFilter(desktopIndependentWindow: w)), size = w.frame.size
                 group.addTask { (i, await thumb(filter.value, size, thumbWidth)) }
             }
-            var out = [String?](repeating: nil, count: shown.count)
-            for await (i, t) in group { out[i] = t }
+            for _ in 0..<4 { add() }
+            for await (i, t) in group { out[i] = t;add() }
             return out
         }
         // Which windows are in the Dock: asked once for each app that has a window here.

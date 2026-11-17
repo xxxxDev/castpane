@@ -562,7 +562,7 @@ function onMessage(msg) {
     if (msg.ok) unlockOpen.value = false;
     else { unlockError.value = msg.busy ? ct('試太快了，請等幾秒再試') : ct('沒有解鎖：密碼可能不對，請再試一次');nextTick(() => unlockField.value?.focus()); }
   } else if (msg.t === 'list') {
-    items.value = msg.items || [];listed.value = true;listAsked = 0;
+    items.value = msg.items || [];listed.value = true;listAsked = 0;if (listAgain) list();
     if (bigWanted) { bigWanted = false;for (const w of items.value) if (w.kind === 'window' && w.thumb && recentWindows.value.some((r) => r.id === w.id)) bigThumbs[w.id] = w.thumb; }
     if (appMode.value !== 'desktop') { appsListed();return; }
     if (!current.value && items.value.length) {
@@ -673,9 +673,13 @@ watch(groups, (gs) => {
 // the largest it sends.
 // One at a time: a list takes the Mac a while (a picture of each window), and asking again
 // before it answers only made each one slower (6 seconds and it is asked anyway).
-let listAsked = 0;
+let listAsked = 0, listAgain = false;
 function list() {
-  if (!link || Date.now() - listAsked < 6000) return;
+  // Asked while one is on its way (after closing a window, say): asked again once it answers,
+  // so what changed meanwhile is not missed.
+  if (!link) return;
+  if (Date.now() - listAsked < 6000) { listAgain = true;return; }
+  listAgain = false;
   listAsked = Date.now();
   link.send(appMode.value === 'os' ? { t: 'list', thumb: 800 } : { t: 'list' });
 }
