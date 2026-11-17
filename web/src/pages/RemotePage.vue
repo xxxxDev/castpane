@@ -1026,7 +1026,8 @@ function move(e) {
     // same way scrolls (or moves a zoomed picture).
     if (!['zoom', 'pan', 'scroll2'].includes(gesture.kind)) {
       const spread = Math.abs(now.d - last.d0), travel = Math.hypot(now.cx - last.cx0, now.cy - last.cy0);
-      if (spread > 24 && spread > travel) gesture.kind = 'zoom';
+      // On CastpaneOS's desk no zoom (it has no 1× to go back): two fingers scroll the Mac.
+      if (spread > 24 && spread > travel && appMode.value !== 'os') gesture.kind = 'zoom';
       else if (travel > 16) {
         gesture.kind = 'scroll2';
         // One axis for the whole scroll, the one it started along, as a Mac trackpad
@@ -1561,15 +1562,15 @@ function watchPicture(w, tried) {
 // pictures and canvases take too much: 600 wide (a card is about 240 points), JPEG, the last
 // 8, for this session only, and the canvas used to make one emptied at once (Safari frees a
 // canvas's memory late, and a page past its limit is closed). CastpaneOS keeps them up to
-// 1800 wide, as its windows are that large: it is offered only to a computer (osAvailable:
-// no touch, 1024 wide or more), whose browser has room for 8 of them.
+// 1800 wide on a computer, as its windows are that large and its browser has room for 8 of
+// them; 1200 by touch, a phone's window being no wider than that in its pixels.
 const snaps = reactive({});
 function snapCurrent() {
   try {
     const c = canvas.value, w = currentWindow.value;
     if (!c || !w || !hasPicture.value || (appMode.value !== 'app' && appMode.value !== 'os') || !c.width) return;
     // On CastpaneOS's desk the window stays on show, as sharp as its live picture was.
-    const s = document.createElement('canvas');s.width = Math.min(c.width, appMode.value === 'os' ? 1800 : 600);s.height = Math.round(s.width * c.height / c.width);
+    const s = document.createElement('canvas');s.width = Math.min(c.width, appMode.value === 'os' ? (isTouch ? 1200 : 1800) : 600);s.height = Math.round(s.width * c.height / c.width);
     s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);
     delete snaps[w.id];snaps[w.id] = s.toDataURL('image/jpeg', 0.8);s.width = s.height = 0;
     for (const k of Object.keys(snaps).slice(0, -8)) delete snaps[k];
@@ -1587,9 +1588,10 @@ async function openWindow(w, keepOrder = false, tried = new Set()) {
   show(w);
   watchPicture(w, tried);
 }
-// CastpaneOS, a computer's only (a mouse and the room): its windows' pictures read again every
-// five seconds while it is up and shown (a list takes the Mac about half a second of work).
-const osAvailable = computed(() => !isTouch && typeof window !== 'undefined' && window.innerWidth >= 1024);
+// CastpaneOS: by touch on any screen; with a mouse, 1024 wide or more. Its windows' pictures
+// read again every five seconds while it is up and shown (a list takes the Mac about half a
+// second of work).
+const osAvailable = computed(() => typeof window !== 'undefined' && (isTouch || window.innerWidth >= 1024));
 const deskRef = ref(null), machineId = ref(''), osLive = ref(null), osAllOpen = ref(false);
 // The Mac's list has come for this connection (its home stops saying it is loading).
 const listed = ref(false);
@@ -1634,6 +1636,8 @@ function askShots() {
 function goOs() {
   goHome();
   clearInterval(shotsTimer);shotsTimer = setInterval(() => { if (appMode.value === 'os') askShots();else clearInterval(shotsTimer); }, 1000);
+  // By touch, a finger on a window points where it is (the mode's switch is not on the desk).
+  if (isTouch) mode.value = 'direct';
   appMode.value = 'os';osAllOpen.value = false;listAsked = 0;list();
   clearInterval(osTimer);osTimer = setInterval(() => { if (appMode.value === 'os' && document.visibilityState === 'visible') list();else if (appMode.value !== 'os') clearInterval(osTimer); }, 5000);
 }

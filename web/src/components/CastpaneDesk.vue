@@ -1,5 +1,5 @@
 <template>
-  <!-- CastpaneOS: a computer's page as a desktop of the Mac's windows, each one a window here
+  <!-- CastpaneOS: the page as a desktop of the Mac's windows, each one a window here
        that is dragged by its bar, resized from its corner and brought to the front with a
        click; the Mac's Dock at the foot. Which windows are open here, where and how big, is
        kept on this device for each Mac. The one in front is live (the page lays its picture over
@@ -10,8 +10,8 @@
       <button type="button" class="cp-desk-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="$emit('home')"><f7-icon f7="chevron_left" :size="16"/></button>
       <b class="cp-desk-name">{{ name }}</b>
       <span class="cp-desk-space"></span>
-      <button type="button" class="cp-desk-tool" @click="$emit('all')"><f7-icon f7="square_grid_2x2" :size="14"/>{{ ct('所有 App') }}</button>
-      <button type="button" class="cp-desk-tool" @click="$emit('desktop')"><f7-icon f7="desktopcomputer" :size="14"/>{{ ct('整個螢幕') }}</button>
+      <button type="button" class="cp-desk-tool" @click="$emit('all')"><f7-icon f7="square_grid_2x2" :size="14"/><span>{{ ct('所有 App') }}</span></button>
+      <button type="button" class="cp-desk-tool" @click="$emit('desktop')"><f7-icon f7="desktopcomputer" :size="14"/><span>{{ ct('整個螢幕') }}</span></button>
     </div>
     <div v-for="o in shown" :key="o.id" class="cp-win" :class="{focus: focused === o.id, max: o.max}" :data-id="o.id"
          :style="o.max ? {zIndex: o.z} : {left: o.x + 'px', top: o.y + 'px', width: o.w + 'px', height: o.h + 'px', zIndex: o.z}"
@@ -35,7 +35,7 @@
     <div v-if="!shown.length" class="cp-desk-empty">{{ ct('從左側的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。') }}</div>
     <!-- The Mac's Dock at the left, as on the Remote home: its apps (a dot beside those running); a tap brings up the app's window here. -->
     <div class="cp-dock" role="toolbar" :aria-label="ct('Dock')">
-      <button v-for="a in dockApps" :key="a.bundle" type="button" class="cp-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="pick(a)" @contextmenu.prevent="$emit('appMenu', a, $event)">
+      <button v-for="a in dockApps" :key="a.bundle" type="button" class="cp-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="held ? (held = false) : pick(a)" @contextmenu.prevent="$emit('appMenu', a, $event)" @pointerdown="holdDown($event, a)" @pointermove="holdMove" @pointerup="holdEnd" @pointercancel="holdEnd">
         <img v-if="icons[a.bundle]" :src="icons[a.bundle]" alt=""/><span v-else>{{ (a.name || '?').slice(0, 1) }}</span>
       </button>
       <!-- Then, as the Mac's Dock: the windows put in it, the folders and files kept there, the Trash. -->
@@ -94,10 +94,12 @@ function place(win) {
   const box = deskEl.value?.getBoundingClientRect() || { width: 1200, height: 800 };
   const room = { w: box.width - 40, h: box.height - 140 };
   const ratio = win.width && win.height ? win.width / win.height : 1.5;
-  let w = Math.min(room.w * 0.6, 760), h = w / ratio;
-  if (h > room.h * 0.75) { h = room.h * 0.75;w = h * ratio; }
   const n = placed.value.length % 6;
-  const o = { id: win.id, x: 100 + n * 36, y: 54 + n * 30, w: Math.round(Math.max(260, w)), h: Math.round(Math.max(180, h) + 30), z: ++top, max: false };
+  // A phone's narrow desk: the room right of the Dock, a little lower for each one after.
+  const narrow = box.width < 600;
+  let w = narrow ? box.width - 80 : Math.min(room.w * 0.6, 760), h = w / ratio;
+  if (h > room.h * (narrow ? 0.85 : 0.75)) { h = room.h * (narrow ? 0.85 : 0.75);w = h * ratio; }
+  const o = { id: win.id, x: narrow ? 70 + n * 4 : 100 + n * 36, y: narrow ? 50 + n * 24 : 54 + n * 30, w: Math.round(Math.max(narrow ? 240 : 260, w)), h: Math.round(Math.max(narrow ? 160 : 180, h) + 30), z: ++top, max: false };
   placed.value = [...placed.value, o];focused.value = o.id;keep();
 }
 function update(id, patch) { placed.value = placed.value.map((o) => (o.id === id ? { ...o, ...patch } : o)); }
@@ -110,6 +112,21 @@ function pick(a) {
   const w = props.windows.find((x) => x.bundle === a.bundle && !isMin(x)) || props.windows.find((x) => x.bundle === a.bundle);
   if (w) place(w);else emit('app', a);
 }
+// By touch (no right click), a Dock app held half a second gives its menu; the tap after it does nothing.
+let held = false, holdAt = null, holdTimer = 0;
+function holdDown(e, a) {
+  if (e.pointerType === 'mouse') return;
+  holdAt = { x: e.clientX, y: e.clientY };held = false;clearTimeout(holdTimer);
+  const el = e.currentTarget;
+  holdTimer = setTimeout(() => {
+    held = true;holdAt = null;
+    const b = el.getBoundingClientRect();
+    emit('appMenu', a, { clientX: b.right + 8, clientY: b.top });
+  }, 500);
+}
+function holdMove(e) { if (holdAt && Math.hypot(e.clientX - holdAt.x, e.clientY - holdAt.y) > 10) { clearTimeout(holdTimer);holdAt = null; } }
+function holdEnd() { clearTimeout(holdTimer);holdAt = null; }
+onBeforeUnmount(() => clearTimeout(holdTimer));
 // The windows on show and not in front, the top ones first, with their body's width.
 function behind() { return shown.value.filter((o) => o.id !== focused.value).sort((a, b) => (b.z || 0) - (a.z || 0)).map((o) => ({ id: o.id, width: o.max ? (deskEl.value?.clientWidth || o.w) : o.w })); }
 defineExpose({ place, behind });
@@ -204,5 +221,31 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
 .cp-dock-trash .cp-dock-glyph {color:#ddd;}
 .cp-dock-thumb {width:48px !important;height:36px !important;margin-top:6px;object-fit:cover;object-position:top;border-radius:5px;background:#000;}
 .cp-dock-badge {position:absolute;right:-4px;bottom:-2px;width:20px !important;height:20px !important;}
+/* By touch: the lights and the edges larger to the finger than they look. */
+@media (pointer: coarse) {
+  .cp-win-bar {height:36px;gap:16px;}
+  .remote-stage .cp-light {position:relative;width:14px;height:14px;border-radius:7px;}
+  .remote-stage .cp-light::before {content:'';position:absolute;inset:-8px;}
+  .remote-stage .cp-win-full {width:32px;height:30px;}
+  .cp-edge-n, .cp-edge-s {height:16px;}
+  .cp-edge-n {top:-10px;}
+  .cp-edge-s {bottom:-10px;}
+  .cp-edge-e, .cp-edge-w {width:16px;}
+  .cp-edge-e {right:-10px;}
+  .cp-edge-w {left:-10px;}
+  .cp-edge-ne, .cp-edge-nw, .cp-edge-se, .cp-edge-sw {width:28px;height:28px;}
+  .cp-edge-ne {right:-14px;top:-14px;}
+  .cp-edge-sw {left:-14px;bottom:-14px;}
+  .cp-edge-nw {left:-14px;top:-14px;}
+  .cp-edge-se {right:-14px;bottom:-14px;}
+}
+/* A phone's narrow desk: the bar's tools as icons, a smaller Dock. */
+@media (max-width: 599px) {
+  .cp-desk-tool span {display:none;}
+  .remote-stage .cp-desk-tool {padding:0 10px;}
+  .cp-dock {left:6px;gap:6px;padding:8px 5px;border-radius:16px;}
+  .remote-stage .cp-dock-app, .cp-dock-app img, .cp-dock-app span, .cp-dock-glyph {width:40px;height:40px;}
+  .cp-dock-thumb {width:40px !important;height:30px !important;}
+}
 .cp-dock-app.running::after {content:'';position:absolute;left:-6px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:2px;background:#ddd;}
 </style>
