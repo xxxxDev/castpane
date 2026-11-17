@@ -61,17 +61,21 @@ enum Apps {
     /// Starts (or brings forward) the app with this bundle id, if it is one `list` gives.
     /// Presses the app's menu item for ⌘N with no other modifier (File › New Window, New Finder
     /// Window…), as a person would from its menu bar; false when it has none enabled.
+    /// Given up after 4 seconds in all, or as soon as the app does not answer.
     nonisolated static func pressNewWindow(_ pid: pid_t) -> Bool {
         let app = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(app, 1)
-        func children(_ e: AXUIElement) -> [AXUIElement] {
+        let until = Date().addingTimeInterval(4)
+        var gone = false
+        func get(_ e: AXUIElement, _ name: String) -> CFTypeRef? {
+            if gone || Date() > until { gone = true;return nil }
             var v: CFTypeRef?
-            return AXUIElementCopyAttributeValue(e, kAXChildrenAttribute as CFString, &v) == .success ? (v as? [AXUIElement] ?? []) : []
+            let r = AXUIElementCopyAttributeValue(e, name as CFString, &v)
+            if r == .cannotComplete { gone = true }
+            return r == .success ? v : nil
         }
-        func attr(_ e: AXUIElement, _ name: String) -> CFTypeRef? {
-            var v: CFTypeRef?
-            return AXUIElementCopyAttributeValue(e, name as CFString, &v) == .success ? v : nil
-        }
+        func children(_ e: AXUIElement) -> [AXUIElement] { get(e, kAXChildrenAttribute) as? [AXUIElement] ?? [] }
+        func attr(_ e: AXUIElement, _ name: String) -> CFTypeRef? { get(e, name) }
         guard let bar = attr(app, kAXMenuBarAttribute) else { return false }
         // The menus after the app's own (File first), a menu's items one level down.
         for top in children(bar as! AXUIElement).dropFirst(2).prefix(4) {
@@ -85,6 +89,19 @@ enum Apps {
             }
         }
         return false
+    }
+
+    /// The running copy of an app `apps` lists (the one listed, by its place on disk), for a
+    /// new window: nil for an app not listed, or not running from there.
+    nonisolated static func listedRunning(_ bundle: String, listed: [(id: String, url: URL)], running: [(bundle: String?, url: URL?, pid: pid_t)]) -> pid_t? {
+        guard let url = listed.first(where: { $0.id == bundle })?.url.standardizedFileURL else { return nil }
+        return running.first(where: { $0.bundle == bundle && $0.url?.standardizedFileURL == url })?.pid
+    }
+    @MainActor static func listed(_ bundle: String) -> (listed: Bool, pid: pid_t?) {
+        let all = found().map { (id: $0.id, url: $0.url) }
+        guard all.contains(where: { $0.id == bundle }) else { return (false, nil) }
+        let running = NSWorkspace.shared.runningApplications.map { (bundle: $0.bundleIdentifier, url: $0.bundleURL, pid: $0.processIdentifier) }
+        return (true, listedRunning(bundle, listed: all, running: running))
     }
 
     @MainActor static func launch(_ bundle: String) -> Bool {

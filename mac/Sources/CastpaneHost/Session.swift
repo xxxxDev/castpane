@@ -123,8 +123,10 @@ actor Session {
     private static let newWindowQueue = DispatchQueue(label: "castpane.new-window")
     nonisolated static func newWindow(_ link: Link, _ bundle: String) {
         newWindowQueue.async {
-            let running = DispatchQueue.main.sync { MainActor.assumeIsolated { NSRunningApplication.runningApplications(withBundleIdentifier: bundle).first } }
-            guard let app = running else {
+            // Only an app `apps` lists, and its copy running from where it is listed.
+            let (listed, pid) = DispatchQueue.main.sync { MainActor.assumeIsolated { Apps.listed(bundle) } }
+            guard listed else { link.send(json: ["t": "launched", "bundle": bundle, "ok": false, "newWindow": true]); return }
+            guard let pid, let app = NSRunningApplication(processIdentifier: pid) else {
                 let ok = DispatchQueue.main.sync { MainActor.assumeIsolated { Apps.launch(bundle) } }
                 link.send(json: ["t": "launched", "bundle": bundle, "ok": ok]); return
             }
