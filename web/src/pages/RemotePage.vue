@@ -659,10 +659,11 @@ function show(w) {
   hasPicture.value = hasPicture.value && same;
   if (!same) zoomNative.value = false;
   notice.value = ct('正在切換…');
+  // The Mac's pointer in the picture only where it is what points (macPointer).
   // Zoomed in, as sharp as the device takes: native on a computer, 2560 on a phone or tablet.
   const resolution = zoomNative.value ? zoomTop() : resolutionNow(), quality = qualityNow();
   // Only values the server passes on (server/remote.js): a stale stored choice is left out.
-  link?.send({ t: 'start', kind: w.kind, id: w.id, maxWidth: Object.hasOwn(RESOLUTION, resolution) ? RESOLUTION[resolution] : undefined, fps: prefs.fps === 30 ? 30 : 60, bitrate: Object.hasOwn(QUALITY, quality) ? QUALITY[quality] : undefined, ...(useHevc ? { codec: 'hevc' } : {}) });
+  link?.send({ t: 'start', kind: w.kind, id: w.id, ...(macPointer() ? {} : { cursor: false }), maxWidth: Object.hasOwn(RESOLUTION, resolution) ? RESOLUTION[resolution] : undefined, fps: prefs.fps === 30 ? 30 : 60, bitrate: Object.hasOwn(QUALITY, quality) ? QUALITY[quality] : undefined, ...(useHevc ? { codec: 'hevc' } : {}) });
   current.value = { kind: w.kind, id: w.id };
 }
 function showCurrent() {
@@ -692,7 +693,16 @@ const headCollapsed = ref(localGet('castpane-remote-head') === 'folded');
 const keyboardSideways = ref(false), headFolded = computed(() => headCollapsed.value || keyboardSideways.value);
 function toggleHead() { headCollapsed.value = !headCollapsed.value;localSet('castpane-remote-head', headCollapsed.value ? 'folded' : 'open');menuOpen.value = false;settingsOpen.value = false; }
 const MODES = [{ id: 'direct', label: '直接點', icon: 'hand_draw' }, { id: 'trackpad', label: '觸控板', icon: 'rectangle_on_rectangle' }, { id: 'pointer', label: '游標', icon: 'cursor_rays' }];
-function setMode(m) { mode.value = m;localSet('castpane-remote-mode', m); }
+// The Mac's pointer is drawn in the picture only where it is what points: a trackpad or the
+// pointer on a ring, by touch. A computer's page has its own mouse pointer, and a direct touch
+// points where the finger is: there it is left out.
+const macPointer = () => isTouch && (mode.value === 'trackpad' || mode.value === 'pointer');
+function setMode(m) {
+  const had = macPointer();
+  mode.value = m;localSet('castpane-remote-mode', m);
+  // Its picture started again, with or without the pointer, when that changes.
+  if (had !== macPointer() && current.value) showCurrent();
+}
 function toggleMode() { setMode(mode.value === 'trackpad' ? 'direct' : 'trackpad'); }
 
 // ---- pointer ----

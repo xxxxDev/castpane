@@ -264,7 +264,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Send
         lock.withLock { self.onFrame = onFrame; self.onStop = onStop }
     }
 
-    func start(_ target: Catalog.Target, width: Int, height: Int, fps: Int) async throws {
+    func start(_ target: Catalog.Target, width: Int, height: Int, fps: Int, cursor: Bool = true) async throws {
         func config(_ w: Int, _ h: Int) -> SCStreamConfiguration {
             let c = SCStreamConfiguration()
             c.width = w
@@ -272,7 +272,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Send
             c.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
             c.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
             c.queueDepth = 5
-            c.showsCursor = true
+            c.showsCursor = cursor
             return c
         }
         if target.parts.isEmpty {

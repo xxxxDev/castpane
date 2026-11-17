@@ -402,8 +402,8 @@ actor Session {
                 do { link.send(json: ["t": "list", "items": try await Catalog.list(thumbWidth: width)]) }
                 catch { link.send(json: ["t": "error", "where": "list", "message": error.localizedDescription]) }
             }
-        case let .start(kind, id, maxWidth, fps, bitrate, hevc):
-            queued { await self.start(kind: kind, id: id, maxWidth: maxWidth, fps: fps, bitrate: bitrate, hevc: hevc) }
+        case let .start(kind, id, maxWidth, fps, bitrate, hevc, cursor):
+            queued { await self.start(kind: kind, id: id, maxWidth: maxWidth, fps: fps, bitrate: bitrate, hevc: hevc, cursor: cursor) }
         case .stop: queued { await self.unfit(); await self.stop(); await self.restore() }
         case .apps:
             let link = self.link
@@ -560,7 +560,7 @@ actor Session {
         return (max(64, Int(w) & ~1), max(64, Int(h) & ~1))
     }
 
-    private func start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool) async {
+    private func start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool, cursor: Bool = true) async {
         // Another window or a display shown: the one made the device's shape goes back.
         if let f = fitted, kind != "window" || Int(f.id) != id { await unfit() }
         await stop()
@@ -600,7 +600,7 @@ actor Session {
                 // On another desktop or in the Dock: wait for macOS to bring it here.
                 if !found.here { for _ in 0..<20 where !Catalog.isHere(wid) { try? await Task.sleep(nanoseconds: 100_000_000) } }
             }
-            try await capture.start(found, width: width, height: height, fps: fps)
+            try await capture.start(found, width: width, height: height, fps: fps, cursor: cursor)
             link.send(json: ["t": "started", "kind": kind, "id": id, "width": width, "height": height, "fps": fps])
             // Whether a text field already has the focus, so the page knows where it starts.
             link.send(json: ["t": "focus", "editable": input.focusEditable(), "initial": true])

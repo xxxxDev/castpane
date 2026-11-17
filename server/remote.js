@@ -60,6 +60,11 @@ const MESSAGES = {
       if (m.codec !== 'h264' && m.codec !== 'hevc') return null;
       out.codec = m.codec;
     }
+    // The Mac's pointer drawn in the picture or not: a boolean only.
+    if (m.cursor !== undefined) {
+      if (typeof m.cursor !== 'boolean') return null;
+      out.cursor = m.cursor;
+    }
     return out;
   },
   move: (m) => at(m),
