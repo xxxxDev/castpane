@@ -132,7 +132,7 @@ const english = {
 "Mac 上可能正在詢問權限":"The Mac may be asking for permission",
 "「{name}」還沒打開：macOS 可能正在問 Castpane 能不能打開它。到整個螢幕或在 Mac 上看看，按「允許」後就會打開。":"“{name}” has not opened yet: macOS may be asking whether Castpane may open it. Look from the whole screen or at the Mac; once you choose Allow, it opens.",
 "單獨全畫面":"Alone, full size",
-"從下面的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。":"Open an app from the Dock below: its window comes here, to drag and resize.",
+"從左側的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。":"Open an app from the Dock at the left: its window comes here, to drag and resize.",
 "已在 Mac 上打開「{name}」":"Opened “{name}” on the Mac",
 "有些 App 只在選單列或整個螢幕上出現，沒有可以單獨顯示的視窗。要改看整個螢幕嗎？":"Some apps appear only in the menu bar or over the whole screen, with no window to show alone. See the whole screen instead?",
 "編輯":"Edit",

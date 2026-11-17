@@ -29,9 +29,10 @@
         <img v-if="snaps[o.id] || o.win.thumb" :src="snaps[o.id] || o.win.thumb" alt="" draggable="false"/>
         <div v-else class="cp-win-blank"><img v-if="icons[o.win.bundle]" :src="icons[o.win.bundle]" alt=""/></div>
       </div>
-      <div v-if="!o.max" class="cp-win-grip" @pointerdown.stop="resizeStart($event, o)"></div>
+      <!-- Resized from any edge or corner, as a Mac window is; the corner bottom right marked. -->
+      <template v-if="!o.max"><div v-for="e in EDGES" :key="e" :class="['cp-win-edge', 'cp-edge-' + e, {'cp-win-grip': e === 'se'}]" @pointerdown.stop="resizeStart($event, o, e)"></div></template>
     </div>
-    <div v-if="!shown.length" class="cp-desk-empty">{{ ct('從下面的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。') }}</div>
+    <div v-if="!shown.length" class="cp-desk-empty">{{ ct('從左側的 Dock 打開 App，視窗會出現在這裡，可以拖動和縮放。') }}</div>
     <!-- The Mac's Dock at the left, as on the Remote home: its apps (a dot beside those running); a tap brings up the app's window here. -->
     <div class="cp-dock" role="toolbar" :aria-label="ct('Dock')">
       <button v-for="a in dockApps" :key="a.bundle" type="button" class="cp-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="pick(a)">
@@ -120,15 +121,24 @@ function dragStart(e, o) {
   e.currentTarget.setPointerCapture?.(e.pointerId);
   addEventListener('pointermove', dragMove);addEventListener('pointerup', dragEnd, { once: true });
 }
-function resizeStart(e, o) {
-  drag = { kind: 'size', id: o.id, sx: e.clientX, sy: e.clientY, ox: o.x, oy: o.y, ow: o.w, oh: o.h };
+const EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+function resizeStart(e, o, edge = 'se') {
+  drag = { kind: 'size', edge, id: o.id, sx: e.clientX, sy: e.clientY, ox: o.x, oy: o.y, ow: o.w, oh: o.h };
   addEventListener('pointermove', dragMove);addEventListener('pointerup', dragEnd, { once: true });
 }
 function dragMove(e) {
   if (!drag) return;
   const b = bounds(), dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
   if (drag.kind === 'move') update(drag.id, { x: Math.round(Math.min(Math.max(drag.ox + dx, -drag.ow + 80), b.w - 80)), y: Math.round(Math.min(Math.max(drag.oy + dy, 40), b.h - 60)) });
-  else update(drag.id, { w: Math.round(Math.max(240, Math.min(drag.ow + dx, b.w - drag.ox))), h: Math.round(Math.max(160, Math.min(drag.oh + dy, b.h - drag.oy))) });
+  else {
+    // Each side that moves keeps the window at least 240 × 160, within the desk and under its bar.
+    const d = drag.edge, p = {};
+    if (d.includes('e')) p.w = Math.round(Math.max(240, Math.min(drag.ow + dx, b.w - drag.ox)));
+    if (d.includes('s')) p.h = Math.round(Math.max(160, Math.min(drag.oh + dy, b.h - drag.oy)));
+    if (d.includes('w')) { const x = Math.min(Math.max(drag.ox + dx, 0), drag.ox + drag.ow - 240);p.x = Math.round(x);p.w = Math.round(drag.ow + drag.ox - x); }
+    if (d.includes('n')) { const y = Math.min(Math.max(drag.oy + dy, 40), drag.oy + drag.oh - 160);p.y = Math.round(y);p.h = Math.round(drag.oh + drag.oy - y); }
+    update(drag.id, p);
+  }
 }
 function dragEnd() { removeEventListener('pointermove', dragMove);if (drag) keep();drag = null; }
 onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
@@ -157,8 +167,17 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
 .cp-win-blank img {width:64px;height:64px;}
 .remote-stage .cp-win-full {margin:0 0 0 auto;width:24px;height:22px;padding:0;border:0;border-radius:6px;background:none;color:#bbb;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .remote-stage .cp-win-full:hover {background:rgba(255,255,255,.12);color:#fff;}
-.cp-win-grip {position:absolute;right:-16px;bottom:-16px;z-index:9001;width:22px;height:22px;cursor:nwse-resize;touch-action:none;}
-.cp-win-grip::after {content:'';position:absolute;right:10px;bottom:10px;width:8px;height:8px;border-right:2px solid rgba(255,255,255,.4);border-bottom:2px solid rgba(255,255,255,.4);}
+.cp-win-edge {position:absolute;z-index:9001;touch-action:none;}
+.cp-edge-n {top:-5px;left:10px;right:10px;height:8px;cursor:ns-resize;}
+.cp-edge-s {bottom:-5px;left:10px;right:10px;height:8px;cursor:ns-resize;}
+.cp-edge-e {right:-5px;top:10px;bottom:10px;width:8px;cursor:ew-resize;}
+.cp-edge-w {left:-5px;top:10px;bottom:10px;width:8px;cursor:ew-resize;}
+.cp-edge-ne, .cp-edge-nw, .cp-edge-se, .cp-edge-sw {width:22px;height:22px;}
+.cp-edge-ne {right:-8px;top:-8px;cursor:nesw-resize;}
+.cp-edge-sw {left:-8px;bottom:-8px;cursor:nesw-resize;}
+.cp-edge-nw {left:-8px;top:-8px;cursor:nwse-resize;}
+.cp-edge-se {right:-8px;bottom:-8px;cursor:nwse-resize;}
+.cp-win-grip::after {content:'';position:absolute;right:2px;bottom:2px;width:8px;height:8px;border-right:2px solid rgba(255,255,255,.4);border-bottom:2px solid rgba(255,255,255,.4);}
 .cp-desk-empty {position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);color:#9a9a9f;font-size:14px;}
 .cp-dock {position:absolute;left:12px;top:calc(50% + 20px);transform:translateY(-50%);z-index:9000;display:flex;flex-direction:column;gap:8px;max-height:calc(100% - 80px);overflow-y:auto;scrollbar-width:none;padding:10px 8px;border-radius:22px;background:rgba(40,40,44,.6);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px rgba(255,255,255,.25), 0 10px 40px rgba(0,0,0,.5);}
 .remote-stage .cp-dock-app {position:relative;flex:0 0 auto;width:48px;height:48px;margin:0;padding:0;border:0;background:none;cursor:pointer;}
