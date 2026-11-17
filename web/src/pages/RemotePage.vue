@@ -156,7 +156,7 @@
         </div>
         <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
         <!-- CastpaneOS: on a computer, the Mac's windows as windows of this page (components/CastpaneDesk.vue). -->
-        <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" @live="osFocus" @home="goHome" @all="goHome();allAppsAsked++" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
+        <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="goHome();allAppsAsked++" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
         <RemoteHome v-if="appMode === 'home'" :os="osAvailable" @os="goOs" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
           <template #dock><RemoteDock v-if="macWindows" docked :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="openApp" @window="openWindow" @other="openDockOther" @trash="openDockTrash"/></template>
         </RemoteHome>
@@ -1309,12 +1309,12 @@ function openFromDock(request, name, kind = 'folder') {
   const finder = items.value.filter((x) => x.kind === 'window' && x.bundle === FINDER);
   link?.send({ t: 'dock-open', ...request });
   const open = kind === 'folder' && finder.find((x) => x.title === name);
-  if (open) { openWindow(open);return; }
+  if (open) { if (appMode.value === 'os') deskRef.value?.place(open);else openWindow(open);return; }
   // A file: said once the Mac says it opened (dock-opened below).
   if (kind === 'file') { fileOpening = name;return; }
   waitForWindow(FINDER, new Set(finder.map((x) => x.id)), () => {
     const now = items.value.find((x) => x.kind === 'window' && x.bundle === FINDER && x.title === name);
-    if (now) openWindow(now);else noWindow();
+    if (now) { if (appMode.value === 'os') deskRef.value?.place(now);else openWindow(now); } else noWindow();
   }, name);
 }
 function openDockOther(index, o) { const item = o || dockOthers.value[index];if (item?.name) openFromDock({ index, name: item.name }, item.name, item.kind === 'file' ? 'file' : 'folder'); }

@@ -37,15 +37,28 @@
       <button v-for="a in dockApps" :key="a.bundle" type="button" class="cp-dock-app" :class="{running: a.running}" :data-bundle="a.bundle" :title="a.name" :aria-label="a.name" @click="pick(a)">
         <img v-if="icons[a.bundle]" :src="icons[a.bundle]" alt=""/><span v-else>{{ (a.name || '?').slice(0, 1) }}</span>
       </button>
+      <!-- Then, as the Mac's Dock: the windows put in it, the folders and files kept there, the Trash. -->
+      <div v-if="inDock.length || others.length || trash" class="cp-dock-sep" aria-hidden="true"></div>
+      <button v-for="w in inDock" :key="'w' + w.id" type="button" class="cp-dock-app cp-dock-window" :data-id="w.id" :title="w.title || w.app" :aria-label="w.title || w.app" @click="place(w)">
+        <img v-if="w.thumb" class="cp-dock-thumb" :src="w.thumb" alt=""/><img v-if="icons[w.bundle]" class="cp-dock-badge" :src="icons[w.bundle]" alt=""/>
+      </button>
+      <button v-for="(o, i) in others" :key="'o' + i" type="button" class="cp-dock-app cp-dock-other" :data-index="i" :title="o.name" :aria-label="o.name" @click="$emit('other', i, o)">
+        <span class="cp-dock-glyph"><f7-icon :f7="o.kind === 'file' ? 'doc_fill' : 'folder_fill'" :size="26"/></span>
+      </button>
+      <button v-if="trash" type="button" class="cp-dock-app cp-dock-trash" :title="ct('垃圾桶')" :aria-label="ct('垃圾桶')" @click="$emit('trash')">
+        <span class="cp-dock-glyph"><f7-icon f7="trash" :size="26"/></span>
+      </button>
     </div>
   </div>
 </template>
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
-const props = defineProps({ name: { type: String, default: '' }, machine: { type: String, default: '' }, windows: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, dockApps: { type: Array, default: () => [] } });
-const emit = defineEmits(['home', 'all', 'desktop', 'open', 'app', 'closeWindow', 'minimize', 'live']);
+const props = defineProps({ name: { type: String, default: '' }, machine: { type: String, default: '' }, windows: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, dockApps: { type: Array, default: () => [] }, others: { type: Array, default: () => [] }, trash: { type: Boolean, default: false } });
+const emit = defineEmits(['home', 'all', 'desktop', 'open', 'app', 'closeWindow', 'minimize', 'live', 'other', 'trash']);
 const deskEl = ref(null), focused = ref(null);
+// The windows in the Mac's Dock, as its Dock shows them after its apps.
+const inDock = computed(() => props.windows.filter((w) => w.minimized));
 // The windows open here: {id, x, y, w, h, z, max}, kept for this Mac on this device.
 const KEY = () => 'castpane-desk-' + (props.machine || 'local');
 function read() { try { const v = JSON.parse(localStorage.getItem(KEY()) || '[]');return Array.isArray(v) ? v.filter((o) => Number.isFinite(o?.id)) : []; } catch { return []; } }
@@ -148,5 +161,10 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
 .remote-stage .cp-dock-app {position:relative;flex:0 0 auto;width:48px;height:48px;margin:0;padding:0;border:0;background:none;cursor:pointer;}
 .cp-dock-app img {width:48px;height:48px;}
 .cp-dock-app span {display:flex;width:48px;height:48px;align-items:center;justify-content:center;border-radius:11px;background:#3a3a3c;color:#fff;font-weight:600;}
+.cp-dock-sep {flex:0 0 auto;width:1px;margin:4px 2px;background:rgba(255,255,255,.2);}
+.cp-dock-glyph {display:flex;width:48px;height:48px;align-items:center;justify-content:center;border-radius:11px;background:rgba(255,255,255,.12);color:#9fc3ff;}
+.cp-dock-trash .cp-dock-glyph {color:#ddd;}
+.cp-dock-thumb {width:48px !important;height:36px !important;margin-top:6px;object-fit:cover;object-position:top;border-radius:5px;background:#000;}
+.cp-dock-badge {position:absolute;right:-4px;bottom:-2px;width:20px !important;height:20px !important;}
 .cp-dock-app.running::after {content:'';position:absolute;left:50%;bottom:-6px;width:4px;height:4px;margin-left:-2px;border-radius:2px;background:#ddd;}
 </style>
