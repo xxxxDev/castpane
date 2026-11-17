@@ -169,7 +169,7 @@ function fitIn() {
     w = Math.min(w, Math.max(240, Math.floor(b.width - left - 4)));
     if (narrow) { if (x + w > b.width) x = Math.max(left, Math.floor(b.width - w));if (x < left) x = left; }
     else x = Math.min(Math.max(x, -w + 80), Math.floor(b.width - 80));
-    y = Math.min(Math.max(y, 40), Math.floor(b.height - 60));
+    y = Math.max(40, Math.min(y, Math.floor(b.height - 60)));
     if (x === o.x && y === o.y && w === o.w) return o;
     changed = true;return { ...o, x, y, w, h };
   });

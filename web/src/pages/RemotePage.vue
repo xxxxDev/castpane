@@ -1609,8 +1609,9 @@ function osFocus(f) {
   // picture was left stretched over the larger window.
   const refit = async () => {
     // Not while typing: the area is then the desk's size, not the window's. Made once the
-    // keyboard has gone (the desk grows back and says so; nothing is taken as fitted).
-    if (osTyping.value) { osFitted = null;return; }
+    // keyboard has gone (the desk grows back and says so; nothing is taken as fitted); a window
+    // come to the front meanwhile is shown as it is.
+    if (osTyping.value) { osFitted = null;if (osLive.value?.id === f.win.id && !hasPicture.value) show(f.win);return; }
     const size = { width: f.rect.width, height: f.rect.height };
     if (await fitTo(f.win) && osLive.value?.id === f.win.id) { osFitted = size;show(f.win); }
   };
