@@ -158,7 +158,7 @@
         <!-- CastpaneOS: on a computer, the Mac's windows as windows of this page (components/CastpaneDesk.vue). -->
         <CastpaneDesk v-if="appMode === 'os'" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :snaps="snaps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="osAllOpen = true;askIcons(true)" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
         <AppsPanel v-if="appMode === 'os' && osAllOpen" class="cp-apps" :apps="apps" :icons="icons" :launching="launching" @close="osAllOpen = false" @pick="(a) => { osAllOpen = false;openApp(a); }"/>
-        <RemoteHome v-if="appMode === 'home'" :os="osAvailable" @os="goOs" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
+        <RemoteHome v-if="appMode === 'home'" :listed="listed" :os="osAvailable" @os="goOs" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
           <template #dock><RemoteDock v-if="macWindows" docked :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="openApp" @window="openWindow" @other="openDockOther" @trash="openDockTrash"/></template>
         </RemoteHome>
         <!-- An app starting takes the Mac a few seconds: said wherever it was started from (the
@@ -513,7 +513,7 @@ async function connect(m, retried = false) {
   let pass;
   try { pass = await getPass(retried); } catch (e) { return f7.dialog.alert(adminProblem(e) || e.message); }
   if (!pass) return;
-  streaming.value = true;macLocked.value = false;unlockOpen.value = false;unlockBusy.value = false;unlockError.value = '';hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;
+  streaming.value = true;listed.value = false;macLocked.value = false;unlockOpen.value = false;unlockBusy.value = false;unlockError.value = '';hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;
   startApps(m);
   await nextTick();
   link = openRemote({
@@ -554,7 +554,7 @@ function onMessage(msg) {
     if (msg.ok) unlockOpen.value = false;
     else { unlockError.value = msg.busy ? ct('試太快了，請等幾秒再試') : ct('沒有解鎖：密碼可能不對，請再試一次');nextTick(() => unlockField.value?.focus()); }
   } else if (msg.t === 'list') {
-    items.value = msg.items || [];
+    items.value = msg.items || [];listed.value = true;
     if (bigWanted) { bigWanted = false;for (const w of items.value) if (w.kind === 'window' && w.thumb && recentWindows.value.some((r) => r.id === w.id)) bigThumbs[w.id] = w.thumb; }
     if (appMode.value !== 'desktop') { appsListed();return; }
     if (!current.value && items.value.length) {
@@ -1534,6 +1534,8 @@ async function openWindow(w, keepOrder = false, tried = new Set()) {
 // five seconds while it is up and shown (a list takes the Mac about half a second of work).
 const osAvailable = computed(() => !isTouch && typeof window !== 'undefined' && window.innerWidth >= 1024);
 const deskRef = ref(null), machineId = ref(''), osLive = ref(null), osAllOpen = ref(false);
+// The Mac's list has come for this connection (its home stops saying it is loading).
+const listed = ref(false);
 // The desk's window in front, live over its body: its picture started when it changes, the
 // box only moved when the window is dragged or resized. None in front: the picture stops.
 function osFocus(f) {

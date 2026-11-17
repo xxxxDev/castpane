@@ -269,6 +269,7 @@ const english = {
 "每一台裝置之後連線都要再驗證一次。":"Every device will be asked again when it connects.",
 "開著的 App":"Open apps",
 "搜尋 App":"Search apps",
+"這台 Mac 沒有開著的 App 視窗。從 Dock 或「所有 App」打開一個。":"No app on this Mac has a window open. Open one from the Dock or All apps.",
 "首頁":"Home",
 "換一台 Mac":"Another Mac",
 "最近用的":"Recently used",

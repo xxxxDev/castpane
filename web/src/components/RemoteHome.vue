@@ -28,8 +28,9 @@
         <button type="button" class="cols-1" :class="{on: cols === 1}" :title="ct('一列一個')" :aria-label="ct('一列一個')" :aria-pressed="cols === 1" @click="setCols(1)"><f7-icon f7="rectangle_grid_1x2" :size="15"/></button>
       </span>
     </div>
-    <div v-if="!windows.length" class="remote-home-empty">{{ ct('正在讀取…') }}</div>
-    <div v-else-if="!openApps.length" class="remote-home-empty">{{ ct('這裡沒有 App') }}</div>
+    <!-- Loading only until the Mac's first list: a Mac with no app window open says so. -->
+    <div v-if="!listed && !windows.length" class="remote-home-empty">{{ ct('正在讀取…') }}</div>
+    <div v-else-if="!openApps.length" class="remote-home-empty">{{ windows.length || filter !== 'all' ? ct('這裡沒有 App') : ct('這台 Mac 沒有開著的 App 視窗。從 Dock 或「所有 App」打開一個。') }}</div>
     <div class="remote-home-open" :class="{one: cols === 1}">
       <div v-for="o in openApps" :key="o.key" role="button" tabindex="0" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @pointerdown="holdDown($event, o)" @pointermove="holdMove" @pointerup="holdEnd" @pointercancel="holdEnd" @contextmenu.prevent @click="held ? (held = false) : o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.enter.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.space.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
         <span class="remote-home-shot">
@@ -60,7 +61,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
 import AppsPanel from './AppsPanel.vue';
-const props = defineProps({ name: { type: String, default: '' }, windows: { type: Array, default: () => [] }, apps: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, launching: { type: String, default: '' }, notice: { type: String, default: '' }, canMinimize: { type: Boolean, default: false }, allAsked: { type: Number, default: 0 }, os: { type: Boolean, default: false } });
+const props = defineProps({ name: { type: String, default: '' }, windows: { type: Array, default: () => [] }, apps: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, launching: { type: String, default: '' }, notice: { type: String, default: '' }, canMinimize: { type: Boolean, default: false }, allAsked: { type: Number, default: 0 }, os: { type: Boolean, default: false }, listed: { type: Boolean, default: false } });
 // windows: an app with several windows, whose card asks which one (RemoteWindows.vue).
 const emit = defineEmits(['open', 'app', 'desktop', 'leave', 'all', 'windows', 'closeWindow', 'minimize', 'allTaken', 'os']);
 const COLS_KEY = 'castpane-home-cols';
