@@ -467,6 +467,10 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
         });
         if (!direct) return sendJson({ t: 'rtc-none' });
         direct.offer(msg.sdp);
+      } else if (msg.t === 'rtc-close') {
+        // The page let the link go (it went quiet): the frames come by the socket again at once,
+        // not when this side's own checks give up. No second link in this session.
+        direct?.close();
       } else if (msg.t === 'rtc-candidate') {
         if (!direct || typeof msg.candidate !== 'string' || msg.candidate.length > 1024 || typeof msg.mid !== 'string' || msg.mid.length > 64) return;
         direct.candidate(msg.candidate, msg.mid);
@@ -486,7 +490,7 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
         if (tooSoon) return raw.subarray(0, 24).toString().startsWith('{"t":"clipboard-set"') ? sendJson({ t: 'clipboard-busy' }) : close('too large');
       }
       let msg; try { msg = JSON.parse(raw.toString()); } catch { return close('bad message'); }
-      if (!large && msg && typeof msg === 'object' && !Array.isArray(msg) && (msg.t === 'rtc-offer' || msg.t === 'rtc-candidate' || msg.t === 'echo')) return signal(msg, via);
+      if (!large && msg && typeof msg === 'object' && !Array.isArray(msg) && (msg.t === 'rtc-offer' || msg.t === 'rtc-candidate' || msg.t === 'rtc-close' || msg.t === 'echo')) return signal(msg, via);
       if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.t !== 'string' || !Object.hasOwn(MESSAGES, msg.t)) return close('unknown message');
       if (large && msg.t !== 'clipboard-set') return close('too large');
       const clean = fromPage(msg);

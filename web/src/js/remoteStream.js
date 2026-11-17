@@ -75,6 +75,8 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
         if (!direct) return;
         direct = false;inputDirect = false;needKey = true;
         if (held) { const q = held;held = null;for (const m of q) sendSocket(m); }
+        // The Mac told by the socket, so its frames come that way at once.
+        sendSocket({ t: 'rtc-close' });
         sendSocket({ t: 'key-frame' });
         // What was pressed may have been lost with the link: the page lets go of it again.
         onState('direct-lost');

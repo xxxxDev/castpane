@@ -17,4 +17,6 @@ Besides Castpane's own code (MIT, see [LICENSE](../LICENSE)), the app bundles:
 cloudflared is not bundled: the app uses one already installed, or downloads Cloudflare's own
 release and checks it.
 The MPL-2.0 parts are used unchanged, as published on npm; their source is at the addresses
-above.
+above. The licenses and copyright notices of what is built into node-datachannel's binary are in
+[THIRD-PARTY-LICENSES.txt](THIRD-PARTY-LICENSES.txt), which the app carries as
+`Contents/Resources/THIRD-PARTY-LICENSES.txt`.

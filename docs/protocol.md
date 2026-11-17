@@ -72,6 +72,7 @@ capture core. `POST /api/remote/pass/end` ends the admin's passes.
 | `{t:"rtc-candidate", candidate, mid}` | both ways, socket only | ICE candidates (at most 1 KiB). |
 | `{t:"rtc-answer", sdp, type}` | server → page | The server's answer. |
 | `{t:"rtc-none"}` | server → page | This server has no direct link; the socket carries everything. |
+| `{t:"rtc-close"}` | page → server, socket only | The page let the link go (it closed, or went quiet); the server closes its side and sends by the socket. |
 | `{t:"echo", n}` | page → server → page | A round trip, answered the way it came (`n` a safe integer; `0` marks that the server has had everything sent by the socket before the page's input moves to the channel). |
 
 While the channel is open the capture core's messages and frames, and the page's messages, go
@@ -79,7 +80,8 @@ by it, each cut into pieces of at most 60 KiB: `[flags:1][bytes]`, flags bit 0 "
 bit 1 "JSON" (else a video frame); a piece saying more follows is always a whole 60 KiB one.
 The page's messages are checked exactly as on the socket (the same list, sizes and rates). If
 the channel closes, or answers no echo for a few seconds, the socket carries everything again
-from a key frame. The socket itself stays for the whole session (sign-in, its checks, the end).
+from a key frame. A link let go is not offered again in that session (the next connection
+tries again). The socket itself stays for the whole session (sign-in, its checks, the end).
 
 The server adds two messages of its own:
 

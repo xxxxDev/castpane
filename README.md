@@ -137,10 +137,10 @@ back, with touch modes made for a small screen.
 - **The clipboard both ways.** Copy the Mac's clipboard to the phone, or paste the phone's
   where the Mac's cursor is in one press. What a password manager marks hidden is never sent;
   each use is in Activity.
-- **A direct link.** Through the tunnel every click and frame goes by Cloudflare, which can be
-  far away; the page and the Mac then try to reach each other directly (WebRTC, finding their
-  way through routers with public STUN), and the picture and your input go that way, the
-  shorter path when Cloudflare's point is far away. When that cannot connect, or stops, the tunnel carries them as before.
+- **A direct link.** Through the tunnel every click and frame goes by Cloudflare's nearest
+  point, which can be far away. The page and the Mac therefore try to reach each other directly
+  (WebRTC, finding their way through routers with public STUN), and the picture and your input
+  take that shorter path; when it cannot connect, or stops, the tunnel carries them as before.
   The picture's numbers show the round trip and which way is in use. **Settings › Remote ›
   Direct link** picks Cloudflare's and Google's STUN, Cloudflare's alone, or off; see
   [docs/security.md](docs/security.md).

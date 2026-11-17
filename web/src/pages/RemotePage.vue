@@ -40,7 +40,7 @@
           <button type="button" class="remote-apphead-back remote-desktop-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goHome"><f7-icon f7="chevron_left" :size="18"/></button>
           <div class="remote-apphead-title">{{ ct('整個螢幕') }}</div>
           <!-- At the right of the bar, as an app's: the picture's numbers, then its buttons. -->
-          <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps<template v-if="stats.rtt"> · {{ stats.rtt }} ms · {{ stats.direct ? ct('直連') : ct('中繼') }}</template></span>
+          <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps<template v-if="stats.rtt"> · {{ stats.rtt }} ms · {{ stats.direct ? ct('直連中') : ct('中繼中') }}</template></span>
           <div class="remote-actions">
             <!-- The screens, desktops and windows fold away for a bigger picture. -->
             <button v-if="isTouch" type="button" class="remote-btn fold" :title="headFolded ? ct('展開視窗列') : ct('收起視窗列')" @pointerdown.prevent @mousedown.prevent @click="toggleHead"><f7-icon :f7="headFolded ? 'chevron_down' : 'chevron_up'" :size="16"/></button>
@@ -86,7 +86,7 @@
         <div v-if="appMode === 'app'" class="remote-apphead">
           <button type="button" class="remote-apphead-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goHome"><f7-icon f7="chevron_left" :size="18"/></button>
           <div class="remote-apphead-title">{{ appTitle }}</div>
-          <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps<template v-if="stats.rtt"> · {{ stats.rtt }} ms · {{ stats.direct ? ct('直連') : ct('中繼') }}</template></span>
+          <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps<template v-if="stats.rtt"> · {{ stats.rtt }} ms · {{ stats.direct ? ct('直連中') : ct('中繼中') }}</template></span>
           <button v-if="view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
           <button v-if="!isTouch" type="button" class="remote-btn keyboard" :class="{on: keyboardOpen}" :title="ct('鍵盤')" @pointerdown.prevent @mousedown.prevent @click="toggleKeyboard"><f7-icon f7="keyboard" :size="18"/></button>
           <button type="button" class="remote-btn more" :class="{on: menuOpen}" :title="ct('更多')" @pointerdown.prevent @mousedown.prevent @click="menuOpen = !menuOpen;settingsOpen = false"><f7-icon f7="ellipsis" :size="18"/></button>
