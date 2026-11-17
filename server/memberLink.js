@@ -10,6 +10,7 @@ const crypto = require('node:crypto');
 const WebSocket = require('ws');
 const { audit } = require('./services/audit');
 const { FROM_PAGE, fromPage } = require('./remote');
+const { createDirect } = require('./directLink');
 
 const SLICE = 256 * 1024;
 const BACKLOG = 4 * 1024 * 1024;
@@ -19,6 +20,9 @@ const UPLINK_BACKLOG = 16 * 1024 * 1024;
 const STOPPED_MS = 5 * 60 * 1000;
 // A frame from the hub is a page's message, never larger than this (remote.js).
 const FRAME_MAX = 2 * 1024 * 1024;
+// A frame from this Mac's capture core (remote.js keeps the same bound).
+const CORE_MAX = 64 * 1024 * 1024;
+const LINK_MESSAGES = new Set(['rtc-offer', 'rtc-candidate', 'rtc-close', 'echo']);
 
 const frame = (kind, payload) => { const h = Buffer.alloc(5); h[0] = kind; h.writeUInt32BE(payload.length, 1); return Buffer.concat([h, payload]); };
 
@@ -61,6 +65,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     if (!session) return;
     const s = session; session = null;
     if (s.sock && mayAudit()) audit({ source: 'remote', action: 'end', username: s.by, via: config?.hub || '', reason: 'ended', seconds: Math.round((Date.now() - Date.parse(s.since)) / 1000) });
+    try { s.direct?.close(); } catch { /* gone */ }
     try { s.sock?.destroy(); } catch { /* gone */ }
     if (tell) sendJson(ws, { t: 'closed', n: s.n });
   }
@@ -68,7 +73,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
   async function openSession(n, by) {
     endSession();
     if (blocked()) return sendJson(ws, { t: 'failed', n });
-    const s = { n, by: typeof by === 'string' ? by.slice(0, 64) : '', since: new Date().toISOString(), sock: null, pieces: [], held: 0, lastClipboard: 0 };
+    const s = { n, by: typeof by === 'string' ? by.slice(0, 64) : '', since: new Date().toISOString(), sock: null, pieces: [], held: 0, lastClipboard: 0, direct: null, core: [], coreHeld: 0, need: 5, dropping: false, win: 0, count: 0, lastLarge: 0 };
     session = s;
     try {
       const token = tokenOf();
@@ -79,17 +84,88 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
       sendJson(ws, { t: 'opened', n });
       // In this Mac's log and Activity too: who, through which Mac.
       if (mayAudit()) audit({ source: 'remote', action: 'open', username: s.by, via: config?.hub || '', ip: config ? new URL(config.hub).hostname : '' });
+      // The capture core's stream, taken a whole frame at a time: its video goes by the direct
+      // link to the page while there is one open, everything else (and the video otherwise) by
+      // the hub, which checks it as before.
       sock.on('data', (d) => {
         if (session !== s || ws?.readyState !== 1) return;
         if (ws.bufferedAmount > UPLINK_BACKLOG) return endSession();
-        const head = Buffer.alloc(4); head.writeUInt32BE(n);
-        for (let i = 0; i < d.length; i += SLICE) ws.send(Buffer.concat([head, d.subarray(i, i + SLICE)]), { binary: true });
+        s.core.push(d); s.coreHeld += d.length;
+        if (s.coreHeld < s.need) return;
+        let buf = s.core.length === 1 ? s.core[0] : Buffer.concat(s.core, s.coreHeld);
+        s.core = []; s.coreHeld = 0; s.need = 5;
+        let toHub = [];
+        while (buf.length >= 5) {
+          const len = buf.readUInt32BE(1);
+          if (len > CORE_MAX) return endSession();
+          if (buf.length < 5 + len) { s.need = 5 + len; break; }
+          const whole = buf.subarray(0, 5 + len); buf = buf.subarray(5 + len);
+          if (whole[0] === 2 && s.direct?.open && len > 9) {
+            const key = (whole[5] & 1) === 1;
+            if (s.direct.buffered() > 4 * 1024 * 1024) { if (!s.dropping) { s.dropping = true; coreKey(s); } continue; }
+            if (s.dropping && !key) continue;
+            s.dropping = false;
+            s.direct.send(2, whole.subarray(5));
+            continue;
+          }
+          toHub.push(whole);
+        }
+        if (buf.length) { s.core = [buf]; s.coreHeld = buf.length; }
+        if (toHub.length) { const out = toHub.length === 1 ? toHub[0] : Buffer.concat(toHub); upHub(s, out); }
       });
       sock.on('close', () => { if (session === s) endSession(); });
       sock.on('error', () => { if (session === s) endSession(); });
     } catch {
       if (session === s) { session = null; sendJson(ws, { t: 'failed', n }); }
     }
+  }
+
+  function upHub(s, d) {
+    const head = Buffer.alloc(4); head.writeUInt32BE(s.n);
+    for (let i = 0; i < d.length; i += SLICE) ws.send(Buffer.concat([head, d.subarray(i, i + SLICE)]), { binary: true });
+  }
+  const coreKey = (s) => { try { s.sock?.write(frame(1, Buffer.from('{"t":"key-frame"}'))); } catch { /* gone */ } };
+
+  // The direct link to the page (server/directLink.js), asked for through the hub: the page's
+  // input then comes straight here, checked as the hub's is, and the video goes straight back.
+  // Echoes are answered the way they came (the hub's way, through the stream).
+  function linkMessage(s, msg, via) {
+    if (msg.t === 'echo') {
+      if (!Number.isSafeInteger(msg.n)) return;
+      const answer = JSON.stringify({ t: 'echo', n: msg.n });
+      return via === 'direct' ? s.direct?.send(1, answer) : busy(s, answer);
+    }
+    if (via !== 'hub') return;
+    if (msg.t === 'rtc-offer') {
+      if (s.direct || typeof msg.sdp !== 'string' || msg.sdp.length > 16384) return;
+      s.direct = createDirect({
+        stun: msg.stun === 'both' ? 'both' : 'cloudflare',
+        sendSignal: (o) => { if (session === s) busy(s, JSON.stringify(o)); },
+        onMessage: (buf) => fromDirect(s, buf),
+        onOpen: () => { s.dropping = false; coreKey(s); if (mayAudit()) audit({ source: 'remote', action: 'direct', username: s.by, via: config?.hub || '' }); },
+        onClose: () => { if (session === s) coreKey(s); },
+      });
+      if (!s.direct) return busy(s, '{"t":"rtc-none"}');
+      s.direct.offer(msg.sdp);
+    } else if (msg.t === 'rtc-candidate') {
+      if (typeof msg.candidate === 'string' && msg.candidate.length <= 1024 && typeof msg.mid === 'string' && msg.mid.length <= 64) s.direct?.candidate(msg.candidate, msg.mid);
+    } else if (msg.t === 'rtc-close') s.direct?.close();
+  }
+  // A page's message by the direct link: the hub's own limits (a rate, one large message a
+  // second, only the clipboard large), then the same checks as one from the hub. A bad one ends
+  // the link, not the session.
+  function fromDirect(s, raw) {
+    if (session !== s) return;
+    if (Date.now() - s.win > 1000) { s.win = Date.now(); s.count = 0; }
+    if (++s.count > 600) return s.direct?.close();
+    const large = raw.length > 32768;
+    if (large) { if (Date.now() - s.lastLarge < 1000) return busy(s); s.lastLarge = Date.now(); }
+    let msg; try { msg = JSON.parse(raw.toString()); } catch { return s.direct?.close(); }
+    if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.t !== 'string') return s.direct?.close();
+    if (large && msg.t !== 'clipboard-set') return s.direct?.close();
+    if (LINK_MESSAGES.has(msg.t)) return linkMessage(s, msg, 'direct');
+    if (!FROM_PAGE.has(msg.t)) return s.direct?.close();
+    if (deliver(s, msg) === false) endSession();
   }
 
   // Told to the page as the hub tells it, through the session's stream.
@@ -111,26 +187,33 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
       if (buf.length < 5 + n) break;
       let msg; try { msg = JSON.parse(buf.subarray(5, 5 + n).toString()); } catch { return endSession(); }
       buf = buf.subarray(5 + n);
+      if (msg && typeof msg === 'object' && !Array.isArray(msg) && LINK_MESSAGES.has(msg.t)) { linkMessage(s, msg, 'hub'); continue; }
       if (!msg || typeof msg !== 'object' || Array.isArray(msg) || !FROM_PAGE.has(msg.t)) return endSession();
-      const clean = fromPage(msg);
-      if (!clean) continue;
-      if (clean.t === 'quit' && clean.force) audit({ source: 'remote', action: 'force-quit', bundle: clean.bundle, username: s.by, via: config?.hub || '' });
-      if (clean.t.startsWith('clipboard-')) {
-        if (Date.now() - s.lastClipboard < 1000) { busy(s); continue; }
-        s.lastClipboard = Date.now();
-        if (mayAudit()) audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: s.by, via: config?.hub || '', ...(clean.s ? { chars: clean.s.length } : {}) });
-      }
-      // A password try at most every 3 seconds on this Mac too, each in its log (without it).
-      if (clean.t === 'unlock') {
-        if (Date.now() - (s.lastUnlock || 0) < 3000) { busy(s, '{"t":"unlocked","ok":false,"busy":true}'); continue; }
-        s.lastUnlock = Date.now();
-        audit({ source: 'remote', action: 'unlock', username: s.by, via: config?.hub || '' });
-      }
-      // The capture core not reading: the session ends rather than piling up.
-      if (s.sock.writableLength > BACKLOG) return endSession();
-      s.sock.write(frame(1, Buffer.from(JSON.stringify(clean))));
+      if (deliver(s, msg) === false) return endSession();
     }
     s.pieces = buf.length ? [buf] : []; s.held = buf.length;
+  }
+  // One page message, by the hub or the direct link, checked and given to the capture core;
+  // false: the session ends.
+  function deliver(s, msg) {
+    const clean = fromPage(msg);
+    if (!clean) return true;
+    if (clean.t === 'quit' && clean.force) audit({ source: 'remote', action: 'force-quit', bundle: clean.bundle, username: s.by, via: config?.hub || '' });
+    if (clean.t.startsWith('clipboard-')) {
+      if (Date.now() - s.lastClipboard < 1000) { busy(s); return true; }
+      s.lastClipboard = Date.now();
+      if (mayAudit()) audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: s.by, via: config?.hub || '', ...(clean.s ? { chars: clean.s.length } : {}) });
+    }
+    // A password try at most every 3 seconds on this Mac too, each in its log (without it).
+    if (clean.t === 'unlock') {
+      if (Date.now() - (s.lastUnlock || 0) < 3000) { busy(s, '{"t":"unlocked","ok":false,"busy":true}'); return true; }
+      s.lastUnlock = Date.now();
+      audit({ source: 'remote', action: 'unlock', username: s.by, via: config?.hub || '' });
+    }
+    // The capture core not reading: the session ends rather than piling up.
+    if (s.sock.writableLength > BACKLOG) return false;
+    s.sock.write(frame(1, Buffer.from(JSON.stringify(clean))));
+    return true;
   }
 
   function connect() {

@@ -449,13 +449,25 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
     // from a key frame (frames on the way were lost).
     const keyFrame = () => { try { host?.write(frame(1, Buffer.from('{"t":"key-frame"}'))); } catch { /* gone */ } };
     function signal(msg, via) {
-      if (msg.t === 'echo') {
+      if (msg.t === 'echo' && !(member && via === 'socket')) {
         // A round trip measured by the page, answered the way it came.
         if (!Number.isSafeInteger(msg.n)) return;
         const answer = JSON.stringify({ t: 'echo', n: msg.n });
         return via === 'direct' ? direct?.send(1, answer) : sendJson({ t: 'echo', n: msg.n });
       }
-      if (via !== 'socket' || member) return;
+      if (via !== 'socket') return;
+      // Another Mac's session: its own server makes the link (server/memberLink.js); what sets it
+      // up is passed on to it, checked here first. Its echoes too, so the one that says all sent
+      // by the socket has arrived comes from that Mac.
+      if (member) {
+        let clean = null;
+        if (msg.t === 'rtc-offer' && typeof msg.sdp === 'string' && msg.sdp.length <= 16384) clean = { t: 'rtc-offer', sdp: msg.sdp, stun: msg.stun === 'both' ? 'both' : 'cloudflare' };
+        else if (msg.t === 'rtc-candidate' && typeof msg.candidate === 'string' && msg.candidate.length <= 1024 && typeof msg.mid === 'string' && msg.mid.length <= 64) clean = { t: 'rtc-candidate', candidate: msg.candidate, mid: msg.mid };
+        else if (msg.t === 'rtc-close') clean = { t: 'rtc-close' };
+        else if (msg.t === 'echo' && Number.isSafeInteger(msg.n)) clean = { t: 'echo', n: msg.n };
+        if (clean && host && host.writableLength <= 1024 * 1024) host.write(frame(1, Buffer.from(JSON.stringify(clean))));
+        return;
+      }
       if (msg.t === 'rtc-offer') {
         if (direct || typeof msg.sdp !== 'string' || msg.sdp.length > 16384) return;
         direct = createDirect({

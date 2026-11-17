@@ -292,6 +292,11 @@ function app(x) {
 // place in the list, so each one stays, however malformed, to keep the places).
 const other = (x) => ({ name: str(x?.name, 200) ?? '', kind: x?.kind === 'folder' ? 'folder' : 'file' });
 const SHAPES = {
+  // The direct link to a page (server/directLink.js), set up through the hub.
+  'rtc-answer': (m) => (str(m.sdp, 16384) !== undefined && m.type === 'answer' ? { sdp: m.sdp, type: 'answer' } : null),
+  'rtc-candidate': (m) => (str(m.candidate, 1024) !== undefined && str(m.mid, 64) !== undefined ? { candidate: m.candidate, mid: m.mid } : null),
+  'rtc-none': () => ({}),
+  echo: (m) => (Number.isSafeInteger(m.n) ? { n: m.n } : null),
   locked: (m) => ({ locked: bool(m.locked) ?? false }),
   unlocked: (m) => pick({ ok: bool(m.ok) ?? false, busy: bool(m.busy) }),
   status: (m) => pick({ screen: bool(m.screen) ?? false, accessibility: bool(m.accessibility) ?? false, version: str(m.version, 64), host: str(m.host, 64), windows: bool(m.windows) }),

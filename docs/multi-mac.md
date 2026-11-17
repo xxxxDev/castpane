@@ -50,6 +50,15 @@ ways, each prefixed with `n` (4 bytes), so nothing from an earlier session is mi
   and unlock try in its own log.
 - Sessions are in both Macs' logs and Activity: on the hub with the member's name, on the
   member with the hub's address.
+- **The direct link** (docs/protocol.md) reaches the member itself: the page's offer, ICE
+  candidates and echoes go through the hub (checked there) to the member, which makes the
+  link and answers through the hub (checked there too: `rtc-answer`, `rtc-candidate`,
+  `rtc-none`, `echo`). While it is open, only the member's video and the answers to echoes on
+  it come by the link; every other message from the member still comes through the hub and
+  its checks. The page's input then goes straight to the member, which checks it as it checks
+  the hub's (the same allow-list, a rate of 600 a second, one large message a second, only the
+  clipboard large; the clipboard and unlock tries in its own log), so those uses are in the
+  member's log only, not the hub's. A bad message on the link ends the link, not the session.
 
 ## Limits on the hub's side
 

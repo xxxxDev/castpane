@@ -154,9 +154,12 @@ unreadable, so the server refuses to start in that state instead of making a new
 
 **The direct link** (Settings › Remote › Direct link, on by default)
 
-- Offered only over the signed-in `/remote` socket, for this Mac, one per session. The
-  channel's DTLS identity is the one in that offer, so only the page that signed in can reach
-  it; everything sent on it is checked as on the socket.
+- Offered only over the signed-in `/remote` socket, one per session. The channel's DTLS
+  identity is the one in that offer, so only the page that signed in can reach it; everything
+  sent on it is checked as on the socket. For a Mac that joined this one, the offer goes
+  through this Mac to that one, which makes the link; only its video comes by it, its other
+  messages still through this Mac's checks, and the page's input on it is checked and logged
+  on that Mac (docs/multi-mac.md).
 - While a session has one, the Mac listens on a UDP port (each network interface) for that
   session; before, it only made outgoing connections. Only STUN from unknown addresses is
   looked at there, and it closes with the session.

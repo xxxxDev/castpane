@@ -64,7 +64,8 @@ On the socket, text frames are JSON in both directions, and binary frames are vi
 capture core. `POST /api/remote/pass/end` ends the admin's passes.
 
 **The direct link.** Once the socket is open the page may offer a WebRTC data channel over it
-(this Mac only, not a Mac that joined it; one per session; Settings › Remote › Direct link):
+(one per session; Settings › Remote › Direct link; for a Mac that joined this one the link is
+made by that Mac, see docs/multi-mac.md):
 
 | Message | Way | What |
 | --- | --- | --- |

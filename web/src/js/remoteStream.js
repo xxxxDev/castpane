@@ -64,7 +64,7 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
     echoAt = performance.now();send({ t: 'echo', n: ++echoN });
   }, 2000);
   function offerDirect() {
-    if (typeof RTCPeerConnection === 'undefined' || machine || directPref === 'off') return;
+    if (typeof RTCPeerConnection === 'undefined' || directPref === 'off') return;
     try {
       const stun = directPref === 'cloudflare' ? ['stun:stun.cloudflare.com:3478'] : ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'];
       pc = new RTCPeerConnection({ iceServers: [{ urls: stun }] });
@@ -89,7 +89,9 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
         if (inParts.length > 1) { whole = new Uint8Array(inLength);let o = 0;for (const p of inParts) { whole.set(p, o);o += p.length; } }
         inParts = [];inLength = 0;
         if (!inputDirect && !held) { held = [];sendSocket({ t: 'echo', n: 0 }); }
-        if (flags & 2) text(new TextDecoder().decode(whole));
+        // Another Mac's link brings only its video and echoes: its other messages come by the
+        // hub, which checks them (server/members.js).
+        if (flags & 2) { const s = new TextDecoder().decode(whole);if (!machine || s.startsWith('{"t":"echo",')) text(s); }
         else video(whole.byteOffset || whole.byteLength !== whole.buffer.byteLength ? whole.slice().buffer : whole.buffer);
       };
       pc.oniceconnectionstatechange = () => { if (direct && (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed')) { try { dc.close(); } catch {} } };
