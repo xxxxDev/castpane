@@ -174,7 +174,7 @@
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
         <button v-if="!isTouch && macWindows && appMode !== 'home' && appMode !== 'os' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @other="(i, o) => { dockOpen = false;openDockOther(i, o); }" @trash="dockOpen = false;openDockTrash()" @close="dockOpen = false"/>
-        <div v-show="(appMode !== 'home' && appMode !== 'os') || (appMode === 'os' && osLive)" ref="area" class="remote-area" :class="{'cp-live': appMode === 'os'}" :style="appMode === 'os' && osLive ? {left: osLive.rect.left + 'px', top: osLive.rect.top + 'px', width: osLive.rect.width + 'px', height: osLive.rect.height + 'px'} : null" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
+        <div v-show="(appMode !== 'home' && appMode !== 'os') || (appMode === 'os' && osLive)" ref="area" class="remote-area" :class="{'cp-live': appMode === 'os', 'cp-waiting': appMode === 'os' && !hasPicture}" :style="appMode === 'os' && osLive ? {left: osLive.rect.left + 'px', top: osLive.rect.top + 'px', width: osLive.rect.width + 'px', height: osLive.rect.height + 'px'} : null" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
@@ -1950,6 +1950,11 @@ function keyUp(e) {
 .remote-area {position:relative;flex:1;min-height:0;touch-action:none;overflow:hidden;}
 /* CastpaneOS: the live picture over the window in front (components/CastpaneDesk.vue). */
 .remote-stage .remote-area.cp-live {position:fixed;z-index:8999;flex:none;border-radius:0 0 12px 12px;background:#1c1c1e;}
+/* Until its live picture comes, the window's last picture (or the Mac's) shows through, with a
+   small "connecting" over it rather than a dark box. */
+.remote-stage .remote-area.cp-live.cp-waiting {background:transparent;}
+.remote-stage .remote-area.cp-live.cp-waiting .remote-notice {top:auto;bottom:14px;left:50%;right:auto;transform:translateX(-50%);height:auto;flex-direction:row;gap:8px;padding:6px 12px;border-radius:16px;background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);}
+.remote-stage .remote-area.cp-live.cp-waiting .remote-notice p {margin:0;font-size:12px;}
 .remote-canvas {width:100%;height:100%;object-fit:contain;display:block;cursor:default;transform-origin:0 0;}
 .remote-canvas.smooth {transition:transform .28s cubic-bezier(.2, .8, .2, 1);}
 .remote-btn.zoom {font-size:12px;font-weight:600;}

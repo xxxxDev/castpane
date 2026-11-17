@@ -32,7 +32,7 @@
     <div v-if="!listed && !windows.length" class="remote-home-empty">{{ ct('正在讀取…') }}</div>
     <div v-else-if="!openApps.length" class="remote-home-empty">{{ windows.length || filter !== 'all' ? ct('這裡沒有 App') : ct('這台 Mac 沒有開著的 App 視窗。從 Dock 或「所有 App」打開一個。') }}</div>
     <div class="remote-home-open" :class="{one: cols === 1}">
-      <div v-for="o in openApps" :key="o.key" role="button" tabindex="0" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @pointerdown="holdDown($event, o)" @pointermove="holdMove" @pointerup="holdEnd" @pointercancel="holdEnd" @contextmenu.prevent @click="held ? (held = false) : o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.enter.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.space.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
+      <div v-for="o in openApps" :key="o.key" role="button" tabindex="0" class="remote-home-card" :class="{launching: launching && launching === o.bundle}" :data-bundle="o.bundle" @pointerdown="holdDown($event, o)" @pointermove="holdMove" @pointerup="holdEnd" @pointercancel="holdEnd" @contextmenu.prevent="rightClick($event, o)" @click="held ? (held = false) : o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.enter.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)" @keydown.space.self.prevent="o.count > 1 ? $emit('windows', o.key) : o.window ? $emit('open', o.window) : $emit('app', o.app)">
         <span class="remote-home-shot">
           <img v-if="o.window?.thumb" :src="o.window.thumb" alt=""/>
           <img v-else-if="icons[o.bundle]" class="remote-home-shot-icon" :src="icons[o.bundle]" alt=""/>
@@ -85,11 +85,19 @@ const openApps = computed(() => {
   }
   return [...seen.values()];
 });
-// Held half a second without moving: the card's menu instead of a tap.
+// Held half a second without moving by touch, or a right click with a mouse: the card's menu
+// instead of a tap.
 const menu = ref(null), homeEl = ref(null);
 let held = false, holdAt = null, holdTimer = 0;
-function holdDown(e, o) {
+function rightClick(e, o) {
   if (!o.window) return;
+  clearTimeout(holdTimer);holdAt = null;
+  const home = homeEl.value?.getBoundingClientRect() || { left: 0, top: 0, width: innerWidth, height: innerHeight };
+  menu.value = { w: o.window, x: Math.max(8, Math.min(e.clientX - home.left, home.width - 208)), y: Math.max(8, Math.min(e.clientY - home.top, home.height - 110)) };
+}
+function holdDown(e, o) {
+  // A mouse has its right click for this: a long left press is no menu.
+  if (!o.window || e.pointerType === 'mouse') return;
   holdAt = { x: e.clientX, y: e.clientY };held = false;clearTimeout(holdTimer);
   const el = e.currentTarget;
   holdTimer = setTimeout(() => {
