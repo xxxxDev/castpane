@@ -580,6 +580,7 @@ function onMessage(msg) {
       show(back || items.value[0]);
     }
   } else if (msg.t === 'started') {
+    if (osWaitStart !== null && msg.kind === 'window' && msg.id === osWaitStart) osWaitStart = null;
     if (!current.value || current.value.kind !== msg.kind || current.value.id !== msg.id) resetView();
     current.value = { kind: msg.kind, id: msg.id };notice.value = '';
   } else if (msg.t === 'apps' || msg.t === 'icons' || msg.t === 'launched' || msg.t === 'fitted' || msg.t === 'dock' || msg.t === 'dock-opened' || msg.t === 'quit') {
@@ -622,7 +623,13 @@ function onMessage(msg) {
       else if (!isTouch) keyHint.value = true;
     } else if (!msg.editable && autoOpened) { keyboardOpen.value = false;autoOpened = false; }
     else if (!msg.editable) keyHint.value = false;
+  } else if (msg.t === 'shots') {
+    shotsAsked = 0;
+    // Not the window in front now: its live picture is what shows.
+    for (const x of Array.isArray(msg.items) ? msg.items : []) if (x && typeof x.thumb === 'string' && x.id !== osLive.value?.id) { delete snaps[x.id];snaps[x.id] = x.thumb; }
   } else if (msg.t === 'config') {
+    // On the desk, only the picture of the window now in front.
+    if (osWaitStart !== null && appMode.value === 'os') return;
     hasPicture.value = true;clearTimeout(noPicture);
   } else if (msg.t === 'error' && appMode.value === 'os' && msg.message === 'gone') {
     current.value = null;hasPicture.value = false;osLive.value = null;list();
@@ -1600,17 +1607,32 @@ function osFocus(f) {
     const size = { width: f.rect.width, height: f.rect.height };
     if (await fitTo(f.win) && osLive.value?.id === f.win.id) { osFitted = size;show(f.win); }
   };
-  if (changed) { clearTimeout(osFitTimer);snapCurrent();resetView();hasPicture.value = false;osFitted = null;nextTick(refit);return; }
+  // The window that was live stops at once (its last picture kept): its frames, still coming
+  // while this one was made the right size, were drawn over this one.
+  if (changed) { clearTimeout(osFitTimer);snapCurrent();link?.send({ t: 'stop' });osWaitStart = f.win.id;resetView();hasPicture.value = false;osFitted = null;nextTick(refit);return; }
   if (osFitted && Math.abs(osFitted.width - f.rect.width) <= 2 && Math.abs(osFitted.height - f.rect.height) <= 2) { clearTimeout(osFitTimer);return; }
   clearTimeout(osFitTimer);
   osFitTimer = setTimeout(() => { if (osLive.value?.id === f.win.id) refit(); }, 600);
 }
-let osFitted = null;
+let osFitted = null, osWaitStart = null;
 let osFitTimer = 0;
 onBeforeUnmount(() => clearTimeout(osFitTimer));
 let osTimer = 0;
+// The desk's windows not in front, their pictures asked again every second (at most four,
+// one asking at a time): each looks as it is now, not as it was when it was left.
+let shotsAsked = 0, shotsTimer = 0;
+onBeforeUnmount(() => clearInterval(shotsTimer));
+function askShots() {
+  if (appMode.value !== 'os' || document.visibilityState !== 'visible' || !link || Date.now() - shotsAsked < 4000) return;
+  const behind = (deskRef.value?.behind?.() || []).filter((o) => items.value.some((w) => w.kind === 'window' && w.id === o.id && !w.minimized)).slice(0, 4);
+  if (!behind.length) return;
+  const width = Math.min(1200, Math.max(160, Math.round(Math.max(...behind.map((o) => o.width)) * (window.devicePixelRatio || 1))));
+  shotsAsked = Date.now();
+  link.send({ t: 'shots', ids: behind.map((o) => o.id), thumb: width });
+}
 function goOs() {
   goHome();
+  clearInterval(shotsTimer);shotsTimer = setInterval(() => { if (appMode.value === 'os') askShots();else clearInterval(shotsTimer); }, 1000);
   appMode.value = 'os';osAllOpen.value = false;listAsked = 0;list();
   clearInterval(osTimer);osTimer = setInterval(() => { if (appMode.value === 'os' && document.visibilityState === 'visible') list();else if (appMode.value !== 'os') clearInterval(osTimer); }, 5000);
 }
@@ -1622,7 +1644,7 @@ function goHome() {
   if (keyboardOpen.value) { keyboardOpen.value = false;typing.value?.blur(); }
   link?.send({ t: 'stop' });
   stopFollowing();
-  current.value = null;hasPicture.value = false;fitSize = null;osLive.value = null;
+  current.value = null;hasPicture.value = false;fitSize = null;osLive.value = null;osWaitStart = null;
   appMode.value = 'home';
   list();link?.send({ t: 'apps' });if (macWindows.value) link?.send({ t: 'dock' });
 }

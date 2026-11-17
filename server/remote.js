@@ -46,6 +46,12 @@ const MESSAGES = {
   status: none, permissions: none, stop: none,
   // Optional: thumbnails this wide (the cards of the apps), 320 when not given.
   list: (m) => (m.thumb === undefined ? {} : int(m.thumb, 160, 800) ? { thumb: m.thumb } : null),
+  // Pictures of up to four windows (CastpaneOS's desk), each id once; optionally this wide.
+  shots(m) {
+    if (!Array.isArray(m.ids) || m.ids.length < 1 || m.ids.length > 4 || !m.ids.every((x) => int(x, 0, 0xffffffff)) || new Set(m.ids).size !== m.ids.length) return null;
+    if (m.thumb !== undefined && !int(m.thumb, 160, 1200)) return null;
+    return { ids: m.ids, ...(m.thumb !== undefined ? { thumb: m.thumb } : {}) };
+  },
   ack: none, 'key-frame': none,
   start(m) {
     if ((m.kind !== 'display' && m.kind !== 'window') || !int(m.id, 0, 0xffffffff)) return null;

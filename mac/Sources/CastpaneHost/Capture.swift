@@ -164,6 +164,26 @@ enum Catalog {
         return items
     }
 
+    /// The pictures of a few windows, at once: one with none (gone, in the Dock) is left out.
+    static func shots(_ ids: [CGWindowID], width: Int) async -> [[String: Any]] {
+        guard let content = try? await content() else { return [] }
+        let found = ids.compactMap { id in content.windows.first(where: { $0.windowID == id }) }
+        let got = await withTaskGroup(of: (Int, String)?.self) { group in
+            for w in found where !ThumbMisses.recent(w.windowID) {
+                let filter = Unchecked(SCContentFilter(desktopIndependentWindow: w)), size = w.frame.size, id = w.windowID
+                group.addTask {
+                    let t = await thumb(filter.value, size, width)
+                    if t == nil { ThumbMisses.note(id) } else { ThumbMisses.clear(id) }
+                    return t.map { (Int(id), $0) }
+                }
+            }
+            var out: [(Int, String)] = []
+            for await x in group { if let x { out.append(x) } }
+            return out
+        }
+        return got.map { ["id": $0.0, "thumb": $0.1] }
+    }
+
     static func target(kind: String, id: Int) async throws -> Target? {
         let content = try await content()
         if kind == "display", id == allDisplays, content.displays.count > 1 {

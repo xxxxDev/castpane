@@ -32,6 +32,8 @@ enum Request: Equatable, Sendable {
     case status, permissions, list, stop, ack, keyFrame
     /// The list with thumbnails this wide (the switcher's cards; 320 otherwise).
     case listSized(Int)
+    /// Pictures of a few windows (CastpaneOS's desk, those not in front), this wide.
+    case shots(ids: [Int], width: Int)
     case start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool = false, cursor: Bool = true)
     case move(x: Double, y: Double)
     case button(Int, down: Bool, x: Double, y: Double)
@@ -89,6 +91,12 @@ enum Request: Equatable, Sendable {
             guard msg["thumb"] != nil else { return .list }
             guard let w = Field.exactInt(msg["thumb"], in: 160...800) else { return .invalid(t) }
             return .listSized(w)
+        case "shots":
+            guard let raw = msg["ids"] as? [Any], (1...4).contains(raw.count) else { return .invalid(t) }
+            let ids = raw.compactMap { Field.exactInt($0, in: 0...Int(UInt32.max)) }
+            guard ids.count == raw.count, Set(ids).count == ids.count,
+                  let w = msg["thumb"] == nil ? 1200 : Field.exactInt(msg["thumb"], in: 160...1200) else { return .invalid(t) }
+            return .shots(ids: ids, width: w)
         case "stop": return .stop
         case "ack": return .ack
         case "key-frame": return .keyFrame

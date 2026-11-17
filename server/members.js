@@ -296,6 +296,7 @@ const SHAPES = {
   unlocked: (m) => pick({ ok: bool(m.ok) ?? false, busy: bool(m.busy) }),
   status: (m) => pick({ screen: bool(m.screen) ?? false, accessibility: bool(m.accessibility) ?? false, version: str(m.version, 64), host: str(m.host, 64), windows: bool(m.windows) }),
   list: (m) => (Array.isArray(m.items) ? { items: m.items.slice(0, 500).map(item).filter(Boolean) } : null),
+  shots: (m) => (Array.isArray(m.items) ? { items: m.items.slice(0, 4).filter((x) => int(x?.id) !== undefined && typeof x.thumb === 'string' && x.thumb.length <= 512 * 1024 && THUMB.test(x.thumb)).map((x) => ({ id: x.id, thumb: x.thumb })) } : null),
   started: (m) => (m.kind === 'display' || m.kind === 'window') && int(m.id) !== undefined ? pick({ kind: m.kind, id: m.id, width: int(m.width) ?? 0, height: int(m.height) ?? 0, fps: int(m.fps) }) : null,
   config: (m) => (str(m.codec, 64) ? pick({ codec: m.codec, width: int(m.width) ?? 0, height: int(m.height) ?? 0 }) : null),
   stopped: (m) => ({ reason: str(m.reason, 100) ?? '' }),

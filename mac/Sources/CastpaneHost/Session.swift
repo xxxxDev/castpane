@@ -412,6 +412,9 @@ actor Session {
                 _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
                 link.send(json: Self.status())
             }
+        case let .shots(ids, width):
+            let link = self.link
+            Task.detached { link.send(json: ["t": "shots", "items": await Catalog.shots(ids.map { CGWindowID($0) }, width: width)]) }
         case .list, .listSized:
             lastListed = Date()
             let link = self.link

@@ -110,7 +110,9 @@ function pick(a) {
   const w = props.windows.find((x) => x.bundle === a.bundle && !isMin(x)) || props.windows.find((x) => x.bundle === a.bundle);
   if (w) place(w);else emit('app', a);
 }
-defineExpose({ place });
+// The windows on show and not in front, the top ones first, with their body's width.
+function behind() { return shown.value.filter((o) => o.id !== focused.value).sort((a, b) => (b.z || 0) - (a.z || 0)).map((o) => ({ id: o.id, width: o.max ? (deskEl.value?.clientWidth || o.w) : o.w })); }
+defineExpose({ place, behind });
 // The window in front is live: the page lays its picture over this window's body, told again as
 // the window moves or is resized (the corner that resizes it sits just outside).
 function liveRect() {
