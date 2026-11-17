@@ -566,8 +566,11 @@ function onMessage(msg) {
     // An app with a window that the Dock does not show as running (started from All apps, or
     // on the Mac): the Dock asked again, as the Mac's shows it there now.
     if (macWindows.value && Date.now() - dockAskedAt > 3000) {
+      // Once for each app: one the Mac's Dock never lists (an app kept outside the usual
+      // folders) is not asked for at every list.
       const running = new Set(dockApps.value.filter((d) => d.running).map((d) => d.bundle));
-      if (items.value.some((w) => w.kind === 'window' && w.dock !== false && w.bundle && !running.has(w.bundle))) { dockAskedAt = Date.now();link?.send({ t: 'dock' }); }
+      const fresh = [...new Set(items.value.filter((w) => w.kind === 'window' && w.dock !== false && w.bundle && !running.has(w.bundle) && !dockAskedFor.has(w.bundle)).map((w) => w.bundle))];
+      if (fresh.length) { for (const b of fresh) dockAskedFor.add(b);dockAskedAt = Date.now();link?.send({ t: 'dock' }); }
     }
     if (bigWanted) { bigWanted = false;for (const w of items.value) if (w.kind === 'window' && w.thumb && recentWindows.value.some((r) => r.id === w.id)) bigThumbs[w.id] = w.thumb; }
     if (appMode.value !== 'desktop') { appsListed();return; }
@@ -1262,7 +1265,7 @@ const appTitle = computed(() => { const w = items.value.find((x) => current.valu
 function startApps(m) {
   rereadAccount(); // the key row as another device may have set it
   machineName.value = m.name || '';machineId.value = m.id || '';
-  closeWindowViews();macWindows.value = false;quitWatch = null;
+  closeWindowViews();macWindows.value = false;quitWatch = null;dockAskedFor = new Set();
   // Back after a while away: as it was (the whole screen, the home or an app's window).
   // CastpaneOS's desk too: back on it, its top window live again.
   const backToOs = resumeMode === 'os' && osAvailable.value;
@@ -1297,7 +1300,7 @@ function appsMessage(msg) {
     if (!msg.ok && launching.value === msg.bundle) { stopLaunch();toast(msg.newWindow ? ct('這個 App 沒有「新增視窗」') : ct('這個 App 打不開')); }
   } else if (msg.t === 'fitted') { fitWait?.(msg); }
   else if (msg.t === 'dock') {
-    dockApps.value = msg.apps || [];dockOthers.value = Array.isArray(msg.others) ? msg.others : [];dockTrash.value = msg.trash === true;
+    dockApps.value = msg.apps || [];for (const d of dockApps.value) if (d.running) dockAskedFor.delete(d.bundle);dockOthers.value = Array.isArray(msg.others) ? msg.others : [];dockTrash.value = msg.trash === true;
     askIconsFor(dockApps.value.map((a) => a.bundle));
   } else if (msg.t === 'dock-opened') {
     // The Mac asking first whether Castpane may reach that folder (Downloads, Documents…):
@@ -1347,7 +1350,7 @@ function allWindowsOf(a) {
 }
 // The Mac's Dock: asked for each time it opens; the windows in it from the list.
 const dockOpen = ref(false), dockApps = ref([]);
-let dockAskedAt = 0;
+let dockAskedAt = 0, dockAskedFor = new Set();
 // The folders and files kept at the Dock's right ({name, kind}, no path) and whether the Mac
 // offers its Trash: a Mac from before sends neither, and is never asked to open them.
 const dockOthers = ref([]), dockTrash = ref(false);
