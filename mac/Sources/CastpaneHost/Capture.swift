@@ -96,39 +96,45 @@ enum Catalog {
         }
         let desks = Spaces.desks()
         let shown = windows(content)
-        // The windows' thumbnails taken all at once rather than one after the other (each can
-        // take a good part of a second): the list came in seconds with a few windows.
-        // Four at a time: many at once made a spike on the Mac, and more of them ran out of time.
-        let thumbs = await withTaskGroup(of: (Int, String?).self) { group in
-            var out = [String?](repeating: nil, count: shown.count), next = 0
-            func add() {
-                guard next < shown.count else { return }
-                let i = next, w = shown[i];next += 1
-                let filter = Unchecked(SCContentFilter(desktopIndependentWindow: w)), size = w.frame.size
-                group.addTask { (i, await thumb(filter.value, size, thumbWidth)) }
-            }
-            for _ in 0..<4 { add() }
-            for await (i, t) in group { out[i] = t;add() }
-            return out
-        }
-        // Which windows are in the Dock: asked once for each app that has a window here.
+        // Each window's facts first: an app in the Dock (an ordinary one), not a menu-bar helper
+        // or a background agent that keeps a window it never shows (the page's home lists only
+        // these), and whether it is in the Dock, asked once for each app.
         var minimized: [pid_t: Set<CGWindowID>] = [:]
-        for (index, w) in shown.enumerated() {
-            // Its desktop: number (per display), full screen, the one shown now; none in the Dock.
-            var desk: [String: Any] = [:]
-            if let id = Spaces.of(w.windowID), let d = desks[id] {
-                desk = ["id": d.id, "number": d.number, "display": d.display, "fullscreen": d.fullscreen, "current": d.current]
-            }
-            // An app in the Dock (an ordinary one), not a menu-bar helper or a background
-            // agent that keeps a window it never shows: the page's home lists only these.
+        let facts: [(regular: Bool, inDock: Bool)] = shown.map { w in
             let regular = w.owningApplication.flatMap { NSRunningApplication(processIdentifier: $0.processID) }?.activationPolicy == .regular
             var inDock = false
             if regular, let pid = w.owningApplication?.processID {
                 if minimized[pid] == nil { minimized[pid] = Fit.minimizedIDs(pid: pid) }
                 inDock = minimized[pid]?.contains(w.windowID) == true
             }
+            return (regular, inDock)
+        }
+        // The thumbnails, four at a time (one after the other the list took seconds; all at
+        // once made a spike). None for a window in the Dock, nor for one whose picture did not
+        // come lately: ScreenCaptureKit has none for them, and each waited out its 2 seconds.
+        let thumbs = await withTaskGroup(of: (Int, String?).self) { group in
+            var out = [String?](repeating: nil, count: shown.count), next = 0
+            func add() {
+                while next < shown.count {
+                    let i = next, w = shown[i];next += 1
+                    if facts[i].inDock || ThumbMisses.recent(w.windowID) { continue }
+                    let filter = Unchecked(SCContentFilter(desktopIndependentWindow: w)), size = w.frame.size, id = w.windowID
+                    group.addTask { let t = await thumb(filter.value, size, thumbWidth);if t == nil { ThumbMisses.note(id) };return (i, t) }
+                    return
+                }
+            }
+            for _ in 0..<4 { add() }
+            for await (i, t) in group { out[i] = t;add() }
+            return out
+        }
+        for (index, w) in shown.enumerated() {
+            // Its desktop: number (per display), full screen, the one shown now; none in the Dock.
+            var desk: [String: Any] = [:]
+            if let id = Spaces.of(w.windowID), let d = desks[id] {
+                desk = ["id": d.id, "number": d.number, "display": d.display, "fullscreen": d.fullscreen, "current": d.current]
+            }
             items.append(["kind": "window", "id": Int(w.windowID), "title": w.title ?? "", "app": w.owningApplication?.applicationName ?? "",
-                          "here": w.isOnScreen, "desk": desk, "dock": regular, "minimized": inDock,
+                          "here": w.isOnScreen, "desk": desk, "dock": facts[index].regular, "minimized": facts[index].inDock,
                           "bundle": w.owningApplication?.bundleIdentifier ?? "",
                           "width": Int(w.frame.width), "height": Int(w.frame.height),
                           "thumb": thumbs[index] ?? ""])
@@ -431,4 +437,11 @@ final class Compositor {
         context.render(picture, to: out, bounds: frame, colorSpace: CGColorSpaceCreateDeviceRGB())
         return out
     }
+}
+
+/// Windows whose thumbnail did not come (a hidden helper's): not asked again for 30 seconds.
+enum ThumbMisses {
+    private static let misses = OSAllocatedUnfairLock<[CGWindowID: Date]>(initialState: [:])
+    static func note(_ id: CGWindowID) { misses.withLock { $0[id] = Date();if $0.count > 500 { $0 = $0.filter { -$0.value.timeIntervalSinceNow < 30 } } } }
+    static func recent(_ id: CGWindowID) -> Bool { misses.withLock { m in m[id].map { -$0.timeIntervalSinceNow < 30 } ?? false } }
 }
