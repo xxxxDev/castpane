@@ -627,6 +627,7 @@ function onMessage(msg) {
     shotsAsked = 0;
     // Not the window in front now: its live picture is what shows.
     for (const x of Array.isArray(msg.items) ? msg.items : []) if (x && typeof x.thumb === 'string' && x.id !== osLive.value?.id) { delete snaps[x.id];snaps[x.id] = x.thumb; }
+    for (const k of Object.keys(snaps).slice(0, -8)) delete snaps[k];
   } else if (msg.t === 'config') {
     // On the desk, only the picture of the window now in front.
     if (osWaitStart !== null && appMode.value === 'os') return;

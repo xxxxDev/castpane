@@ -181,7 +181,14 @@ enum Catalog {
             for await x in group { if let x { out.append(x) } }
             return out
         }
-        return got.map { ["id": $0.0, "thumb": $0.1] }
+        // Within what a joined Mac's link carries in one message (2 MB): a picture over 400 KB
+        // is left out, and the answer stops at 1.4 MB in all.
+        var total = 0, out: [[String: Any]] = []
+        for (id, t) in got where t.utf8.count <= 400_000 && total + t.utf8.count <= 1_400_000 {
+            total += t.utf8.count
+            out.append(["id": id, "thumb": t])
+        }
+        return out
     }
 
     static func target(kind: String, id: Int) async throws -> Target? {
