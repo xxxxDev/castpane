@@ -120,11 +120,12 @@ back, with touch modes made for a small screen.
 - **At a computer too.** Pinch on a trackpad, Ctrl or ⌘ with the wheel, or the sizes in the top
   bar zoom the picture, which then follows your pointer; the wheel alone keeps scrolling the Mac. On a Windows or Linux keyboard, Ctrl is the Mac's ⌘,
   the Windows key is ⌃, and F5 reloads; Ctrl+← →, Ctrl+Backspace, Home, End and Ctrl+Y work as on Windows, and the full-screen button lets Chrome and Edge pass on Ctrl+W, Ctrl+T and the like. The keyboard button opens a row of keys under the picture, the same keys as the phone's row in one line, for shortcuts your browser keeps for itself.
-- **CastpaneOS, a desk of windows.** On a computer, or a tablet by touch, CastpaneOS shows the
-  Mac's windows as windows of the page, with the Mac's Dock at the left. Drag one by its bar or
-  resize it from any edge or corner, and the Mac's window is made that size; its red, yellow and
-  green buttons close it, put it in the Dock or fill the page. The window in front is live, the
-  others are pictures read again every second. Right-click a Dock app (hold it, by touch) for New
+- **CastpaneOS, a desk of windows.** The CastpaneOS button at the top of the Remote home, on a
+  computer (in a browser window 1024 wide or more) or a tablet by touch, shows the Mac's windows
+  as windows of the page, with the Mac's Dock at the left. Drag one by its bar or resize it from
+  any edge or corner, and the Mac's window is made that size where the app allows; its red,
+  yellow and green buttons close it, put it in the Dock or fill the page. The window in front is
+  live; the others are pictures, the four nearest the front read again about every second. Right-click a Dock app (hold it, by touch) for New
   Window, which presses that app's ⌘N on the Mac. Typing by touch brings the window over the
   desk with the key row, zoomed to the field. Where the windows are is kept on that device for
   each Mac. A phone has no CastpaneOS: its screen is too small for a desk of windows.
