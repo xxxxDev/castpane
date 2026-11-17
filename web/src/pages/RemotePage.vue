@@ -893,7 +893,7 @@ function focusOn(p) {
   clampView();
 }
 watch(keyboardOpen, (open) => {
-  // An app's window made this device's shape (Labs) is made the shape left above the
+  // An app's window made this device's shape is made the shape left above the
   // keyboard instead (refitSoon), its text the size it was: zooming in as well came in two
   // steps, the second when the window's new picture arrived, and stayed when the keyboard went.
   if (appMode.value === 'app' && fitSize) { zoomTo = null;smoothZoom.value = true;resetView();nextTick(fitViewport);return; }
@@ -1371,9 +1371,11 @@ const mayQuit = (w) => macWindows.value && !!w?.bundle && w.bundle.toLowerCase()
 // The windows' sheet, the Dock and a card's menu belong to one Mac and one moment.
 function closeWindowViews() { windowsOf.value = '';dockOpen.value = false;dockApps.value = [];dockOthers.value = [];dockTrash.value = false;cardMenu.value = null; }
 const dockWindows = computed(() => orderedWindows.value.filter((w) => w.minimized));
-// The key row's height, kept clear under the Dock.
+// From the key row's top to the stage's foot (its safe area too), kept clear under the Dock.
 const dockFoot = ref(0);
-function openDock() { dockFoot.value = document.querySelector('.remote-keys-touch')?.offsetHeight || 0;dockOpen.value = true;link?.send({ t: 'dock' });list(); }
+function openDock() {
+  const row = document.querySelector('.remote-keys-touch'), stage = row?.closest('.remote-stage');
+  dockFoot.value = row && stage ? Math.max(0, Math.round(stage.getBoundingClientRect().bottom - row.getBoundingClientRect().top)) : 0;dockOpen.value = true;link?.send({ t: 'dock' });list(); }
 // A folder or file from the Dock (by its place there) or the Trash, opened on the Mac; the
 // Finder window that comes for it is shown: one that was not open before. A file opened in
 // its own app brings none, and is given up on as an app without a window is.
