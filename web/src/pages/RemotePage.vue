@@ -182,7 +182,7 @@
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
         <button v-if="!isTouch && macWindows && appMode !== 'home' && appMode !== 'os' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
         <RemoteDock v-if="dockOpen" @app-menu="openDockMenu" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @other="(i, o) => { dockOpen = false;openDockOther(i, o); }" @trash="dockOpen = false;openDockTrash()" @close="dockOpen = false"/>
-        <div v-show="(appMode !== 'home' && appMode !== 'os') || (appMode === 'os' && osLive)" ref="area" class="remote-area" :class="{'cp-live': appMode === 'os', 'cp-waiting': appMode === 'os' && !hasPicture}" :style="appMode === 'os' && osLive ? {left: osLive.rect.left + 'px', top: osLive.rect.top + 'px', width: osLive.rect.width + 'px', height: osLive.rect.height + 'px'} : null" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
+        <div v-show="(appMode !== 'home' && appMode !== 'os') || (appMode === 'os' && osLive)" ref="area" class="remote-area" :class="{'cp-live': appMode === 'os', 'cp-waiting': appMode === 'os' && !hasPicture, 'cp-typing': osTyping}" :style="appMode === 'os' && osLive ? osBox : null" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
             <template v-if="permission">
@@ -242,7 +242,7 @@
         <!-- On a phone: the keys a phone's keyboard lacks in one capsule, a page at a time
              sideways, with the keyboard's own round button beside it; ⇧ ⌃ ⌥ ⌘ hold for the
              next key. Always there, so the keyboard can be called up from it. -->
-        <div v-if="isTouch && appMode !== 'home' && appMode !== 'os'" class="remote-keys remote-keys-touch" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
+        <div v-if="isTouch && appMode !== 'home' && (appMode !== 'os' || osTyping)" class="remote-keys remote-keys-touch" @mousedown.prevent @pointerdown.capture="rowPress = true" @pointerup.capture="rowRelease" @pointercancel.capture="rowRelease">
           <!-- As set in Settings › Remote › Key row (js/remotePrefs.js): a round button at most at
                the left, two at the right, four pages of keys between; any key in any of them. -->
           <template v-for="id in rowKeys.left" :key="'l' + id"><button v-if="keyDef(id)" type="button" :class="['remote-round', keyDef(id).cls, {on: keyDef(id).on}]" :data-key="id" :aria-pressed="keyDef(id).pressed" :title="keyDef(id).title" :aria-label="keyDef(id).title" @pointerdown.prevent @mousedown.prevent @click="keyDef(id).act()"><f7-icon :f7="keyDef(id).icon" :size="18"/></button></template>
@@ -901,7 +901,7 @@ watch(keyboardOpen, (open) => {
   if (open) { zoomTo = lastTap && Date.now() - lastTap.at < 5000 ? { ...lastTap } : null;nextTick(fitViewport);setTimeout(() => { if (!stageBox.value) zoomTo = null; }, 1500); }
   // The keyboard down, the zoom stays and the cursor's line where it was: going back to the
   // whole picture lost the place just read. Two fingers or 1× go back.
-  else { zoomTo = null;nextTick(fitViewport); }
+  else { zoomTo = null;if (appMode.value === 'os') { smoothZoom.value = true;resetView(); } nextTick(fitViewport); }
 });
 if (typeof window !== 'undefined' && window.visualViewport) {
   window.visualViewport.addEventListener('resize', fitViewport);
@@ -1026,8 +1026,8 @@ function move(e) {
     // same way scrolls (or moves a zoomed picture).
     if (!['zoom', 'pan', 'scroll2'].includes(gesture.kind)) {
       const spread = Math.abs(now.d - last.d0), travel = Math.hypot(now.cx - last.cx0, now.cy - last.cy0);
-      // On CastpaneOS's desk no zoom (it has no 1× to go back): two fingers scroll the Mac.
-      if (spread > 24 && spread > travel && appMode.value !== 'os') gesture.kind = 'zoom';
+      // On CastpaneOS's desk no zoom (it has no 1× to go back) but while typing: two fingers scroll the Mac.
+      if (spread > 24 && spread > travel && (appMode.value !== 'os' || osTyping.value)) gesture.kind = 'zoom';
       else if (travel > 16) {
         gesture.kind = 'scroll2';
         // One axis for the whole scroll, the one it started along, as a Mac trackpad
@@ -1599,6 +1599,7 @@ const listed = ref(false);
 // box only moved when the window is dragged or resized. None in front: the picture stops.
 function osFocus(f) {
   if (appMode.value !== 'os') return;
+  osDesk.value = f?.desk || null;
   if (!f) { if (osLive.value) { snapCurrent();link?.send({ t: 'stop' });current.value = null;hasPicture.value = false; } osLive.value = null;return; }
   const changed = osLive.value?.id !== f.win.id;
   osLive.value = { id: f.win.id, rect: f.rect };
@@ -1618,6 +1619,14 @@ function osFocus(f) {
   osFitTimer = setTimeout(() => { if (osLive.value?.id === f.win.id) refit(); }, 600);
 }
 let osFitted = null, osWaitStart = null;
+// Typing by touch on the desk: the window in front over the whole desk below its bar, with the
+// key row, zoomed to the field as an app alone is; back in its window when the keyboard goes.
+const osTyping = computed(() => appMode.value === 'os' && isTouch && keyboardOpen.value);
+const osDesk = ref(null);
+const osBox = computed(() => {
+  const r = osTyping.value && osDesk.value ? { left: osDesk.value.left, top: osDesk.value.top + 40, width: osDesk.value.width, height: osDesk.value.height - 40 } : osLive.value?.rect;
+  return r ? { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' } : null;
+});
 let osFitTimer = 0;
 onBeforeUnmount(() => clearTimeout(osFitTimer));
 let osTimer = 0;
@@ -2031,6 +2040,7 @@ function keyUp(e) {
 .remote-dock-menu-layer {position:fixed;inset:0;z-index:9700;}
 .remote-home-menu.remote-dock-menu {position:fixed;}
 .remote-stage .remote-area.cp-live.cp-waiting {background:transparent;}
+.remote-stage .remote-area.cp-live.cp-typing {border-radius:0;background:#000;}
 .remote-stage .remote-area.cp-live.cp-waiting .remote-notice {top:auto;bottom:14px;left:50%;right:auto;transform:translateX(-50%);height:auto;flex-direction:row;gap:8px;padding:6px 12px;border-radius:16px;background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);}
 .remote-stage .remote-area.cp-live.cp-waiting .remote-notice p {margin:0;font-size:12px;}
 .remote-canvas {width:100%;height:100%;object-fit:contain;display:block;cursor:default;transform-origin:0 0;}

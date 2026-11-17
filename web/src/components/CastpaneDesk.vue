@@ -75,7 +75,7 @@ const inDock = computed(() => props.windows.filter(isMin));
 const KEY = () => 'castpane-desk-' + (props.machine || 'local');
 function read() { try { const v = JSON.parse(localStorage.getItem(KEY()) || '[]');return Array.isArray(v) ? v.filter((o) => Number.isFinite(o?.id)) : []; } catch { return []; } }
 const placed = ref(read());
-watch(() => props.machine, () => { placed.value = read(); });
+watch(() => props.machine, () => { placed.value = read();fitWidth = 0;nextTick(fitIn); });
 function keep() { try { localStorage.setItem(KEY(), JSON.stringify(placed.value)); } catch { /* this time only */ } }
 let top = Math.max(1, ...placed.value.map((o) => o.z || 1));
 // Those of the Mac's windows still there (and not in its Dock); one gone is forgotten.
@@ -144,13 +144,34 @@ function liveRect() {
   const o = shown.value.find((x) => x.id === focused.value);
   const el = o && deskEl.value?.querySelector(`.cp-win[data-id="${o.id}"] .cp-win-body`);
   if (!el) return null;
-  const b = el.getBoundingClientRect();
-  return { win: o.win, rect: { left: Math.round(b.left), top: Math.round(b.top), width: Math.round(b.width), height: Math.round(b.height) } };
+  const b = el.getBoundingClientRect(), d = deskEl.value.getBoundingClientRect();
+  return { win: o.win, rect: { left: Math.round(b.left), top: Math.round(b.top), width: Math.round(b.width), height: Math.round(b.height) }, desk: { left: Math.round(d.left), top: Math.round(d.top), width: Math.round(d.width), height: Math.round(d.height) } };
 }
 watch([focused, placed], () => nextTick(() => emit('live', liveRect())), { deep: true });
 // The desk itself moved or resized (the browser window, the sidebar folded or opened): told again.
 let sized = null;
-watch(deskEl, (el) => { sized?.disconnect();sized = null;if (el && typeof ResizeObserver !== 'undefined') { sized = new ResizeObserver(() => emit('live', liveRect()));sized.observe(el); } });
+watch(deskEl, (el) => { sized?.disconnect();sized = null;if (el && typeof ResizeObserver !== 'undefined') { sized = new ResizeObserver(() => { fitIn();emit('live', liveRect()); });sized.observe(el); } });
+// Each window kept within the desk as it is now (one placed on a wider screen, or before the
+// phone turned): no wider or taller than the room right of the Dock and under the bar.
+// Only when its width changes (turned, another screen): the keyboard coming up takes height for a
+// while, and the windows stay as they were.
+let fitWidth = 0;
+function fitIn() {
+  const b = deskEl.value?.getBoundingClientRect();if (!b?.width || Math.round(b.width) === fitWidth) return;
+  fitWidth = Math.round(b.width);
+  const left = b.width < 600 ? 62 : 0;
+  let changed = false;
+  const next = placed.value.map((o) => {
+    if (o.max) return o;
+    let { x, y, w, h } = o;
+    w = Math.min(w, Math.max(240, Math.floor(b.width - left - 4)));h = Math.min(h, Math.max(160, Math.floor(b.height - 44)));
+    if (x + w > b.width) x = Math.max(left, Math.floor(b.width - w));
+    if (y + h > b.height) y = Math.max(40, Math.floor(b.height - h));
+    if (x === o.x && y === o.y && w === o.w && h === o.h) return o;
+    changed = true;return { ...o, x, y, w, h };
+  });
+  if (changed) { placed.value = next;keep(); }
+}
 onBeforeUnmount(() => sized?.disconnect());
 // Dragging and resizing, kept within the desk.
 let drag = null;
@@ -198,14 +219,17 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
 .remote-stage .cp-light.close {background:#ff5f57;}
 .remote-stage .cp-light.minimize {background:#febc2e;}
 .remote-stage .cp-light.zoom {background:#28c840;}
-.cp-win-bar img {width:16px;height:16px;margin-left:6px;}
-.cp-win-title {margin-left:6px;color:#9a9a9f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cp-win-bar img {flex:0 0 auto;width:16px;height:16px;margin-left:6px;}
+.cp-win-bar b {flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.remote-stage .cp-light {flex:0 0 auto;}
+.cp-win-title {flex:1 1 0;min-width:0;margin-left:6px;color:#9a9a9f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* The body as the Mac's window: its rounded foot, no black around its picture. */
 .cp-win-body {position:relative;flex:1;min-height:0;overflow:hidden;border-radius:0 0 12px 12px;background:#1c1c1e;cursor:default;}
-.cp-win-body > img {width:100%;height:100%;object-fit:cover;object-position:top center;}
+/* The picture whole, at the top, when the Mac's window is not this one's shape (fit for another screen). */
+.cp-win-body > img {width:100%;height:100%;object-fit:contain;object-position:top center;}
 .cp-win-blank {width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
 .cp-win-blank img {width:64px;height:64px;}
-.remote-stage .cp-win-full {margin:0 0 0 auto;width:24px;height:22px;padding:0;border:0;border-radius:6px;background:none;color:#bbb;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.remote-stage .cp-win-full {flex:0 0 auto;margin:0 0 0 auto;width:24px;height:22px;padding:0;border:0;border-radius:6px;background:none;color:#bbb;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .remote-stage .cp-win-full:hover {background:rgba(255,255,255,.12);color:#fff;}
 .cp-win-edge {position:absolute;z-index:9001;touch-action:none;}
 .cp-edge-n {top:-5px;left:10px;right:10px;height:8px;cursor:ns-resize;}
