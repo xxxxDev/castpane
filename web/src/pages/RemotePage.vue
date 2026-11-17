@@ -563,6 +563,12 @@ function onMessage(msg) {
     else { unlockError.value = msg.busy ? ct('試太快了，請等幾秒再試') : ct('沒有解鎖：密碼可能不對，請再試一次');nextTick(() => unlockField.value?.focus()); }
   } else if (msg.t === 'list') {
     items.value = msg.items || [];listed.value = true;listAsked = 0;if (listAgain) list();
+    // An app with a window that the Dock does not show as running (started from All apps, or
+    // on the Mac): the Dock asked again, as the Mac's shows it there now.
+    if (macWindows.value && Date.now() - dockAskedAt > 3000) {
+      const running = new Set(dockApps.value.filter((d) => d.running).map((d) => d.bundle));
+      if (items.value.some((w) => w.kind === 'window' && w.dock !== false && w.bundle && !running.has(w.bundle))) { dockAskedAt = Date.now();link?.send({ t: 'dock' }); }
+    }
     if (bigWanted) { bigWanted = false;for (const w of items.value) if (w.kind === 'window' && w.thumb && recentWindows.value.some((r) => r.id === w.id)) bigThumbs[w.id] = w.thumb; }
     if (appMode.value !== 'desktop') { appsListed();return; }
     if (!current.value && items.value.length) {
@@ -1258,7 +1264,10 @@ function startApps(m) {
   machineName.value = m.name || '';machineId.value = m.id || '';
   closeWindowViews();macWindows.value = false;quitWatch = null;
   // Back after a while away: as it was (the whole screen, the home or an app's window).
+  // CastpaneOS's desk too: back on it, its top window live again.
+  const backToOs = resumeMode === 'os' && osAvailable.value;
   appMode.value = resumeMode !== 'desktop' ? 'home' : 'desktop';resumeMode = null;
+  if (backToOs) { resumeItem = null;nextTick(goOs); }
   apps.value = [];launching.value = '';switcherOpen.value = false;iconsAsked = new Set();iconsAll = false;
   for (const k of Object.keys(icons)) delete icons[k];
   for (const k of Object.keys(snaps)) delete snaps[k];
@@ -1338,6 +1347,7 @@ function allWindowsOf(a) {
 }
 // The Mac's Dock: asked for each time it opens; the windows in it from the list.
 const dockOpen = ref(false), dockApps = ref([]);
+let dockAskedAt = 0;
 // The folders and files kept at the Dock's right ({name, kind}, no path) and whether the Mac
 // offers its Trash: a Mac from before sends neither, and is never asked to open them.
 const dockOthers = ref([]), dockTrash = ref(false);
