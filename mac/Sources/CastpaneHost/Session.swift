@@ -620,7 +620,13 @@ actor Session {
                 // On another desktop or in the Dock: wait for macOS to bring it here.
                 if !found.here { for _ in 0..<20 where !Catalog.isHere(wid) { try? await Task.sleep(nanoseconds: 100_000_000) } }
             }
-            try await capture.start(found, width: width, height: height, fps: fps, cursor: cursor)
+            // On the screen now: its app's alerts, sheets and menus over it are in the picture
+            // too, the cut following the window (the window alone when it cannot be so).
+            var shown = found
+            if let pid = found.pid, let wid = found.windowID, pid != ProcessInfo.processInfo.processIdentifier,
+               let withApp = await Catalog.withItsApp(wid, pid: pid) { shown = withApp }
+            try await capture.start(shown, width: width, height: height, fps: fps, cursor: cursor)
+            if let wid = shown.windowID, shown.crop != nil { followCut(wid, display: shown.display) }
             link.send(json: ["t": "started", "kind": kind, "id": id, "width": width, "height": height, "fps": fps])
             // Whether a text field already has the focus, so the page knows where it starts.
             link.send(json: ["t": "focus", "editable": input.focusEditable(), "initial": true])
@@ -767,7 +773,28 @@ actor Session {
         if let pid, pid != hid { Catalog.activate(pid) }
     }
 
+    /// The cut picture of a window kept on it as it moves or changes size, twice a second,
+    /// within its display (`display`, global points).
+    private var following: Task<Void, Never>?
+    private func followCut(_ wid: CGWindowID, display: CGRect) {
+        following?.cancel()
+        let capture = self.capture
+        following = Task.detached {
+            var last: CGRect?
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                guard !Task.isCancelled, let f = Catalog.frame(of: wid) else { continue }
+                if f == last { continue }
+                last = f
+                let crop = f.offsetBy(dx: -display.minX, dy: -display.minY).intersection(CGRect(origin: .zero, size: display.size))
+                if crop.isEmpty { continue }
+                if !(await capture.follow(crop)) { return }
+            }
+        }
+    }
+
     func stop() async {
+        following?.cancel();following = nil
         await capture.stop()
         video.replace(with: nil)?.invalidate()
         let t = target

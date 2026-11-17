@@ -19,6 +19,29 @@ enum Catalog {
         let filter: SCContentFilter; let frame: CGRect; let size: CGSize; let windowID: CGWindowID?; let pid: pid_t?; var here = true
         /// All displays at once: each display's own filter and where it sits (global, top-left).
         var parts: [(filter: SCContentFilter, frame: CGRect)] = []
+        /// A window with its app's others over it (an alert, a sheet, a menu): its display's
+        /// picture of that app alone, cut to where the window is, in the display's points.
+        var crop: CGRect?
+        /// That display's place and size (global points).
+        var display: CGRect = .null
+    }
+
+    /// A window on the screen as its app shows it there: its alerts, sheets and menus that
+    /// open over it come in the picture too (a window's own picture has none of them). Nil
+    /// when it is not on a display now, or its app is not known: then the window alone.
+    static func withItsApp(_ windowID: CGWindowID, pid: pid_t) async -> Target? {
+        guard let content = try? await content(), let w = content.windows.first(where: { $0.windowID == windowID }), w.isOnScreen,
+              let app = content.applications.first(where: { $0.processID == pid }),
+              let frame = frame(of: windowID) else { return nil }
+        let mid = CGPoint(x: frame.midX, y: frame.midY)
+        guard let d = content.displays.first(where: { CGDisplayBounds($0.displayID).contains(mid) }) else { return nil }
+        let bounds = CGDisplayBounds(d.displayID)
+        let crop = frame.offsetBy(dx: -bounds.minX, dy: -bounds.minY).intersection(CGRect(origin: .zero, size: bounds.size))
+        guard !crop.isEmpty else { return nil }
+        var t = Target(filter: SCContentFilter(display: d, including: [app], exceptingWindows: []), frame: frame, size: frame.size,
+                       windowID: windowID, pid: pid)
+        t.crop = crop;t.display = bounds
+        return t
     }
 
     /// The id of "all displays": no display has it (kCGNullDirectDisplay).
@@ -267,6 +290,21 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Send
     typealias StopHandler = @Sendable (String) -> Void
     private let lock = NSLock()
     private var streams: [SCStream] = []
+    /// The picture cut to a window (Catalog.withItsApp): its configuration, to move the cut.
+    private var followed: SCStreamConfiguration?
+
+    /// The window moved or changed size on its display: the cut follows it. False when the
+    /// picture is not a cut one.
+    func follow(_ crop: CGRect) async -> Bool {
+        let got = lock.withLock { () -> (cut: Bool, change: (SCStream, SCStreamConfiguration)?) in
+            guard let c = followed, let s = streams.first else { return (false, nil) }
+            if c.sourceRect == crop { return (true, nil) }
+            c.sourceRect = crop
+            return (true, (s, c))
+        }
+        if let (s, c) = got.change { try? await s.updateConfiguration(c) }
+        return got.cut
+    }
     private var onFrame: FrameHandler?
     private var onStop: StopHandler?
     private let queue = DispatchQueue(label: "castpane.capture")
@@ -294,10 +332,13 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Send
             c.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
             c.queueDepth = 5
             c.showsCursor = cursor
+            if let crop = target.crop { c.sourceRect = crop }
             return c
         }
         if target.parts.isEmpty {
-            let s = SCStream(filter: target.filter, configuration: config(width, height), delegate: self)
+            let made = config(width, height)
+            lock.withLock { followed = target.crop == nil ? nil : made }
+            let s = SCStream(filter: target.filter, configuration: made, delegate: self)
             try s.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
             try await s.startCapture()
             queue.sync { compositor = nil; forgetStill() }
@@ -329,7 +370,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Send
     }
 
     func stop() async {
-        let all = lock.withLock { () -> [SCStream] in defer { streams = [] }; return streams }
+        let all = lock.withLock { () -> [SCStream] in defer { streams = [];followed = nil }; return streams }
         for s in all { try? await s.stopCapture() }
         queue.sync { compositor = nil; forgetStill() }
     }
