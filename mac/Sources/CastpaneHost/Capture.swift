@@ -111,7 +111,7 @@ enum Catalog {
         }
         // The thumbnails, four at a time (one after the other the list took seconds; all at
         // once made a spike). None for a window in the Dock, nor for one whose picture did not
-        // come lately: ScreenCaptureKit has none for them, and each waited out its 2 seconds.
+        // come twice lately: ScreenCaptureKit has none for them, and each waited out its 2 seconds.
         let thumbs = await withTaskGroup(of: (Int, String?).self) { group in
             var out = [String?](repeating: nil, count: shown.count), next = 0
             func add() {
@@ -119,7 +119,7 @@ enum Catalog {
                     let i = next, w = shown[i];next += 1
                     if facts[i].inDock || ThumbMisses.recent(w.windowID) { continue }
                     let filter = Unchecked(SCContentFilter(desktopIndependentWindow: w)), size = w.frame.size, id = w.windowID
-                    group.addTask { let t = await thumb(filter.value, size, thumbWidth);if t == nil { ThumbMisses.note(id) };return (i, t) }
+                    group.addTask { let t = await thumb(filter.value, size, thumbWidth);if t == nil { ThumbMisses.note(id) } else { ThumbMisses.clear(id) };return (i, t) }
                     return
                 }
             }
@@ -439,9 +439,16 @@ final class Compositor {
     }
 }
 
-/// Windows whose thumbnail did not come (a hidden helper's): not asked again for 30 seconds.
+/// Windows whose thumbnail did not come twice in a row (a hidden helper's, not one the Mac was
+/// only too busy for once): not asked again for 30 seconds.
 enum ThumbMisses {
-    private static let misses = OSAllocatedUnfairLock<[CGWindowID: Date]>(initialState: [:])
-    static func note(_ id: CGWindowID) { misses.withLock { $0[id] = Date();if $0.count > 500 { $0 = $0.filter { -$0.value.timeIntervalSinceNow < 30 } } } }
-    static func recent(_ id: CGWindowID) -> Bool { misses.withLock { m in m[id].map { -$0.timeIntervalSinceNow < 30 } ?? false } }
+    private static let misses = OSAllocatedUnfairLock<[CGWindowID: (count: Int, at: Date)]>(initialState: [:])
+    static func note(_ id: CGWindowID) {
+        misses.withLock { m in
+            m[id] = ((m[id]?.count ?? 0) + 1, Date())
+            if m.count > 500 { m = m.filter { -$0.value.at.timeIntervalSinceNow < 30 } }
+        }
+    }
+    static func clear(_ id: CGWindowID) { _ = misses.withLock { $0.removeValue(forKey: id) } }
+    static func recent(_ id: CGWindowID) -> Bool { misses.withLock { m in m[id].map { $0.count >= 2 && -$0.at.timeIntervalSinceNow < 30 } ?? false } }
 }
