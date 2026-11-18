@@ -42,7 +42,7 @@ const SHAPES = {
   shots: (m) => (Array.isArray(m.items) ? { items: m.items.slice(0, 4).filter((x) => int(x?.id) !== undefined && typeof x.thumb === 'string' && x.thumb.length <= 512 * 1024 && THUMB.test(x.thumb)).map((x) => ({ id: x.id, thumb: x.thumb })) } : null),
   started: (m) => (m.kind === 'display' || m.kind === 'window') && int(m.id) !== undefined ? pick({ kind: m.kind, id: m.id, width: int(m.width) ?? 0, height: int(m.height) ?? 0, fps: int(m.fps) }) : null,
   config: (m) => (str(m.codec, 64) ? pick({ codec: m.codec, width: int(m.width) ?? 0, height: int(m.height) ?? 0 }) : null),
-  stopped: (m) => ({ reason: str(m.reason, 100) ?? '' }),
+  stopped: (m) => pick({ reason: str(m.reason, 100) ?? '', closed: bool(m.closed) }),
   focus: (m) => pick({ editable: bool(m.editable) ?? false, caret: rect(m.caret), initial: bool(m.initial) }),
   caret: (m) => (rect(m.caret) ? { caret: m.caret } : null),
   probe: (m) => pick({ editable: bool(m.editable) ?? false, n: int(m.n) ?? 0 }),
