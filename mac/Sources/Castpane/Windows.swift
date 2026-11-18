@@ -578,7 +578,7 @@ private struct ActivityRow: View {
     let item: ActivityItem
 
     private var whose: String { item.machine.isEmpty ? "this Mac's" : "\(item.machine)'s" }
-        private var times: String { item.count > 1 ? " (\(item.count) times)" : "" }
+        private var times: String { (item.count > 1 ? " (\(item.count) times)" : "") + (item.reported ? " · from \(item.machine.isEmpty ? "that Mac" : item.machine)" : "") }
 
     private var look: (symbol: String, color: Color, text: String) {
         let who = item.username.isEmpty ? "Someone" : item.username

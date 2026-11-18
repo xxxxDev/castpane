@@ -60,6 +60,8 @@ public struct ActivityItem: Equatable, Identifiable, Sendable {
     public var machine: String = ""
     /// How many times in a row, for a clipboard use.
     public var count: Int = 1
+    /// Said by that other Mac (a use by a direct link to it, which this Mac did not see).
+    public var reported: Bool = false
 
     /// `{items: [...]}` or a bare array; each item's time from `at`, `time` or `ts`.
     public static func decodeList(_ data: Data) -> [ActivityItem] {
@@ -71,7 +73,7 @@ public struct ActivityItem: Equatable, Identifiable, Sendable {
             let parts = ["method", "ip", "from", "device", "detail", "reason"].compactMap { r[$0] as? String }.filter { !$0.isEmpty }
             return ActivityItem(id: i, at: LocalJSON.date(r["at"] ?? r["time"] ?? r["ts"]), kind: kind, username: user,
                                 detail: parts.joined(separator: " · "), machine: r["machine"] as? String ?? "",
-                                count: max(1, LocalJSON.count(r["count"])))
+                                count: max(1, LocalJSON.count(r["count"])), reported: r["reported"] as? Bool == true)
         }
     }
 }
