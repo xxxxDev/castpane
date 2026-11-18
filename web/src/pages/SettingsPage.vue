@@ -423,5 +423,7 @@ async function forceUpdate() {
   .direct-row :deep(.item-inner) {flex-wrap:wrap;}
   .direct-row :deep(.item-title) {flex:1 1 100%;}
   .direct-row :deep(.item-after) {margin-left:0;padding-top:8px;}
+  /* Its title whole, on two lines if need be, not cut short. */
+  .desk-windows-row :deep(.item-title) {white-space:normal;}
 }
 </style>

@@ -62,7 +62,7 @@ Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用�
   <img src="docs/assets/anim/remote-trust-dark.svg" width="250" alt="設定：驗證一次就信任這台裝置；信任的裝置：信任多久、哪些裝置">
 </p>
 <p align="center">
-  <img src="docs/assets/anim/castpane-os-dark.svg" width="820" alt="電腦上的 CastpaneOS：Mac 的視窗變成瀏覽器裡一張桌面上的視窗，從 Dock 打開、拖動、縮放；最前面的那個是即時畫面">
+  <img src="docs/assets/anim/castpane-os-dark.svg" width="820" alt="電腦上的 CastpaneOS：Mac 的視窗變成瀏覽器裡一張桌面上的視窗，從 Dock 打開、拖動；最前面的那個是即時畫面">
 </p>
 
 - **把 Mac 的 App 當手機 App 用。**
@@ -166,7 +166,7 @@ Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用�
 </p>
 
 <p align="center"><img src="docs/assets/shot-desktop-home.png" alt="電腦瀏覽器裡一台 Mac 的首頁，上方有 CastpaneOS、所有 App 和整個螢幕" width="820"></p>
-<p align="center"><img src="docs/assets/shot-desktop-stage.png" alt="電腦瀏覽器裡的整個螢幕，右側欄列出顯示器和桌面" width="820"></p>
+<p align="center"><img src="docs/assets/shot-desktop-stage.png" alt="電腦瀏覽器裡的整個螢幕，設定 › 遠端 › 整個螢幕列出所有視窗打開時，右側欄列出顯示器和桌面" width="820"></p>
 <p align="center"><img src="docs/assets/shot-desktop-os.png" alt="電腦瀏覽器裡的 CastpaneOS：Notes、Mail 和 Calendar 是桌面上的視窗，左側是 Dock" width="820"></p>
 
 Mac 上的設定精靈和設定視窗：

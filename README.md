@@ -62,7 +62,7 @@ back, with touch modes made for a small screen.
   <img src="docs/assets/anim/remote-trust-dark.svg" width="250" alt="Settings: trust this device after asking once; Trusted devices: how long trust lasts and which devices are trusted">
 </p>
 <p align="center">
-  <img src="docs/assets/anim/castpane-os-dark.svg" width="820" alt="CastpaneOS on a computer: the Mac's windows as windows of a desk in the browser, opened from its Dock, dragged and resized; the one in front is live">
+  <img src="docs/assets/anim/castpane-os-dark.svg" width="820" alt="CastpaneOS on a computer: the Mac's windows as windows of a desk in the browser, opened from its Dock and dragged; the one in front is live">
 </p>
 
 - **The Mac's apps, as a phone's.** The Remote tab opens on the apps open on the Mac, one card
@@ -184,7 +184,7 @@ back, with touch modes made for a small screen.
 </p>
 
 <p align="center"><img src="docs/assets/shot-desktop-home.png" alt="A Mac's home in a computer's browser, with CastpaneOS, All apps and Whole screen at the top" width="820"></p>
-<p align="center"><img src="docs/assets/shot-desktop-stage.png" alt="The whole screen in a computer's browser, its displays and desktops in the column at the right" width="820"></p>
+<p align="center"><img src="docs/assets/shot-desktop-stage.png" alt="The whole screen in a computer's browser, with Settings › Remote › Whole screen lists every window on: its displays and desktops in the column at the right" width="820"></p>
 <p align="center"><img src="docs/assets/shot-desktop-os.png" alt="CastpaneOS in a computer's browser: Notes, Mail and Calendar as windows on a desk, the Dock at the left" width="820"></p>
 
 On the Mac, the setup assistant and Settings:
