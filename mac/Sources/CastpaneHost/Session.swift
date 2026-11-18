@@ -652,7 +652,7 @@ actor Session {
             steps.mark("with app")
             try await capture.start(shown, width: width, height: height, fps: fps, cursor: cursor)
             steps.mark("capture")
-            if let wid = shown.windowID, shown.crop != nil { followCut(wid, display: shown.display) }
+            if let wid = shown.windowID { followCut(wid, display: shown.display, cut: shown.crop != nil) }
             link.send(json: ["t": "started", "kind": kind, "id": id, "width": width, "height": height, "fps": fps])
             // Whether a text field already has the focus, so the page knows where it starts.
             link.send(json: ["t": "focus", "editable": input.focusEditable(), "initial": true])
@@ -818,15 +818,24 @@ actor Session {
     private var following: Task<Void, Never>?
     /// Taken partly off its display or to another one: the picture started again, cut anew or
     /// of the window alone (Catalog.withItsApp). Stopped with the picture.
-    private func followCut(_ wid: CGWindowID, display: CGRect) {
+    /// A window closed (its last tab, say) ends its picture: a cut one is of its app, which
+    /// goes on running, and would keep showing the window's last frame.
+    private func followCut(_ wid: CGWindowID, display: CGRect, cut: Bool) {
         following?.cancel()
         let capture = self.capture
         following = Task.detached { [weak self] in
-            var last: CGRect?
+            var last: CGRect?, missed = 0
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 500_000_000)
-                guard !Task.isCancelled, let f = Catalog.frame(of: wid) else { continue }
-                if f == last { continue }
+                guard !Task.isCancelled else { return }
+                // Gone from the window server, twice running (not a moment's slip): closed.
+                guard let f = Catalog.frame(of: wid) else {
+                    missed += 1
+                    if missed >= 2 { await self?.windowClosed(wid);return }
+                    continue
+                }
+                missed = 0
+                if !cut || f == last { continue }
                 // Out of sight (another desktop, the Dock): left as it is until it is back, not
                 // brought back here by starting again.
                 if !Catalog.isHere(wid) { last = nil;continue }
@@ -835,6 +844,12 @@ actor Session {
                 if !(await capture.follow(f.offsetBy(dx: -display.minX, dy: -display.minY))) { return }
             }
         }
+    }
+    private func windowClosed(_ wid: CGWindowID) async {
+        guard target?.windowID == wid else { return }
+        if fitted?.id == wid { fitted = nil }
+        await stop()
+        link.send(json: ["t": "stopped", "reason": "the window was closed", "closed": true])
     }
     private func restartCut(_ wid: CGWindowID) async {
         guard target?.windowID == wid, let s = lastStart, s.kind == "window", s.id == Int(wid) else { return }

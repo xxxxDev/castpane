@@ -671,9 +671,14 @@ function onMessage(msg) {
   } else if (msg.t === 'stopped') {
     // An app that opens with a window of its own first (Discord's updater) closes it for its
     // main one: the page follows the app to that window.
-    const w = currentWindow.value;
+    // One closed (its last tab, say) goes back home when its app opens no other soon.
+    const w = currentWindow.value || (msg.closed && current.value?.kind === 'window' ? current.value : null);
     const stopped = () => { notice.value = ct('畫面已停止：') + (msg.reason || ''); };
-    if (appMode.value === 'app' && w?.bundle) { notice.value = ct('正在打開…');waitForWindow(w.bundle, w.id, stopped); }
+    if (msg.closed && w) {
+      notice.value = ct('這個視窗已經關閉');
+      if (appMode.value === 'app' && w.bundle) waitForWindow(w.bundle, w.id, () => leaveIfShown(w), '', 3);
+      else leaveIfShown(w);
+    } else if (appMode.value === 'app' && w?.bundle) { notice.value = ct('正在打開…');waitForWindow(w.bundle, w.id, stopped); }
     else stopped();
   } else if (msg.t === 'closed' && msg.reason === 'replaced') {
     error.value = ct('已在別的頁面打開遠端，這裡已中斷。');
@@ -1566,11 +1571,11 @@ const launchLabel = ref('');
 function noWindow() {
   f7.dialog.create({ title: ct('這個 App 沒有開出視窗'), text: ct('有些 App 只在選單列或整個螢幕上出現，沒有可以單獨顯示的視窗。要改看整個螢幕嗎？'), buttons: [{ text: ct('取消') }, { text: ct('整個螢幕'), bold: true, onClick: goDesktop }] }).open();
 }
-function waitForWindow(bundle, skip = null, giveUp = noWindow, label = '') {
+function waitForWindow(bundle, skip = null, giveUp = noWindow, label = '', most = 15) {
   launching.value = bundle;launchSkip = skip;launchLabel.value = label;
   clearInterval(launchTimer);
   let tries = 0;
-  launchTimer = setInterval(() => { if (!launching.value || ++tries > 15) { clearInterval(launchTimer);if (launching.value) { launching.value = '';launchSkip = null;launchLabel.value = '';giveUp(); } return; } list(); }, 1000);
+  launchTimer = setInterval(() => { if (!launching.value || ++tries > most) { clearInterval(launchTimer);if (launching.value) { launching.value = '';launchSkip = null;launchLabel.value = '';giveUp(); } return; } list(); }, 1000);
   if (skip) list();
 }
 // Waiting for the window after one gone is dropped once the person goes elsewhere.
