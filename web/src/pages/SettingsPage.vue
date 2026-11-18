@@ -417,4 +417,11 @@ async function forceUpdate() {
   color: #ff3b30;
 }
 .settings-select {max-width:170px;height:32px;padding:0 8px;border:0;border-radius:8px;background:rgba(127,127,127,.18);color:inherit;font-size:14px;}
+/* On a phone the direct link's choice goes under its words, which a select beside them squeezed
+   into a narrow column. */
+@media (max-width:599px) {
+  .direct-row :deep(.item-inner) {flex-wrap:wrap;}
+  .direct-row :deep(.item-title) {flex:1 1 100%;}
+  .direct-row :deep(.item-after) {margin-left:0;padding-top:8px;}
+}
 </style>
