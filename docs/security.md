@@ -157,8 +157,8 @@ unreadable, so the server refuses to start in that state instead of making a new
 - Offered only over the signed-in `/remote` socket, one per session. The channel's DTLS
   identity is the one in that offer, so only the page that signed in can reach it; everything
   sent on it is checked as on the socket. For a Mac that joined this one, the offer goes
-  through this Mac to that one, which makes the link; only its video comes by it, its other
-  messages still through this Mac's checks (the page takes nothing else from it on the link),
+  through this Mac to that one, which makes the link; its video and messages come by it, the
+  page checking the messages with this Mac's own rules (the same file) before using any,
   and the page's input on it is checked and logged on that Mac; its clipboard, unlock and force
   quit uses are also in this Mac's log, without content, as that Mac reports them (its word,
   not this Mac's own view); that Mac opens

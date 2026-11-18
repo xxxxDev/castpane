@@ -467,7 +467,7 @@ function installRemote(server, { passes = sharedPasses, connect = connectHost, m
           return;
         }
         let clean = null;
-        if (msg.t === 'rtc-offer' && typeof msg.sdp === 'string' && msg.sdp.length <= 16384) clean = { t: 'rtc-offer', sdp: msg.sdp, stun: msg.stun === 'both' ? 'both' : 'cloudflare' };
+        if (msg.t === 'rtc-offer' && typeof msg.sdp === 'string' && msg.sdp.length <= 16384) clean = { t: 'rtc-offer', sdp: msg.sdp, stun: msg.stun === 'both' ? 'both' : 'cloudflare', ...(msg.words === true ? { words: true } : {}) };
         else if (msg.t === 'rtc-candidate' && typeof msg.candidate === 'string' && msg.candidate.length <= 1024 && typeof msg.mid === 'string' && msg.mid.length <= 64) clean = { t: 'rtc-candidate', candidate: msg.candidate, mid: msg.mid };
         else if (msg.t === 'rtc-close') clean = { t: 'rtc-close' };
         else if (msg.t === 'echo' && Number.isSafeInteger(msg.n)) clean = { t: 'echo', n: msg.n };

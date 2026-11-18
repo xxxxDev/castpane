@@ -70,7 +70,7 @@ made by that Mac, see docs/multi-mac.md):
 
 | Message | Way | What |
 | --- | --- | --- |
-| `{t:"rtc-offer", sdp, stun}` | page → server, socket only | The page's offer (at most 16 KiB) for one channel labelled `castpane`; `stun` is `both` (Cloudflare's and Google's STUN) or `cloudflare`. |
+| `{t:"rtc-offer", sdp, stun, words}` | page → server, socket only | The page's offer (at most 16 KiB) for one channel labelled `castpane`; `stun` is `both` (Cloudflare's and Google's STUN) or `cloudflare`; `words: true` says the page checks a member Mac's messages on the channel itself. |
 | `{t:"rtc-candidate", candidate, mid}` | both ways, socket only | ICE candidates (at most 1 KiB). |
 | `{t:"rtc-answer", sdp, type}` | server → page | The server's answer. |
 | `{t:"rtc-none"}` | server → page | This server has no direct link; the socket carries everything. |
@@ -78,8 +78,8 @@ made by that Mac, see docs/multi-mac.md):
 | `{t:"echo", n}` | page → server → page | A round trip, answered the way it came (`n` a safe integer; `0` marks that the server has had everything sent by the socket before the page's input moves to the channel). |
 
 While the channel is open the capture core's messages and frames, and the page's messages, go
-by it (for a member Mac only its video and echoes, its other messages still by the hub; see
-docs/multi-mac.md), each cut into pieces of at most 60 KiB: `[flags:1][bytes]`, flags bit 0
+by it (for a member Mac its messages too only when the offer says `words: true`, the page then
+checking them as the hub does; see docs/multi-mac.md), each cut into pieces of at most 60 KiB: `[flags:1][bytes]`, flags bit 0
 "more follows", bit 1 "JSON" (else a video frame); a piece saying more follows is always a
 whole 60 KiB one, and both sides take at most about 8 MiB (the page) or 1 MiB (the server) a
 message. The page's messages are checked as on the socket (on a member, by the member: see

@@ -42,8 +42,11 @@ ways, each prefixed with `n` (4 bytes), so nothing from an earlier session is mi
 - The page's messages go through the same allow-list as for the hub's own capture core.
 - What comes from a member is checked before it reaches the page: JSON objects of the
   capture core's known types only, and thumbnails only as `data:image/…;base64` URLs. On a
-  direct link only its video and echoes come straight to the page, which takes nothing else
-  there (an echo rebuilt from its number), and at most 8 MiB a message.
+  direct link its video and its messages come straight to the page, which checks the messages
+  itself with the same rules (one file, `server/memberWords.mjs`, used by both), each rebuilt
+  from its known fields; the link's own setting up stays the hub's way, and a message is at
+  most 8 MiB. The page says so in its offer (`words: true`); to a page that does not, a member
+  sends only its video and echoes by the link.
 - One viewer at a time, across all Macs.
 - The member's menu shows the viewer. **Stop Sharing Now** ends the session, and the hub may
   not open another for five minutes; **Pause** stops sharing until it resumes. Either way the

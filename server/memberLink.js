@@ -84,9 +84,9 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
       sendJson(ws, { t: 'opened', n });
       // In this Mac's log and Activity too: who, through which Mac.
       if (mayAudit()) audit({ source: 'remote', action: 'open', username: s.by, via: config?.hub || '', ip: config ? new URL(config.hub).hostname : '' });
-      // The capture core's stream, taken a whole frame at a time: its video goes by the direct
-      // link to the page while there is one open, everything else (and the video otherwise) by
-      // the hub, which checks it as before.
+      // The capture core's stream, taken a whole frame at a time: its video (and its words, to a
+      // page that checks them) goes by the direct link to the page while there is one open,
+      // everything else (and all of it otherwise) by the hub, which checks it as before.
       sock.on('data', (d) => {
         if (session !== s || ws?.readyState !== 1) return;
         if (ws.bufferedAmount > UPLINK_BACKLOG) return endSession();
@@ -107,6 +107,13 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
             s.dropping = false;
             s.direct.send(2, whole.subarray(5));
             continue;
+          }
+          // Its words too, to a page that checks them, in order with its frames: an answer by the
+          // hub took the tunnel's way, about half a second more each. A page not reading them is
+          // let go of as the hub lets go of one (the socket then carries everything again).
+          if (whole[0] === 1 && s.words && s.direct?.open) {
+            if (s.direct.buffered() > 16 * 1024 * 1024) s.direct.close();
+            else if (s.direct.send(1, whole.subarray(5))) continue;
           }
           toHub.push(whole);
         }
@@ -138,6 +145,9 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     if (via !== 'hub') return;
     if (msg.t === 'rtc-offer') {
       if (s.direct || typeof msg.sdp !== 'string' || msg.sdp.length > 16384) return;
+      // A page that checks this Mac's words itself (server/memberWords.mjs) takes them by the
+      // link too; an older one only its video and echoes.
+      s.words = msg.words === true;
       s.direct = createDirect({
         stun: msg.stun === 'both' ? 'both' : 'cloudflare',
         sendSignal: (o) => { if (session === s) busy(s, JSON.stringify(o)); },

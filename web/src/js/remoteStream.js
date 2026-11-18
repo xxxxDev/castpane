@@ -3,6 +3,8 @@
 // decoded by the browser's own (hardware) decoder and drawn on a canvas; each one shown
 // is acknowledged, and the capture core skips frames while three are unshown, so the picture
 // stays current instead of falling behind (as Sill does).
+import { vetFromMember } from '../../../server/memberWords.mjs';
+
 export function remoteSupported() {
   return typeof window !== 'undefined' && 'VideoDecoder' in window && 'EncodedVideoChunk' in window;
 }
@@ -102,22 +104,22 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
           // Its answer lost (the Mac too busy, or one that never answers): the link is let go.
           setTimeout(() => { if (held && !inputDirect) { try { dc.close(); } catch {} } }, 5000);
         }
-        // Another Mac's link brings only its video and echoes: its other messages come by the
-        // hub, which checks them (server/members.js).
+        // Another Mac's words by its link are checked here as its hub checks them (the same file,
+        // server/memberWords.mjs), each rebuilt from its known fields; the link's own setting-up
+        // stays the hub's way.
         if (flags & 2) {
           const s = new TextDecoder().decode(whole);
           if (!machine) text(s);
           else {
-            // Taken apart once, only an echo with its number kept (a key given twice is no way in).
-            let o = null;try { o = JSON.parse(s); } catch {}
-            if (o && o.t === 'echo' && Number.isSafeInteger(o.n)) text(JSON.stringify({ t: 'echo', n: o.n }));
+            const clean = vetFromMember(s);
+            if (clean !== null && !clean.startsWith('{"t":"rtc-')) text(clean);
           }
         }
         else video(whole.byteOffset || whole.byteLength !== whole.buffer.byteLength ? whole.slice().buffer : whole.buffer);
       };
       pc.oniceconnectionstatechange = () => { if (direct && (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed')) { try { dc.close(); } catch {} } };
       pc.onicecandidate = (e) => { if (e.candidate?.candidate) sendSocket({ t: 'rtc-candidate', candidate: e.candidate.candidate, mid: e.candidate.sdpMid || '0' }); };
-      pc.createOffer().then((o) => pc.setLocalDescription(o)).then(() => sendSocket({ t: 'rtc-offer', sdp: pc.localDescription.sdp, stun: directPref === 'cloudflare' ? 'cloudflare' : 'both' })).catch(() => {});
+      pc.createOffer().then((o) => pc.setLocalDescription(o)).then(() => sendSocket({ t: 'rtc-offer', sdp: pc.localDescription.sdp, stun: directPref === 'cloudflare' ? 'cloudflare' : 'both', words: true })).catch(() => {});
     } catch { pc = null; }
   }
 
