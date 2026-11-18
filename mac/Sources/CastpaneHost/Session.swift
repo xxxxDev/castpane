@@ -377,14 +377,16 @@ actor Session {
 
     /// Wakes the displays of a Mac that is asleep or locked, and waits (at most 3 s) until
     /// the capture sees them again: asleep, it lists none.
-    private static func wakeDisplays() async {
-        guard Wake.needed else { return }
+    @discardableResult
+    private static func wakeDisplays() async -> String {
+        guard let why = Wake.why else { return "awake" }
         Wake.display()
         let until = Date().addingTimeInterval(3)
         while Date() < until {
-            if let c = try? await Catalog.within(1, { Catalog.Unchecked(try await Catalog.content()) }), !c.value.displays.isEmpty { return }
+            if let c = try? await Catalog.within(1, { Catalog.Unchecked(try await Catalog.content()) }), !c.value.displays.isEmpty { return why }
             try? await Task.sleep(nanoseconds: 250_000_000)
         }
+        return why + ", still"
     }
 
     /// Every active display's place and size in points and pixels.
@@ -601,8 +603,8 @@ actor Session {
         steps.mark("unfit")
         await stop()
         steps.mark("stop")
-        await Self.wakeDisplays()
-        steps.mark("wake")
+        let woke = await Self.wakeDisplays()
+        steps.mark("wake (\(woke))")
         lastStart = (kind, id, maxWidth, fps, bitrate, hevc);lastCursor = cursor
         displaysAtStart = Self.displaysSignature()
         do {
@@ -641,7 +643,7 @@ actor Session {
                 // On another desktop or in the Dock: wait for macOS to bring it here.
                 if !found.here { for _ in 0..<20 where !Catalog.isHere(wid) { try? await Task.sleep(nanoseconds: 100_000_000) } }
             }
-            steps.mark("forward")
+            steps.mark("forward (window \(Int(found.size.width))x\(Int(found.size.height)))")
             // On the screen now: its app's alerts, sheets and menus over it are in the picture
             // too, the cut following the window (the window alone when it cannot be so).
             var shown = found
@@ -654,6 +656,7 @@ actor Session {
             link.send(json: ["t": "started", "kind": kind, "id": id, "width": width, "height": height, "fps": fps])
             // Whether a text field already has the focus, so the page knows where it starts.
             link.send(json: ["t": "focus", "editable": input.focusEditable(), "initial": true])
+            steps.mark("focus")
         } catch {
             link.send(json: ["t": "error", "where": "start", "message": error.localizedDescription])
         }
@@ -694,7 +697,9 @@ actor Session {
         steps.mark("bring here")
         // Full screen on another desktop could not be seen from here (Accessibility lists only
         // the windows on the desktop shown): out of it now that it is here, and brought here again.
-        if await MainActor.run(body: { Fit.axWindow(id, pid: pid).map(Fit.isFullScreen) ?? false }) {
+        let fullHere = await MainActor.run(body: { Fit.axWindow(id, pid: pid).map(Fit.isFullScreen) ?? false })
+        steps.mark(fullHere ? "full screen here" : "not full screen")
+        if fullHere {
             if again == nil { wasFull = true }
             await MainActor.run { if let w = Fit.axWindow(id, pid: pid) { Fit.setFullScreen(w, false) } }
             for _ in 0..<30 {
@@ -703,13 +708,14 @@ actor Session {
             }
             try? await Task.sleep(nanoseconds: 400_000_000)
             await bringHere(id, pid: pid)
+            steps.mark("out of full screen")
         }
         let result: (CGRect, CGRect)? = await MainActor.run {
             guard let w = Fit.axWindow(id, pid: pid), let now = Fit.frame(w) else { return nil }
             Fit.set(w, Fit.place(size, from: now, in: Fit.usable(for: now)))
             return (again?.was ?? now, Fit.frame(w) ?? now)
         }
-        steps.mark("resize")
+        steps.mark("resize (asked \(Int(size.width))x\(Int(size.height)), " + (result.map { "\(Int($0.1.width))x\(Int($0.1.height))" } ?? "no window") + ")")
         guard let (before, after) = result else { link.send(json: ["t": "fitted", "id": Int(id), "ok": false]); return }
         fitted = (id, pid, before, wasFull)
         windowFrame = nil; frameCheckedAt = 0

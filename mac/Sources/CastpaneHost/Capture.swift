@@ -30,7 +30,9 @@ enum Catalog {
     /// open over it come in the picture too (a window's own picture has none of them). Nil
     /// when it is not on a display now, or its app is not known: then the window alone.
     static func withItsApp(_ windowID: CGWindowID, pid: pid_t) async -> Target? {
-        guard let content = try? await content(), let w = content.windows.first(where: { $0.windowID == windowID }), w.isOnScreen,
+        // Only the windows on the screen: it must be one of them, and listing every window
+        // took the Intel Mac mini up to a second and a half here.
+        guard let content = try? await content(onScreenOnly: true), let w = content.windows.first(where: { $0.windowID == windowID }), w.isOnScreen,
               let app = content.applications.first(where: { $0.processID == pid }),
               let frame = frame(of: windowID) else { return nil }
         // Wholly on one display only: one part off it would come out cut and stretched.
@@ -48,8 +50,8 @@ enum Catalog {
 
     /// Every window, also those on the Mac's other desktops (Spaces) and in the Dock
     /// too: a window there is brought here when picked.
-    static func content() async throws -> SCShareableContent {
-        guard let content = try await within(5, { Unchecked(try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)) }) else {
+    static func content(onScreenOnly: Bool = false) async throws -> SCShareableContent {
+        guard let content = try await within(5, { Unchecked(try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: onScreenOnly)) }) else {
             log.error("the list of displays and windows did not come within 5 s")
             throw CocoaError(.featureUnsupported, userInfo: [NSLocalizedDescriptionKey: "The screen capture did not answer"])
         }

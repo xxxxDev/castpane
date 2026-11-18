@@ -12,12 +12,14 @@ enum Wake {
     private static let assertion = OSAllocatedUnfairLock<IOPMAssertionID>(initialState: 0)
 
     /// Whether any display is asleep or the screen is locked now.
-    static var needed: Bool {
+    static var needed: Bool { why != nil }
+    /// Which of the two it is, if either (for the log).
+    static var why: String? {
         var ids = [CGDirectDisplayID](repeating: 0, count: 16), count: UInt32 = 0
         if CGGetOnlineDisplayList(16, &ids, &count) == .success, ids.prefix(Int(count)).contains(where: { CGDisplayIsAsleep($0) != 0 }) {
-            return true
+            return "a display asleep"
         }
-        return locked
+        return locked ? "locked" : nil
     }
 
     /// Whether the Mac sits at its lock screen: a window's picture still comes, but a click
