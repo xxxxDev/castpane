@@ -229,7 +229,7 @@ function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openM
       // record): in this log too, without its content, for the session open now only.
       used(m) {
         const s = link.session;
-        if (closed || !s || m.n !== s.n || pending?.n === s.n || !USED.has(m.action)) return;
+        if (closed || !link.direct || !s || m.n !== s.n || pending?.n === s.n || !USED.has(m.action)) return;
         // The clipboard at most once a second there: a minute's worth, no more.
         const minute = Math.floor(now() / 60000); if (minute !== link.usedMinute) { link.usedMinute = minute; link.usedCount = 0; }
         if (++link.usedCount > 70) return;

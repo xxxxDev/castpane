@@ -159,7 +159,9 @@ unreadable, so the server refuses to start in that state instead of making a new
   sent on it is checked as on the socket. For a Mac that joined this one, the offer goes
   through this Mac to that one, which makes the link; only its video comes by it, its other
   messages still through this Mac's checks (the page takes nothing else from it on the link),
-  and the page's input on it is checked and logged on that Mac, not this one; that Mac opens
+  and the page's input on it is checked and logged on that Mac; its clipboard, unlock and force
+  quit uses are also in this Mac's log, without content, as that Mac reports them (its word,
+  not this Mac's own view); that Mac opens
   its own UDP port, asks the chosen STUN servers and learns the viewing device's addresses
   (docs/multi-mac.md). A Mac on an older version is never asked.
 - While a session has one, the Mac listens on a UDP port (each network interface) for that
