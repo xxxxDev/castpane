@@ -1591,7 +1591,8 @@ function fitTo(w) {
     // Switching desktops and leaving full screen take the Mac a few seconds each (up to
     // about 12.5 in all, Session.fit).
     const t = setTimeout(() => done(null), 15000);
-    fitWait = done;
+    // Only this window's answer: one for an ask before (late by the hub's way) is not it.
+    fitWait = (m) => { if (m?.id === w.id) done(m); };
     link?.send({ t: 'fit', id: w.id, ...want });
   });
   // An app wider than it can be made (a browser's least width): made taller too, to the

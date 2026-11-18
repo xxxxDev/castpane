@@ -61,8 +61,10 @@ ways, each prefixed with `n` (4 bytes), so nothing from an earlier session is mi
   the page stays on the socket). The page's offer, ICE candidates and echoes go through the
   hub (checked there) to the member, which makes the link and answers through the hub
   (checked there too: `rtc-answer`, `rtc-candidate`, `rtc-none`, `echo`). While it is open,
-  only the member's video and the answers to echoes on it come by the link; every other
-  message from the member still comes through the hub and its checks. The page's input then
+  the member's video and, to a page whose offer said `words: true`, its other messages come
+  by the link, the page checking each with the hub's own rules (`server/memberWords.mjs`) and
+  ending the link past 1000 of them a second; the link's setting up always comes through the
+  hub. To an older page only the video and the answers to echoes come by the link. The page's input then
   goes straight to the member, which checks it as it checks the hub's: the same allow-list,
   600 a second (more ends the link, not the session), one large message a second (one too soon
   is answered busy), only the clipboard large, its capture core at most 4 MiB behind. The

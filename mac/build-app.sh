@@ -93,6 +93,11 @@ if ! lipo -archs "$node_bin" | tr ' ' '\n' | grep -qx "$arch"; then
   exit 1
 fi
 node_version=$("$node_bin" -p process.versions.node)
+# The server loads an ES module with require (server/memberWords.mjs): Node 22.18 or later.
+if ! "$node_bin" -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
+  echo "error: node $node_version is older than 22.18, which the server needs" >&2
+  exit 1
+fi
 mkdir -p "$app/Contents/Resources/node/bin"
 cp "$node_bin" "$app/Contents/Resources/node/bin/node"
 node_license="$(dirname "$node_bin")/../LICENSE"

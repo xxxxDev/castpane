@@ -61,6 +61,8 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
   const askKey = (force = false, viaSocket = false) => { const now = performance.now(); if (!force && now - keyAskedAt < 1000) return; keyAskedAt = now; (viaSocket ? sendSocket : send)({ t: 'key-frame' }); };
   // The time a message takes there and back, by whichever way is in use.
   let echoN = 0, echoAt = 0, rtt = 0;
+  // Another Mac's messages by the link in the current second.
+  let words = 0, wordsAt = 0;
   // A link that went quiet (a phone changing networks) is let go after a few seconds without an
   // answer, and the socket takes over, rather than a frozen picture until the browser notices.
   let echoAnswered = 0;
@@ -111,6 +113,10 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
           const s = new TextDecoder().decode(whole);
           if (!machine) text(s);
           else {
+            // As many as the hub let a member send (server/members.js): more ends the link.
+            const now = performance.now();
+            if (now - wordsAt >= 1000) { wordsAt = now;words = 0; }
+            if (++words > 1000) { try { dc.close(); } catch {} return; }
             const clean = vetFromMember(s);
             if (clean !== null && !clean.startsWith('{"t":"rtc-')) text(clean);
           }

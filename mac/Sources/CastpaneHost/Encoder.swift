@@ -19,6 +19,9 @@ final class ScreenEncoder: @unchecked Sendable {
     private var session: VTCompressionSession?
     let settings: Settings
     private var forceKey = true
+    /// A key frame asked for also brings the codec again: the page that asked may have lost the
+    /// first (a direct link gone with it on the way) and cannot decode without it.
+    private var resendCodec = false
     /// Touched only by `emit`, which VideoToolbox calls one frame at a time.
     private var lastCodec = ""
     /// (Annex B bytes, is key frame, timestamp µs, codec string when it changed)
@@ -48,7 +51,7 @@ final class ScreenEncoder: @unchecked Sendable {
         VTCompressionSessionPrepareToEncodeFrames(s)
     }
 
-    func requestKeyFrame() { lock.withLock { forceKey = true } }
+    func requestKeyFrame() { lock.withLock { forceKey = true; resendCodec = true } }
 
     func encode(_ pixels: CVPixelBuffer, at time: CMTime) {
         let (current, key) = lock.withLock { () -> (VTCompressionSession?, Bool) in
@@ -129,7 +132,8 @@ final class ScreenEncoder: @unchecked Sendable {
             }
             // The SPS names the profile and level the page decodes with.
             let sps = sets.first { settings.hevc ? ($0.first ?? 0) >> 1 & 0x3f == 33 : ($0.first ?? 0) & 0x1f == 7 }
-            if let sps, let c = settings.hevc ? Self.hevcCodec(sps: sps) : Self.avcCodec(sps: sps), c != lastCodec { lastCodec = c; codec = c }
+            let again = lock.withLock { () -> Bool in defer { resendCodec = false }; return resendCodec }
+            if let sps, let c = settings.hevc ? Self.hevcCodec(sps: sps) : Self.avcCodec(sps: sps), c != lastCodec || again { lastCodec = c; codec = c }
         }
         // AVCC (4-byte lengths) to Annex B (start codes).
         var length = 0
