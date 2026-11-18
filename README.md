@@ -136,14 +136,17 @@ back, with touch modes made for a small screen.
   ([docs/multi-mac.md](docs/multi-mac.md)).
 - **The clipboard both ways.** Copy the Mac's clipboard to the phone, or paste the phone's
   where the Mac's cursor is in one press. What a password manager marks hidden is never sent;
-  each use is in Activity.
+  each use is in Activity (on a Mac that joined this one, in its own Activity in full, and in
+  this Mac's without the content, marked with that Mac's name).
 - **A direct link.** Through the tunnel every click and frame goes by Cloudflare's nearest
   point, which can be far away. The page and the Mac therefore try to reach each other directly
-  (WebRTC, finding their way through routers with public STUN), and the picture and your input
-  take that shorter path; when it cannot connect, or stops, the tunnel carries them as before.
-  The picture's numbers show the round trip and which way is in use. **Settings › Remote ›
-  Direct link** picks Cloudflare's and Google's STUN, Cloudflare's alone, or off; see
-  [docs/security.md](docs/security.md).
+  (WebRTC, finding their way through routers with public STUN), and the picture, your input and
+  the Mac's answers take that shorter path, to a Mac that joined this one as well; when it
+  cannot connect, or stops, the tunnel carries them as before. The top of a Mac's home and of
+  CastpaneOS, and the picture's numbers, show the round trip and whether it is direct or
+  relayed. **Settings › Remote › Direct link** picks Cloudflare's and Google's STUN,
+  Cloudflare's alone, or off, for that device, and a connection open then connects again with
+  it at once; see [docs/security.md](docs/security.md).
 - **Stays current.** Each frame shown is acknowledged; the Mac skips frames while a few are
   unshown (more over a slower round trip), so a slow network gives fewer frames, not old
   ones. Quality and resolution are automatic by default: they start from what the device can
