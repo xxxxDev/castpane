@@ -136,8 +136,9 @@ back, with touch modes made for a small screen.
   ([docs/multi-mac.md](docs/multi-mac.md)).
 - **The clipboard both ways.** Copy the Mac's clipboard to the phone, or paste the phone's
   where the Mac's cursor is in one press. What a password manager marks hidden is never sent;
-  each use is in Activity (on a Mac that joined this one, in its own Activity in full, and in
-  this Mac's without the content, marked with that Mac's name).
+  each use is in Activity (a use by the direct link to a Mac that joined this one is in that
+  Mac's Activity, and in this Mac's as reported by that Mac, marked with its name; the content
+  is in neither).
 - **A direct link.** Through the tunnel every click and frame goes by Cloudflare's nearest
   point, which can be far away. The page and the Mac therefore try to reach each other directly
   (WebRTC, finding their way through routers with public STUN), and the picture, your input and
