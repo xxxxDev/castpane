@@ -7,9 +7,12 @@
     <!-- A bar at the top, as the whole screen's: back to the list of Macs, this Mac, every app. -->
     <div class="remote-home-head">
       <button type="button" class="remote-home-back" :title="ct('中斷連線')" @click="$emit('leave')"><f7-icon f7="chevron_left" :size="18"/></button>
-      <div class="remote-home-name">{{ name }}</div>
-      <!-- How the picture comes: straight from that Mac, or through the server. -->
-      <span class="remote-home-link"><template v-if="link.rtt">{{ link.rtt }} ms · {{ link.direct ? ct('直連中') : ct('中繼中') }}</template></span>
+      <!-- The Mac's name, and how the picture comes: straight from it or through the server
+           (beside the name on a computer, under it on a narrow screen). -->
+      <div class="remote-home-titles">
+        <div class="remote-home-name">{{ name }}</div>
+        <span v-if="link.rtt" class="remote-home-link">{{ link.rtt }} ms · {{ link.direct ? ct('直連中') : ct('中繼中') }}</span>
+      </div>
       <button v-if="os" type="button" class="remote-home-all remote-home-os" @click="$emit('os')"><f7-icon f7="rectangle_on_rectangle" :size="15"/>CastpaneOS</button>
       <button type="button" class="remote-home-all" @click="allOpen = true"><f7-icon f7="square_grid_2x2" :size="15"/>{{ ct('所有 App') }}</button>
       <!-- A computer: the whole screen a button beside them (a phone has its wide one, in reach of a thumb). -->
@@ -129,8 +132,10 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-home-head {flex:0 0 auto;z-index:2;display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(0,0,0,.92);}
 .remote-stage .remote-home-back, .remote-stage .remote-home-all, .remote-stage .remote-home-desktop, .remote-home-filter, .remote-home-cols {background:rgba(255,255,255,.12);}
 .remote-stage .remote-home-back {flex:0 0 auto;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:17px;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.remote-home-titles {flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;}
 .remote-home-name {flex:0 1 auto;min-width:0;font-size:18px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.remote-stage .remote-home-link {flex:1;min-width:0;padding-left:4px;font-size:11px;color:#8e8e93;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.remote-stage .remote-home-link {flex:0 0 auto;font-size:11px;color:#8e8e93;white-space:nowrap;font-variant-numeric:tabular-nums;}
+@media (max-width: 599px) {.remote-home-titles {flex-direction:column;align-items:flex-start;gap:1px;} .remote-home-name {max-width:100%;}}
 .remote-stage .remote-home-all {flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;width:auto;height:34px;margin:0;padding:0 14px;border:0;border-radius:17px;color:#fff;font-size:14px;cursor:pointer;}
 .remote-home-notice {margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,69,58,.18);color:#fff;font-size:14px;}
 .remote-home-title {display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px;font-size:13px;color:#999;}
