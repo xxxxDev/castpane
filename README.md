@@ -49,17 +49,20 @@ back, with touch modes made for a small screen.
 ## Features
 
 <p align="center">
-  <img src="docs/assets/anim/labs-home-dark.svg" width="250" alt="Remote tab: the Mac's open apps as cards; Notes opens made the phone's shape, a slide in from the left edge goes home, All apps opens Music, which was not running">
-  <img src="docs/assets/anim/labs-switch-dark.svg" width="250" alt="Remote tab: the bar at the bottom slid sideways goes to Mail, then Calendar; slid up, Calendar shrinks into its card among the others; Mail's card slid up closes it; Notes opens from its card">
-  <img src="docs/assets/anim/labs-keys-dark.svg" width="250" alt="Remote tab: the same capsule of keys under an app; with the keyboard up the Mac's window is made the shape of what is left above it">
+  <img src="docs/assets/anim/remote-home-dark.svg" width="250" alt="Remote: pick a Mac; its home shows the open apps as cards and its Dock at the left; Notes opens made the phone's shape; a slide from the left edge goes home; All apps lists every app">
+  <img src="docs/assets/anim/remote-switch-dark.svg" width="250" alt="Remote: the bar at the bottom slid sideways goes to the next app; slid up, every open app as a card; a card slid up closes that window on the Mac">
+  <img src="docs/assets/anim/remote-dock-dark.svg" width="250" alt="Remote: the Mac's Dock at the left of the home; an app held shows New Window, Show All Windows and Quit; Music, not running, starts and opens">
 </p>
 <p align="center">
-  <img src="docs/assets/anim/remote-windows-dark.svg" width="300" alt="Remote tab: the whole screen, then Desktop 1 and its Notes window, then Desktop 2 and a Calendar window that was not on screen">
-  <img src="docs/assets/anim/remote-unlock-dark.svg" width="300" alt="Remote tab: a locked Mac asks for its password in a small window, then unlocks and shows its screen">
+  <img src="docs/assets/anim/remote-keys-dark.svg" width="250" alt="Remote: the keys a phone lacks in one capsule under an app; slid sideways for the next page; with the keyboard up the Mac's window is made the shape of what is left">
+  <img src="docs/assets/anim/remote-keyrow-dark.svg" width="250" alt="Settings: the key row's keys arranged, one at the left, four pages, two at the right, kept with the account on every device">
+  <img src="docs/assets/anim/remote-unlock-dark.svg" width="250" alt="Remote: a locked Mac asks for its password in a small window, then unlocks">
 </p>
 <p align="center">
-  <img src="docs/assets/anim/remote-keys-dark.svg" width="300" alt="Remote tab: the phone's keys in one capsule; hold ⌘, slide to the second page, switch desktops, call up and hide the keyboard">
-  <img src="docs/assets/anim/remote-trust-dark.svg" width="300" alt="Settings: trust this device after asking once; Admin: trusted devices, kept for 90 days">
+  <img src="docs/assets/anim/remote-trust-dark.svg" width="250" alt="Settings: trust this device after asking once; Trusted devices: how long trust lasts and which devices are trusted">
+</p>
+<p align="center">
+  <img src="docs/assets/anim/castpane-os-dark.svg" width="820" alt="CastpaneOS on a computer: the Mac's windows as windows of a desk in the browser, opened from its Dock, dragged and resized; the one in front is live">
 </p>
 
 - **The Mac's apps, as a phone's.** The Remote tab opens on the apps open on the Mac, one card
@@ -175,12 +178,14 @@ back, with touch modes made for a small screen.
 ## What it looks like
 
 <p align="center">
-  <img src="docs/assets/shot-phone-remote.png" alt="The Remote tab on a phone: this Mac, another Mac that joined it, and Add another Mac" width="200">
-  <img src="docs/assets/shot-phone-stage.png" alt="A phone showing the Mac's desktop, with the desktops and windows above" width="200">
-  <img src="docs/assets/shot-phone-keys.png" alt="The key panel in the phone keyboard's place: copy, paste, undo, Spotlight, Mission Control and more" width="200">
+  <img src="docs/assets/shot-phone-remote.png" alt="The Remote page on a phone: this Mac, another Mac that joined it, and Add another Mac" width="200">
+  <img src="docs/assets/shot-phone-home.png" alt="A Mac's home on a phone: its open apps as cards, the Dock at the left, the link's round trip at the top" width="200">
+  <img src="docs/assets/shot-phone-app.png" alt="An app on a phone, made its shape on the Mac, with the key capsule below" width="200">
 </p>
 
-<p align="center"><img src="docs/assets/shot-desktop-stage.png" alt="Remote in a computer's browser: the desktops and windows across the top, the Mac's screen below" width="820"></p>
+<p align="center"><img src="docs/assets/shot-desktop-home.png" alt="A Mac's home in a computer's browser, with CastpaneOS, All apps and Whole screen at the top" width="820"></p>
+<p align="center"><img src="docs/assets/shot-desktop-stage.png" alt="The whole screen in a computer's browser, its displays and desktops in the column at the right" width="820"></p>
+<p align="center"><img src="docs/assets/shot-desktop-os.png" alt="CastpaneOS in a computer's browser: Notes, Mail and Calendar as windows on a desk, the Dock at the left" width="820"></p>
 
 On the Mac, the setup assistant and Settings:
 

@@ -49,17 +49,20 @@ Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用�
 ## 功能
 
 <p align="center">
-  <img src="docs/assets/anim/labs-home-dark.svg" width="250" alt="遠端分頁：Mac 上開著的 App 一個一張卡，點開 Notes 調成手機形狀，從左邊緣滑回首頁，再從所有 App 打開原本沒開的 Music">
-  <img src="docs/assets/anim/labs-switch-dark.svg" width="250" alt="遠端分頁：底部橫條往旁邊滑切到 Mail、再到 Calendar；往上滑時 Calendar 縮成卡片；Mail 的卡片往上滑關掉；點 Notes 的卡片打開">
-  <img src="docs/assets/anim/labs-keys-dark.svg" width="250" alt="遠端分頁：App 下方一樣是按鍵膠囊，叫出鍵盤時 Mac 上的視窗會調成鍵盤上方剩下的形狀">
+  <img src="docs/assets/anim/remote-home-dark.svg" width="250" alt="遠端：選一台 Mac，首頁把開著的 App 一個一張卡，左側是 Mac 的 Dock；點開 Notes 調成手機形狀；從左邊緣滑回首頁；所有 App 列出每個 App">
+  <img src="docs/assets/anim/remote-switch-dark.svg" width="250" alt="遠端：底部橫條往旁邊滑切到下一個 App；往上滑時每個開著的 App 變成卡片；卡片往上滑就關掉 Mac 上那個視窗">
+  <img src="docs/assets/anim/remote-dock-dark.svg" width="250" alt="遠端：首頁左側的 Mac Dock；按住一個 App 出現新增視窗、顯示所有視窗和結束；原本沒開的 Music 啟動並打開">
 </p>
 <p align="center">
-  <img src="docs/assets/anim/remote-windows-dark.svg" width="300" alt="遠端分頁：整個螢幕，切到桌面 1 開 Notes 視窗，再切到桌面 2 叫出原本不在畫面上的 Calendar 視窗">
-  <img src="docs/assets/anim/remote-unlock-dark.svg" width="300" alt="遠端分頁：Mac 鎖定時跳出小視窗輸入密碼，解鎖後看到畫面">
+  <img src="docs/assets/anim/remote-keys-dark.svg" width="250" alt="遠端：手機沒有的按鍵在 App 下方的膠囊裡，往旁邊滑換頁；叫出鍵盤時 Mac 上的視窗調成剩下空間的形狀">
+  <img src="docs/assets/anim/remote-keyrow-dark.svg" width="250" alt="設定：自己排按鈕列，左邊一個、四頁、右邊兩個，存在帳號上，每台裝置都一樣">
+  <img src="docs/assets/anim/remote-unlock-dark.svg" width="250" alt="遠端：Mac 鎖定時跳出小視窗輸入密碼，然後解鎖">
 </p>
 <p align="center">
-  <img src="docs/assets/anim/remote-keys-dark.svg" width="300" alt="遠端分頁：手機按鍵都在一個膠囊裡，按住 ⌘、滑到第二頁、切換桌面、叫出再收起鍵盤">
-  <img src="docs/assets/anim/remote-trust-dark.svg" width="300" alt="設定裡驗證一次就信任這台裝置，管理頁把信任期限選成 90 天">
+  <img src="docs/assets/anim/remote-trust-dark.svg" width="250" alt="設定：驗證一次就信任這台裝置；信任的裝置：信任多久、哪些裝置">
+</p>
+<p align="center">
+  <img src="docs/assets/anim/castpane-os-dark.svg" width="820" alt="電腦上的 CastpaneOS：Mac 的視窗變成瀏覽器裡一張桌面上的視窗，從 Dock 打開、拖動、縮放；最前面的那個是即時畫面">
 </p>
 
 - **把 Mac 的 App 當手機 App 用。**
@@ -157,12 +160,14 @@ Castpane 讓你用手機或另一台電腦，看見並操作自己的 Mac。用�
 ## 實際畫面
 
 <p align="center">
-  <img src="docs/assets/shot-phone-remote.png" alt="手機上的遠端分頁：這台 Mac、加入它的另一台 Mac，以及「加入另一台 Mac」" width="200">
-  <img src="docs/assets/shot-phone-stage.png" alt="手機顯示 Mac 的桌面，上方是桌面和視窗" width="200">
-  <img src="docs/assets/shot-phone-keys.png" alt="取代手機鍵盤的按鍵面板：拷貝、貼上、復原、Spotlight、指揮中心等" width="200">
+  <img src="docs/assets/shot-phone-remote.png" alt="手機上的遠端頁：這台 Mac、加入它的另一台 Mac，以及「加入另一台 Mac」" width="200">
+  <img src="docs/assets/shot-phone-home.png" alt="手機上一台 Mac 的首頁：開著的 App 一張張卡片，左側是 Dock，上方是連線的往返時間" width="200">
+  <img src="docs/assets/shot-phone-app.png" alt="手機上的一個 App，在 Mac 上調成手機形狀，下方是按鍵膠囊" width="200">
 </p>
 
-<p align="center"><img src="docs/assets/shot-desktop-stage.png" alt="電腦瀏覽器裡的遠端畫面：上方是桌面和視窗，下方是 Mac 的螢幕" width="820"></p>
+<p align="center"><img src="docs/assets/shot-desktop-home.png" alt="電腦瀏覽器裡一台 Mac 的首頁，上方有 CastpaneOS、所有 App 和整個螢幕" width="820"></p>
+<p align="center"><img src="docs/assets/shot-desktop-stage.png" alt="電腦瀏覽器裡的整個螢幕，右側欄列出顯示器和桌面" width="820"></p>
+<p align="center"><img src="docs/assets/shot-desktop-os.png" alt="電腦瀏覽器裡的 CastpaneOS：Notes、Mail 和 Calendar 是桌面上的視窗，左側是 Dock" width="820"></p>
 
 Mac 上的設定精靈和設定視窗：
 
