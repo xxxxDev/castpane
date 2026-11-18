@@ -308,7 +308,7 @@ import { deskWindows, keyLayout, rereadAccount, railAuto, directMode } from '../
 import RemoteWindows from '../components/RemoteWindows.vue';
 import RemoteDock from '../components/RemoteDock.vue';
 import { trustedPass } from '../js/trust.js';
-import { neverFits, setNever, noteNarrow, noteApps } from '../js/noFit.js';
+import { noFit, neverFits, setNever, noteNarrow, noteApps } from '../js/noFit.js';
 
 import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, otherKeyboardKey, QUALITY, RESOLUTION, STEPS, autoStep } from '../js/remoteStream.js';
 
@@ -1592,14 +1592,18 @@ function fitTo(w) {
     fitWait = done;
     link?.send({ t: 'fit', id: w.id, ...want });
   });
-  return ask(size).then(async (m) => {
-    // An app wider than it can be made (a browser's least width): made taller too, to the
-    // device's shape, so the picture fills it top to bottom rather than leaving bands; as
-    // tall as the Mac's screen allows.
-    if (m?.ok && m.width > size.width + 8) {
+  // An app wider than it can be made (a browser's least width): made taller too, to the
+  // device's shape, so the picture fills it top to bottom rather than leaving bands; as tall as
+  // the Mac's screen allows. One found so before is asked so at once (each ask takes the Mac
+  // a second or more).
+  const taller = (width) => ({ width, height: Math.min(8000, Math.round(width * size.height / size.width)) });
+  const known = noFit.narrow[w.bundle]?.width;
+  const first = known > size.width + 8 ? taller(known) : size;
+  return ask(first).then(async (m) => {
+    if (m?.ok && m.width > first.width + 8) {
       noteNarrow(w.bundle, w.app || w.title, m.width);
-      const taller = await ask({ width: m.width, height: Math.min(8000, Math.round(m.width * size.height / size.width)) });
-      if (taller?.ok) m = taller;
+      const again = await ask(taller(m.width));
+      if (again?.ok) m = again;
     }
     fitSize = m?.ok ? size : null;
     return m;
@@ -1642,6 +1646,9 @@ async function openWindow(w, keepOrder = false, tried = new Set()) {
   snapCurrent();
   switcherOpen.value = false;menuOpen.value = false;settingsOpen.value = false;
   if (!keepOrder) used(w.id);
+  // The window already shown, picked again (from the switcher, say): left as it is, rather than
+  // made its shape and started again, which took a few seconds for the same picture.
+  if (!keepOrder && appMode.value === 'app' && hasPicture.value && current.value?.kind === 'window' && current.value.id === w.id && !notice.value && !areaMoved()) return;
   if (appMode.value !== 'app') { fromOs = appMode.value === 'os' || (appMode.value === 'desktop' && fromOs);appMode.value = 'app';mode.value = 'direct'; }
   resetView();hasPicture.value = false;notice.value = ct('正在打開…');
   await nextTick();
@@ -1756,6 +1763,11 @@ function toggleFit() {
   if (!w) return;
   if (prefs.fit === false) { link?.send({ t: 'unfit' });fitSize = null;setTimeout(showCurrent, 300); } else openWindow(w, true);
 }
+// The area no longer the size its window was made (none made: as it was).
+function areaMoved() {
+  const r = area.value?.getBoundingClientRect();
+  return !!(r && fitSize && (Math.abs(r.width - fitSize.width) >= 40 || Math.abs(r.height - fitSize.height) >= 40));
+}
 // The keyboard up or down changes the room the window has: made that shape again (once
 // the size has settled), and its picture started again at it.
 function refitSoon() {
@@ -1763,7 +1775,7 @@ function refitSoon() {
   clearTimeout(fitTimer);
   fitTimer = setTimeout(async () => {
     const r = area.value?.getBoundingClientRect(), w = items.value.find((x) => current.value && x.kind === 'window' && x.id === current.value.id);
-    if (!r || !w || !fitSize || appMode.value !== 'app' || (Math.abs(r.width - fitSize.width) < 40 && Math.abs(r.height - fitSize.height) < 40)) return;
+    if (!r || !w || !fitSize || appMode.value !== 'app' || !areaMoved()) return;
     if (await fitTo(w)) show(w);
   }, 350);
 }
