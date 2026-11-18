@@ -308,7 +308,7 @@ import { deskWindows, keyLayout, rereadAccount, railAuto, directMode } from '../
 import RemoteWindows from '../components/RemoteWindows.vue';
 import RemoteDock from '../components/RemoteDock.vue';
 import { trustedPass } from '../js/trust.js';
-import { noFit, neverFits, setNever, noteNarrow, noteApps } from '../js/noFit.js';
+import { noFit, neverFits, setNever, noteNarrow, forgetNarrow, noteApps } from '../js/noFit.js';
 
 import { openRemote, remoteSupported, hevcDecodes, toPicture, codeOfChar, otherKeyboardKey, QUALITY, RESOLUTION, STEPS, autoStep } from '../js/remoteStream.js';
 
@@ -540,7 +540,7 @@ async function connect(m, retried = false) {
   let pass;
   try { pass = await getPass(retried); } catch (e) { return f7.dialog.alert(adminProblem(e) || e.message); }
   if (!pass || gen !== connectGen) return;
-  streaming.value = true;listed.value = false;listAsked = 0;macLocked.value = false;unlockOpen.value = false;unlockBusy.value = false;unlockError.value = '';hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;stats.rtt = 0;stats.direct = false;
+  streaming.value = true;listed.value = false;listAsked = 0;fitOnce.clear();macLocked.value = false;unlockOpen.value = false;unlockBusy.value = false;unlockError.value = '';hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;stats.rtt = 0;stats.direct = false;
   startApps(m);
   await nextTick();
   if (gen !== connectGen) return;
@@ -1304,6 +1304,8 @@ function growCompose() { const el = composeField.value;if (!el) return;el.style.
 const appMode = ref('desktop'), apps = ref([]), icons = reactive({}), launching = ref(''), switcherOpen = ref(false), cardSwipe = reactive({});
 const machineName = ref(''), recent = ref([]);
 let iconsAsked = new Set(), launchTimer = 0, fitWait = null, fitSize = null, fitTimer = 0;
+// The apps made the device's shape on this connection (fitTo).
+const fitOnce = new Set();
 const iconsKey = () => `castpane-icons-${machine}`, recentKey = () => `castpane-recent-${machine}`;
 // The windows used last first, then those on the Mac's screen now.
 // The windows used last first, then those on the screen, then the larger: an app's hidden
@@ -1594,12 +1596,17 @@ function fitTo(w) {
   });
   // An app wider than it can be made (a browser's least width): made taller too, to the
   // device's shape, so the picture fills it top to bottom rather than leaving bands; as tall as
-  // the Mac's screen allows. One found so before is asked so at once (each ask takes the Mac
-  // a second or more).
+  // the Mac's screen allows. Each ask takes the Mac a second or more: an app already made so on
+  // this connection is asked at its width at once. Its first each connection asks the area's
+  // size, and the answer puts the width noted right (narrower, or none once it fits).
   const taller = (width) => ({ width, height: Math.min(8000, Math.round(width * size.height / size.width)) });
-  const known = noFit.narrow[w.bundle]?.width;
+  const known = w.bundle && fitOnce.has(w.bundle) ? noFit.narrow[w.bundle]?.width : 0;
   const first = known > size.width + 8 ? taller(known) : size;
   return ask(first).then(async (m) => {
+    if (m?.ok && w.bundle) {
+      fitOnce.add(w.bundle);
+      if (first === size && m.width <= size.width + 8) forgetNarrow(w.bundle);
+    }
     if (m?.ok && m.width > first.width + 8) {
       noteNarrow(w.bundle, w.app || w.title, m.width);
       const again = await ask(taller(m.width));
