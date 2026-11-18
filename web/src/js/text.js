@@ -170,7 +170,7 @@ const english = {
 "Cloudflare 與 Google":"Cloudflare and Google",
 "只用 Cloudflare":"Cloudflare only",
 "不用直連":"Off",
-"畫面和操作直接在這台裝置和 Mac 之間傳，比經過 Cloudflare 通道快；連不上時自動走通道。找路時用的 STUN 服務會看到兩邊的對外 IP，看不到內容。只影響這台裝置，下次連線生效。":"The picture and your input go straight between this device and the Mac, faster than through the Cloudflare tunnel; when that cannot connect, the tunnel carries them. The STUN service that finds the way sees both sides\u2019 public IP addresses, not what is sent. This device only, from the next connection.",
+"畫面和操作直接在這台裝置和 Mac 之間傳，比經過 Cloudflare 通道快；連不上時自動走通道。找路時用的 STUN 服務會看到兩邊的對外 IP，看不到內容。只影響這台裝置，改了馬上重新連線生效。":"The picture and your input go straight between this device and the Mac, faster than through the Cloudflare tunnel; when that cannot connect, the tunnel carries them. The STUN service that finds the way sees both sides\u2019 public IP addresses, not what is sent. This device only; a connection open now connects again with it.",
 "直連中":"direct",
 "中繼中":"relayed",
 "打開後，整個螢幕的視窗列表除了顯示器，也依桌面列出全螢幕 App 和每個視窗（電腦在右側欄，手機和平板在上方）。只影響這台裝置。":"Besides the displays, the whole screen’s list shows the desktops with their full-screen apps and every window (in the column at the right on a computer, at the top on a phone or tablet). This device only.",

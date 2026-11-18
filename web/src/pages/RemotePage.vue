@@ -540,9 +540,12 @@ async function connect(m, retried = false) {
   streaming.value = true;listed.value = false;listAsked = 0;macLocked.value = false;unlockOpen.value = false;unlockBusy.value = false;unlockError.value = '';hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;stats.rtt = 0;stats.direct = false;
   startApps(m);
   await nextTick();
-  link = openRemote({
+  let mine = null;
+  link = mine = openRemote({
     pass, machine: machine === 'local' ? '' : machine, canvas: canvas.value, direct: directMode.value,
     onState(state) {
+      // A link already replaced (connected again) closing late: not the one shown now.
+      if (mine && link !== mine) return;
       // The direct link gone: keys held down by it are let go (their key-up may have been lost).
       if (state === 'direct-lost') { for (const code of sentDown) link?.send({ t: 'key', code, down: false, mods: [] });sentDown.clear();held.clear();return; }
       if (state === 'refused') { link = null;streaming.value = false;sessionSet('castpane-remote-pass', null);if (!retried) connect(m, true);else error.value = ct('無法連線，請重新整理頁面後再試。');return; }
@@ -753,6 +756,13 @@ function disconnect() {
   closeWindowViews();quitWatch = null;
   link?.close();link = null;streaming.value = false;keyboardOpen.value = false;settingsOpen.value = false;menuOpen.value = false;held.clear();panel.value = false;compose.value = false;composeText.value = '';clipOpen.value = false;clipWait?.reject(new Error('closed'));
 }
+// The direct link's setting changed while connected (Settings is another tab): connected again
+// at once, on the same Mac and screen or window, so it takes effect now.
+watch(directMode, () => {
+  if (!streaming.value || !lastMachine) return;
+  const m = lastMachine;resumeItem = current.value;resumeMode = appMode.value;
+  disconnect();connect(m);
+});
 const headCollapsed = ref(localGet('castpane-remote-head') === 'folded');
 // Held sideways with the keyboard up there is little height left: the bar of windows folds
 // away for that time, or the picture has almost none.
