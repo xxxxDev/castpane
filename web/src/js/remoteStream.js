@@ -53,6 +53,10 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
     }
     sendSocket(msg);
   };
+  // A key frame asked for: at most once a second while waiting for one; a decoder error or a link
+  // gone asks at once (force), and counts as the ask, as does the server's own at a link's opening.
+  let keyAskedAt = -Infinity;
+  const askKey = (force = false, viaSocket = false) => { const now = performance.now(); if (!force && now - keyAskedAt < 1000) return; keyAskedAt = now; (viaSocket ? sendSocket : send)({ t: 'key-frame' }); };
   // The time a message takes there and back, by whichever way is in use.
   let echoN = 0, echoAt = 0, rtt = 0;
   // A link that went quiet (a phone changing networks) is let go after a few seconds without an
@@ -70,14 +74,14 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
       pc = new RTCPeerConnection({ iceServers: [{ urls: stun }] });
       dc = pc.createDataChannel('castpane', { ordered: true });
       dc.binaryType = 'arraybuffer';
-      dc.onopen = () => { direct = true;needKey = true;onLink({ rtt, direct }); };
+      dc.onopen = () => { direct = true;needKey = true;keyAskedAt = performance.now();onLink({ rtt, direct }); };
       dc.onclose = () => {
         if (!direct) return;
         direct = false;inputDirect = false;needKey = true;onLink({ rtt, direct });
         if (held) { const q = held;held = null;for (const m of q) sendSocket(m); }
         // The Mac told by the socket, so its frames come that way at once.
         sendSocket({ t: 'rtc-close' });
-        sendSocket({ t: 'key-frame' });
+        askKey(true, true);
         // What was pressed may have been lost with the link: the page lets go of it again.
         onState('direct-lost');
         // Its candidates no longer taken (a member could name any address to be tried).
@@ -134,7 +138,7 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
       error() {
         // HEVC that fails before its first picture: this browser cannot decode it.
         if (hevc() && !shown) { codecFailed();return; }
-        needKey = true; send({ t: 'key-frame' }); if (config) { try { makeDecoder(); } catch {} }
+        needKey = true; askKey(true); if (config) { try { makeDecoder(); } catch {} }
       },
     });
     shown = false;
@@ -172,8 +176,6 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
     if (msg.t === 'config') { config = msg; makeDecoder(); }
     onMessage(msg);
   }
-  let keyAskedAt = -Infinity;
-  const askKey = () => { const now = performance.now(); if (now - keyAskedAt < 1000) return; keyAskedAt = now; send({ t: 'key-frame' }); };
   function video(buffer) {
     const data = new Uint8Array(buffer);
     if (!decoder || decoder.state !== 'configured' || data.length < 10) { send({ t: 'ack' }); return; }
@@ -189,7 +191,7 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
     if (sentAt.size > 30) sentAt.clear();
     sentAt.set(timestamp, performance.now());
     try { decoder.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp, data: data.subarray(9) }));queueMax = Math.max(queueMax, decoder.decodeQueueSize || 0); }
-    catch { needKey = true; send({ t: 'ack' }); send({ t: 'key-frame' }); }
+    catch { needKey = true; send({ t: 'ack' }); askKey(true); }
     const now = performance.now();
     if (now - statsAt >= 1000) {
       onStats({ fps: Math.round(frames * 1000 / (now - statsAt)), mbps: +(bytes * 8 / 1e6 / ((now - statsAt) / 1000)).toFixed(1), lag: lagCount ? Math.round(lagSum / lagCount) : 0, queue: queueMax, width: canvas.width, rtt, direct });

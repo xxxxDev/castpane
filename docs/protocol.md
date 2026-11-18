@@ -63,7 +63,8 @@ at each local request; it makes a `local.token` only when there is none, and nev
 On the socket, text frames are JSON in both directions, and binary frames are video from the
 capture core. `POST /api/remote/pass/end` ends the admin's passes.
 
-**The direct link.** Once the socket is open the page may offer a WebRTC data channel over it
+**The direct link.** Once the server's first message has come (before it, the server may not yet be
+reading the socket, or have reached the other Mac, and an offer is lost) the page may offer a WebRTC data channel over it
 (one per session; Settings › Remote › Direct link; for a Mac that joined this one the link is
 made by that Mac, see docs/multi-mac.md):
 

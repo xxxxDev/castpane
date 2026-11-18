@@ -537,7 +537,7 @@ async function connect(m, retried = false) {
   let pass;
   try { pass = await getPass(retried); } catch (e) { return f7.dialog.alert(adminProblem(e) || e.message); }
   if (!pass) return;
-  streaming.value = true;listed.value = false;listAsked = 0;macLocked.value = false;unlockOpen.value = false;unlockBusy.value = false;unlockError.value = '';hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;
+  streaming.value = true;listed.value = false;listAsked = 0;macLocked.value = false;unlockOpen.value = false;unlockBusy.value = false;unlockError.value = '';hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;stats.rtt = 0;stats.direct = false;
   startApps(m);
   await nextTick();
   link = openRemote({
