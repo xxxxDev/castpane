@@ -22,7 +22,7 @@ export function hevcDecodes() {
 // machine: another Mac that joined this one (docs/multi-mac.md), or empty for this Mac.
 // onCodecFailed: an HEVC stream this browser would not decode after all; ask for H.264.
 // direct: 'both', 'cloudflare' or 'off' (js/remotePrefs.js).
-export function openRemote({ pass, machine = '', canvas, direct: directPref = 'both', onMessage = () => {}, onState = () => {}, onStats = () => {}, onCodecFailed = () => {} }) {
+export function openRemote({ pass, machine = '', canvas, direct: directPref = 'both', onMessage = () => {}, onState = () => {}, onStats = () => {}, onLink = () => {}, onCodecFailed = () => {} }) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const ws = new WebSocket(`${proto}//${location.host}/remote?pass=${encodeURIComponent(pass)}${machine ? `&machine=${encodeURIComponent(machine)}` : ''}`);
   ws.binaryType = 'arraybuffer';
@@ -32,7 +32,7 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
   // page's automatic size reads to tell a device that cannot keep up.
   const sentAt = new Map();let lagSum = 0, lagCount = 0, queueMax = 0;
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
-  // The direct link (server/directLink.js): offered once the socket is open; while it is open
+  // The direct link (server/directLink.js): offered once the Mac has answered; while it is open
   // everything goes and comes that way, and the socket only keeps the session.
   // Input goes the new way only once the server has had all it was sent the old way (an echo by
   // the socket comes back after them): a mouse-up never overtakes its mouse-down.
@@ -70,10 +70,10 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
       pc = new RTCPeerConnection({ iceServers: [{ urls: stun }] });
       dc = pc.createDataChannel('castpane', { ordered: true });
       dc.binaryType = 'arraybuffer';
-      dc.onopen = () => { direct = true;needKey = true; };
+      dc.onopen = () => { direct = true;needKey = true;onLink({ rtt, direct }); };
       dc.onclose = () => {
         if (!direct) return;
-        direct = false;inputDirect = false;needKey = true;
+        direct = false;inputDirect = false;needKey = true;onLink({ rtt, direct });
         if (held) { const q = held;held = null;for (const m of q) sendSocket(m); }
         // The Mac told by the socket, so its frames come that way at once.
         sendSocket({ t: 'rtc-close' });
@@ -146,7 +146,7 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
   const hevc = () => !!config?.codec?.startsWith('hvc1');
   function codecFailed() { const was = config;config = null;try { decoder?.close(); } catch {} decoder = null;if (was) onCodecFailed(); }
 
-  ws.onopen = () => { opened = true; onState('open'); offerDirect(); };
+  ws.onopen = () => { opened = true; onState('open'); };
   ws.onclose = () => { closed = true; try { decoder?.close(); } catch {} try { pc?.close(); } catch {} onState(opened ? 'closed' : 'refused'); };
   ws.onmessage = (e) => {
     if (typeof e.data === 'string') return text(e.data);
@@ -154,25 +154,34 @@ export function openRemote({ pass, machine = '', canvas, direct: directPref = 'b
     if (direct) { send({ t: 'ack' });return; }
     video(e.data);
   };
+  let offered = false;
   function text(s) {
     let msg; try { msg = JSON.parse(s); } catch { return; }
+    // Offered once the Mac's first word is here: before, the server is still reaching it (another
+    // Mac's through this one takes a while), and an offer then went nowhere.
+    if (!offered) { offered = true;offerDirect(); }
     if (msg.t === 'rtc-answer') { pc?.setRemoteDescription({ type: 'answer', sdp: msg.sdp }).catch(() => {});return; }
     if (msg.t === 'rtc-candidate') { pc?.addIceCandidate({ candidate: msg.candidate, sdpMid: msg.mid }).catch(() => {});return; }
     if (msg.t === 'rtc-none') return;
     if (msg.t === 'echo') {
       if (msg.n === 0) { if (held) { const q = held;held = null;inputDirect = direct;echoAnswered = echoN;for (const m of q) send(m); } return; }
       if (Number.isSafeInteger(msg.n) && msg.n > echoAnswered) echoAnswered = msg.n;
-      if (msg.n === echoN) rtt = Math.round(performance.now() - echoAt);
+      if (msg.n === echoN) { rtt = Math.round(performance.now() - echoAt);onLink({ rtt, direct }); }
       return;
     }
     if (msg.t === 'config') { config = msg; makeDecoder(); }
     onMessage(msg);
   }
+  let keyAskedAt = -Infinity;
+  const askKey = () => { const now = performance.now(); if (now - keyAskedAt < 1000) return; keyAskedAt = now; send({ t: 'key-frame' }); };
   function video(buffer) {
     const data = new Uint8Array(buffer);
     if (!decoder || decoder.state !== 'configured' || data.length < 10) { send({ t: 'ack' }); return; }
     const key = (data[0] & 1) === 1;
-    if (needKey && !key) { send({ t: 'ack' }); return; }
+    // Waiting for a key frame: one is asked for, not left to the encoder's own interval. By the
+    // direct link a key frame can come before the config that goes the hub's way, and then be
+    // dropped, the picture stuck until the next one.
+    if (needKey && !key) { send({ t: 'ack' }); askKey(); return; }
     needKey = false;
     const view = new DataView(buffer);
     const timestamp = Number(view.getBigUint64(1));

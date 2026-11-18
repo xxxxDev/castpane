@@ -182,7 +182,7 @@
           </div>
         </div>
         <AppsPanel v-if="appMode === 'os' && osAllOpen" class="cp-apps" :apps="apps" :icons="icons" :launching="launching" @close="osAllOpen = false" @pick="(a) => { osAllOpen = false;openApp(a); }"/>
-        <RemoteHome v-if="appMode === 'home'" :listed="listed" :os="osAvailable" @os="goOs" :name="machineName" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
+        <RemoteHome v-if="appMode === 'home'" :listed="listed" :os="osAvailable" @os="goOs" :name="machineName" :link="stats" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
           <template #dock><RemoteDock v-if="macWindows" docked @app-menu="openDockMenu" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="openApp" @window="openWindow" @other="openDockOther" @trash="openDockTrash"/></template>
         </RemoteHome>
         <!-- An app starting takes the Mac a few seconds: said wherever it was started from (the
@@ -550,6 +550,8 @@ async function connect(m, retried = false) {
     },
     onMessage,
     onStats(s) { Object.assign(stats, s);autoAdjust(s); },
+    // The way it goes and its round trip, on the home too (no picture there to bring the figures).
+    onLink(l) { Object.assign(stats, l); },
     onCodecFailed() { useHevc = false;showCurrent(); },
   });
 }
