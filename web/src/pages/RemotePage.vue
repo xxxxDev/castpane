@@ -531,15 +531,19 @@ function removeMac(m) {
   });
 }
 
+// Each connect's number: one overtaken by a later one while it waited opens nothing.
+let connectGen = 0;
 async function connect(m, retried = false) {
   if (!m.running || !supported) return;
+  const gen = ++connectGen;
   machine = m.local ? 'local' : m.id;lastMachine = m;
   let pass;
   try { pass = await getPass(retried); } catch (e) { return f7.dialog.alert(adminProblem(e) || e.message); }
-  if (!pass) return;
+  if (!pass || gen !== connectGen) return;
   streaming.value = true;listed.value = false;listAsked = 0;macLocked.value = false;unlockOpen.value = false;unlockBusy.value = false;unlockError.value = '';hasPicture.value = false;notice.value = '';permission.value = '';items.value = [];current.value = null;stats.rtt = 0;stats.direct = false;
   startApps(m);
   await nextTick();
+  if (gen !== connectGen) return;
   let mine = null;
   link = mine = openRemote({
     pass, machine: machine === 'local' ? '' : machine, canvas: canvas.value, direct: directMode.value,
