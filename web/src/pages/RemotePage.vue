@@ -37,7 +37,7 @@
         <div v-if="appMode !== 'home' && appMode !== 'os'" ref="headEl" class="remote-head" :class="{collapsed: headFolded && appMode === 'desktop'}">
         <!-- Back to the apps at the top left, the size and place an app's own bar has it. -->
         <div v-if="appMode === 'desktop'" class="remote-apphead remote-desktop-head">
-          <button type="button" class="remote-apphead-back remote-desktop-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goHome"><f7-icon f7="chevron_left" :size="18"/></button>
+          <button type="button" class="remote-apphead-back remote-desktop-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goBack"><f7-icon f7="chevron_left" :size="18"/></button>
           <div class="remote-apphead-title">{{ ct('整個螢幕') }}</div>
           <!-- At the right of the bar, as an app's: the picture's numbers, then its buttons. -->
           <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps<template v-if="stats.rtt"> · {{ stats.rtt }} ms · {{ stats.direct ? ct('直連中') : ct('中繼中') }}</template></span>
@@ -84,7 +84,7 @@
         </div>
         <!-- An app's own bar: back to the home, its name, the keyboard and the rest. -->
         <div v-if="appMode === 'app'" class="remote-apphead">
-          <button type="button" class="remote-apphead-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goHome"><f7-icon f7="chevron_left" :size="18"/></button>
+          <button type="button" class="remote-apphead-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="goBack"><f7-icon f7="chevron_left" :size="18"/></button>
           <div class="remote-apphead-title">{{ appTitle }}</div>
           <span class="remote-stats remote-nav-stats">{{ stats.fps }} fps · {{ stats.mbps }} Mbps<template v-if="stats.rtt"> · {{ stats.rtt }} ms · {{ stats.direct ? ct('直連中') : ct('中繼中') }}</template></span>
           <button v-if="view.z > 1" type="button" class="remote-btn zoom" :title="ct('還原大小')" @click="smoothZoom = true;resetView()">1×</button>
@@ -172,7 +172,7 @@
         </div>
         <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
         <!-- CastpaneOS: on a computer, the Mac's windows as windows of this page (components/CastpaneDesk.vue). -->
-        <CastpaneDesk v-if="appMode === 'os'" @app-menu="openDockMenu" ref="deskRef" :name="machineName" :stats="stats" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :snaps="snaps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="osAllOpen = true;askIcons(true)" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
+        <CastpaneDesk v-if="appMode === 'os'" @app-menu="openDockMenu" ref="deskRef" :name="machineName" :stats="stats" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockShown" :snaps="snaps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="osAllOpen = true;askIcons(true)" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
         <!-- A Dock app's menu (right click), over everything. -->
         <div v-if="dockMenu" class="remote-dock-menu-layer" @pointerdown.self="dockMenu = null" @contextmenu.prevent="$event.pointerType && $event.pointerType !== 'mouse' ? null : (dockMenu = null)">
           <div class="remote-home-menu remote-dock-menu" :style="{left: dockMenu.x + 'px', top: dockMenu.y + 'px'}">
@@ -183,7 +183,7 @@
         </div>
         <AppsPanel v-if="appMode === 'os' && osAllOpen" class="cp-apps" :apps="apps" :icons="icons" :launching="launching" @close="osAllOpen = false" @pick="(a) => { osAllOpen = false;openApp(a); }"/>
         <RemoteHome v-if="appMode === 'home'" :listed="listed" :os="osAvailable" @os="goOs" :name="machineName" :link="stats" :windows="orderedWindows" :apps="apps" :icons="icons" :launching="launching" :notice="notice" @all="askIcons(true)" @open="openWindow" @app="openApp" @desktop="goDesktop" @leave="disconnect" @windows="showWindows" :can-minimize="macWindows" :all-asked="allAppsAsked" @all-taken="allAppsAsked = 0" @close-window="closeWindow" @minimize="minimizeWindow">
-          <template #dock><RemoteDock v-if="macWindows" docked @app-menu="openDockMenu" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="openApp" @window="openWindow" @other="openDockOther" @trash="openDockTrash"/></template>
+          <template #dock><RemoteDock v-if="macWindows" docked @app-menu="openDockMenu" :apps="dockShown" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="openApp" @window="openWindow" @other="openDockOther" @trash="openDockTrash"/></template>
         </RemoteHome>
         <!-- An app starting takes the Mac a few seconds: said wherever it was started from (the
              home, All apps, the Dock over an app or the whole screen), with a way to cancel. -->
@@ -197,7 +197,7 @@
         <RemoteWindows v-if="windowsOf" :name="windowsOfName" :icon="icons[windowsOf] || ''" :windows="windowsOfList" :current-id="current?.kind === 'window' ? current.id : null" @pick="(w) => { windowsOf = '';openWindow(w); }" @close="windowsOf = ''" :can-quit="mayQuit(windowsOfList[0])" @quit="() => { const w = windowsOfList[0];windowsOf = '';quitApp(w); }" @force-quit="() => { const w = windowsOfList[0];windowsOf = '';forceQuit(w); }"/>
         <!-- The Mac's Dock, from the handle at the left edge (a slide from that edge is "back"). -->
         <button v-if="!isTouch && macWindows && appMode !== 'home' && appMode !== 'os' && !dockOpen && !switcherOpen && !windowsOf" type="button" class="remote-dock-handle" :title="ct('Dock')" :aria-label="ct('Dock')" @pointerdown.stop @click="openDock"><span></span></button>
-        <RemoteDock v-if="dockOpen" :style="dockFoot ? {'--dock-foot': dockFoot + 'px'} : null" @app-menu="openDockMenu" :apps="dockApps" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @other="(i, o) => { dockOpen = false;openDockOther(i, o); }" @trash="dockOpen = false;openDockTrash()" @close="dockOpen = false"/>
+        <RemoteDock v-if="dockOpen" :style="dockFoot ? {'--dock-foot': dockFoot + 'px'} : null" @app-menu="openDockMenu" :apps="dockShown" :windows="dockWindows" :others="dockOthers" :trash="dockTrash" :icons="icons" @app="(a) => { dockOpen = false;openApp(a); }" @window="(w) => { dockOpen = false;openWindow(w); }" @other="(i, o) => { dockOpen = false;openDockOther(i, o); }" @trash="dockOpen = false;openDockTrash()" @close="dockOpen = false"/>
         <div v-show="(appMode !== 'home' && appMode !== 'os') || (appMode === 'os' && osLive)" ref="area" class="remote-area" :class="{'beside-rail': rail, 'cp-live': appMode === 'os', 'cp-waiting': appMode === 'os' && !hasPicture, 'cp-typing': osTyping}" :style="appMode === 'os' && osLive ? osBox : null" @mousedown.prevent @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @wheel.prevent="wheel" @gesturestart="pinchStart" @gesturechange="pinchChange">
           <canvas ref="canvas" class="remote-canvas" :class="{hidden: !hasPicture, smooth: smoothZoom}" :style="view.z > 1 ? {transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`} : null"></canvas>
           <div v-if="!hasPicture || notice" class="remote-notice">
@@ -1396,6 +1396,12 @@ function allWindowsOf(a) {
 }
 // The Mac's Dock: asked for each time it opens; the windows in it from the list.
 const dockOpen = ref(false), dockApps = ref([]);
+// The Dock as shown: an app with a window listed is running, whatever the Dock said when last
+// asked (an app just opened from here was not running yet then).
+const dockShown = computed(() => {
+  const open = new Set(items.value.filter((w) => w.kind === 'window' && w.bundle).map((w) => w.bundle));
+  return dockApps.value.map((d) => (!d.running && open.has(d.bundle) ? { ...d, running: true } : d));
+});
 let dockAskedAt = 0, dockAskedFor = new Set();
 // The folders and files kept at the Dock's right ({name, kind}, no path) and whether the Mac
 // offers its Trash: a Mac from before sends neither, and is never asked to open them.
@@ -1442,7 +1448,7 @@ function leaveIfShown(w) {
   if (current.value?.kind !== 'window' || current.value.id !== w.id) return;
   // On CastpaneOS's desk only that window's picture stops: the desk stays.
   if (appMode.value === 'os') { link?.send({ t: 'stop' });current.value = null;hasPicture.value = false;osLive.value = null;return; }
-  goHome();
+  goBack();
 }
 function minimizeWindow(w) {
   link?.send({ t: 'minimize', id: w.id });
@@ -1466,7 +1472,7 @@ function quitApp(w) {
       quitWatch = { bundle: w.bundle, name, at: Date.now() };setTimeout(list, 3000);
       const gone = new Set(items.value.filter((x) => x.kind === 'window' && x.bundle === w.bundle).map((x) => x.id));
       items.value = items.value.filter((x) => !gone.has(x.id));switcherCards.value = switcherCards.value.filter((x) => !gone.has(x.id));
-      if (current.value?.kind === 'window' && gone.has(current.value.id)) goHome();
+      if (current.value?.kind === 'window' && gone.has(current.value.id)) leaveIfShown(current.value);
     } }],
   }).open();
 }
@@ -1491,7 +1497,7 @@ function forceQuit(w) {
       if (machine !== on || !link) return;
       // Its window, if it is the one shown, goes with it: home, rather than "the picture
       // stopped" over a window no longer there.
-      if (currentWindow.value?.bundle === w.bundle) goHome();
+      if (currentWindow.value?.bundle === w.bundle) leaveIfShown(currentWindow.value);
       link.send({ t: 'quit', bundle: w.bundle, force: true });
       const gone = new Set(items.value.filter((x) => x.kind === 'window' && x.bundle === w.bundle).map((x) => x.id));
       items.value = items.value.filter((x) => !gone.has(x.id));
@@ -1622,7 +1628,7 @@ async function openWindow(w, keepOrder = false, tried = new Set()) {
   snapCurrent();
   switcherOpen.value = false;menuOpen.value = false;settingsOpen.value = false;
   if (!keepOrder) used(w.id);
-  if (appMode.value !== 'app') { appMode.value = 'app';mode.value = 'direct'; }
+  if (appMode.value !== 'app') { fromOs = appMode.value === 'os' || (appMode.value === 'desktop' && fromOs);appMode.value = 'app';mode.value = 'direct'; }
   resetView();hasPicture.value = false;notice.value = ct('正在打開…');
   await nextTick();
   await fitTo(w);
@@ -1688,8 +1694,9 @@ function askShots() {
   shotsAsked = Date.now();
   link.send({ t: 'shots', ids: behind.map((o) => o.id), thumb: width });
 }
+let fromOs = false;
 function goOs() {
-  goHome();
+  goHome();fromOs = false;
   clearInterval(shotsTimer);shotsTimer = setInterval(() => { if (appMode.value === 'os') askShots();else clearInterval(shotsTimer); }, 1000);
   // By touch, a finger on a window points where it is (the mode's switch is not on the desk).
   if (isTouch) mode.value = 'direct';
@@ -1708,7 +1715,10 @@ function goHome() {
   appMode.value = 'home';
   list();link?.send({ t: 'apps' });if (macWindows.value) link?.send({ t: 'dock' });
 }
+// Left from CastpaneOS for the whole screen or a window alone: back goes back to it, not home.
+function goBack() { if (fromOs && osAvailable.value) goOs();else goHome(); }
 function goDesktop() {
+  if (appMode.value !== 'desktop') fromOs = appMode.value === 'os' || (appMode.value === 'app' && fromOs);
   appMode.value = 'desktop';switcherOpen.value = false;
   mode.value = localGet('castpane-remote-mode') || 'direct';
   const d = items.value.find((x) => x.kind === 'display' && !x.all) || items.value[0];
