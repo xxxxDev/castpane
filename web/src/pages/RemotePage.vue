@@ -172,7 +172,7 @@
         </div>
         <!-- The home: the Mac's Dock kept open at its left, under the bar, its open apps beside it. -->
         <!-- CastpaneOS: on a computer, the Mac's windows as windows of this page (components/CastpaneDesk.vue). -->
-        <CastpaneDesk v-if="appMode === 'os'" @app-menu="openDockMenu" ref="deskRef" :name="machineName" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :snaps="snaps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="osAllOpen = true;askIcons(true)" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
+        <CastpaneDesk v-if="appMode === 'os'" @app-menu="openDockMenu" ref="deskRef" :name="machineName" :stats="stats" :machine="machineId" :windows="orderedWindows" :icons="icons" :dock-apps="dockApps" :snaps="snaps" :others="dockOthers" :trash="dockTrash" @other="openDockOther" @trash="openDockTrash" @live="osFocus" @home="goHome" @all="osAllOpen = true;askIcons(true)" @desktop="goDesktop" @open="openWindow" @app="openApp" @close-window="closeWindow" @minimize="minimizeWindow"/>
         <!-- A Dock app's menu (right click), over everything. -->
         <div v-if="dockMenu" class="remote-dock-menu-layer" @pointerdown.self="dockMenu = null" @contextmenu.prevent="$event.pointerType && $event.pointerType !== 'mouse' ? null : (dockMenu = null)">
           <div class="remote-home-menu remote-dock-menu" :style="{left: dockMenu.x + 'px', top: dockMenu.y + 'px'}">

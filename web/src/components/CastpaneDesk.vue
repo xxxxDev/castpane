@@ -9,7 +9,8 @@
     <div class="cp-desk-top">
       <button type="button" class="cp-desk-back" :title="ct('首頁')" :aria-label="ct('首頁')" @click="$emit('home')"><f7-icon f7="chevron_left" :size="18"/></button>
       <b class="cp-desk-name">{{ name }}</b>
-      <span class="cp-desk-space"></span>
+      <!-- The live window's figures and the way they come, as the whole screen's bar shows them. -->
+      <span class="cp-desk-space"><span class="cp-desk-stats">{{ stats.fps || 0 }} fps · {{ stats.mbps || 0 }} Mbps<template v-if="stats.rtt"> · {{ stats.rtt }} ms · {{ stats.direct ? ct('直連中') : ct('中繼中') }}</template></span></span>
       <button type="button" class="cp-desk-tool" @click="$emit('all')"><f7-icon f7="square_grid_2x2" :size="15"/><span>{{ ct('所有 App') }}</span></button>
       <button type="button" class="cp-desk-tool" @click="$emit('desktop')"><f7-icon f7="desktopcomputer" :size="15"/><span>{{ ct('整個螢幕') }}</span></button>
     </div>
@@ -55,7 +56,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { ct } from '../js/text.js';
-const props = defineProps({ name: { type: String, default: '' }, machine: { type: String, default: '' }, windows: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, dockApps: { type: Array, default: () => [] }, others: { type: Array, default: () => [] }, trash: { type: Boolean, default: false }, snaps: { type: Object, default: () => ({}) } });
+const props = defineProps({ name: { type: String, default: '' }, machine: { type: String, default: '' }, windows: { type: Array, default: () => [] }, icons: { type: Object, default: () => ({}) }, dockApps: { type: Array, default: () => [] }, others: { type: Array, default: () => [] }, trash: { type: Boolean, default: false }, snaps: { type: Object, default: () => ({}) }, stats: { type: Object, default: () => ({}) } });
 const emit = defineEmits(['home', 'all', 'desktop', 'open', 'app', 'closeWindow', 'minimize', 'live', 'other', 'trash', 'appMenu']);
 const deskEl = ref(null), focused = ref(null);
 // The desk's bar, as tall as the Remote home's (no window goes under it).
@@ -214,7 +215,8 @@ onBeforeUnmount(() => removeEventListener('pointermove', dragMove));
 .cp-desk-top {position:absolute;left:0;right:0;top:0;z-index:9000;height:54px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(0,0,0,.92);}
 .remote-stage .cp-desk-back {flex:0 0 auto;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:17px;background:rgba(255,255,255,.12);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .cp-desk-name {min-width:0;font-size:18px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.cp-desk-space {flex:1;}
+.cp-desk-space {flex:1;min-width:0;display:flex;justify-content:flex-end;overflow:hidden;}
+.cp-desk-stats {padding:0 4px;font-size:11px;color:#8e8e93;white-space:nowrap;font-variant-numeric:tabular-nums;}
 .remote-stage .cp-desk-tool {flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;width:auto;height:34px;margin:0;padding:0 14px;border:0;border-radius:17px;background:rgba(255,255,255,.12);color:#fff;font-size:14px;cursor:pointer;}
 .cp-win {position:absolute;display:flex;flex-direction:column;border-radius:12px;background:#1c1c1e;box-shadow:0 18px 50px rgba(0,0,0,.55), 0 0 0 .5px rgba(255,255,255,.18);}
 .cp-win.focus {box-shadow:0 24px 70px rgba(0,0,0,.7), 0 0 0 1px rgba(10,132,255,.6);}
