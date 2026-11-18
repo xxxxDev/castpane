@@ -343,7 +343,7 @@ actor Session {
         guard relockPending.withLock({ p -> Bool in let was = p; if !(locked && checking) { p = false }; return was }), !locked else { return }
         if !Lock.now() { log.error("the Mac could not be locked again after Remote unlocked it") }
     }
-    private static let log = Logger(subsystem: "io.github.castpane", category: "session")
+    fileprivate static let log = Logger(subsystem: "io.github.castpane", category: "session")
 
     private func checkWindows() {
         guard !link.isClosed, CGPreflightScreenCaptureAccess() else { return }
@@ -520,6 +520,16 @@ actor Session {
         }
     }
 
+    /// How long each step of a fit or a start took, in the Mac's log (Console, category
+    /// "session"): the steps' names and milliseconds only.
+    struct Steps {
+        let what: String
+        var at = Date(), begun = Date(), parts: [String] = []
+        init(_ what: String) { self.what = what }
+        mutating func mark(_ step: String) { let now = Date(); parts.append("\(step) \(Int(now.timeIntervalSince(at) * 1000))"); at = now }
+        func done() { Session.log.notice("\(what, privacy: .public): \(parts.joined(separator: ", "), privacy: .public); \(Int(Date().timeIntervalSince(begun) * 1000), privacy: .public) ms in all") }
+    }
+
     private func queued(_ job: @escaping @Sendable () async -> Void) {
         let previous = chain
         chain = Task { await previous?.value; await job() }
@@ -585,13 +595,20 @@ actor Session {
 
     private func start(kind: String, id: Int, maxWidth: Int, fps: Int, bitrate: Int, hevc: Bool, cursor: Bool = true) async {
         // Another window or a display shown: the one made the device's shape goes back.
+        var steps = Steps("start")
+        defer { steps.done() }
         if let f = fitted, kind != "window" || Int(f.id) != id { await unfit() }
+        steps.mark("unfit")
         await stop()
+        steps.mark("stop")
         await Self.wakeDisplays()
+        steps.mark("wake")
         lastStart = (kind, id, maxWidth, fps, bitrate, hevc);lastCursor = cursor
         displaysAtStart = Self.displaysSignature()
         do {
-            guard let found = try await Catalog.target(kind: kind, id: id) else {
+            let found0 = try await Catalog.target(kind: kind, id: id)
+            steps.mark("list")
+            guard let found = found0 else {
                 link.send(json: ["t": "error", "where": "start", "message": "gone"]); return
             }
             // Pixels, not points: a Retina display's full detail, scaled down to fit maxWidth.
@@ -613,6 +630,7 @@ actor Session {
             let enc = try (hevc ? try? ScreenEncoder(settings, output: output) : nil)
                 ?? ScreenEncoder(.init(width: settings.width, height: settings.height, fps: fps, bitrate: settings.bitrate), output: output)
             video.replace(with: enc)?.invalidate()
+            steps.mark("encoder")
             target = found
             windowFrame = nil
             frameCheckedAt = 0
@@ -623,12 +641,15 @@ actor Session {
                 // On another desktop or in the Dock: wait for macOS to bring it here.
                 if !found.here { for _ in 0..<20 where !Catalog.isHere(wid) { try? await Task.sleep(nanoseconds: 100_000_000) } }
             }
+            steps.mark("forward")
             // On the screen now: its app's alerts, sheets and menus over it are in the picture
             // too, the cut following the window (the window alone when it cannot be so).
             var shown = found
             if let pid = found.pid, let wid = found.windowID, pid != ProcessInfo.processInfo.processIdentifier,
                let withApp = await Catalog.withItsApp(wid, pid: pid) { shown = withApp }
+            steps.mark("with app")
             try await capture.start(shown, width: width, height: height, fps: fps, cursor: cursor)
+            steps.mark("capture")
             if let wid = shown.windowID, shown.crop != nil { followCut(wid, display: shown.display) }
             link.send(json: ["t": "started", "kind": kind, "id": id, "width": width, "height": height, "fps": fps])
             // Whether a text field already has the focus, so the page knows where it starts.
@@ -641,9 +662,14 @@ actor Session {
     /// Makes a window the device's shape, putting back one made so before. The page starts
     /// the window's picture again at its new size.
     private func fit(_ id: CGWindowID, _ size: CGSize) async {
+        var steps = Steps("fit")
+        defer { steps.done() }
         if let f = fitted, f.id != id { await unfit() }
+        steps.mark("unfit")
         let link = self.link
-        guard let pid = (try? await Catalog.content())?.windows.first(where: { $0.windowID == id })?.owningApplication?.processID,
+        let content = try? await Catalog.content()
+        steps.mark("list")
+        guard let pid = content?.windows.first(where: { $0.windowID == id })?.owningApplication?.processID,
               pid != ProcessInfo.processInfo.processIdentifier else {
             link.send(json: ["t": "fitted", "id": Int(id), "ok": false]); return
         }
@@ -661,8 +687,11 @@ actor Session {
             }
             try? await Task.sleep(nanoseconds: 400_000_000)
         }
+        steps.mark("full screen")
         await note(id, pid: pid)
+        steps.mark("note")
         await bringHere(id, pid: pid)
+        steps.mark("bring here")
         // Full screen on another desktop could not be seen from here (Accessibility lists only
         // the windows on the desktop shown): out of it now that it is here, and brought here again.
         if await MainActor.run(body: { Fit.axWindow(id, pid: pid).map(Fit.isFullScreen) ?? false }) {
@@ -680,6 +709,7 @@ actor Session {
             Fit.set(w, Fit.place(size, from: now, in: Fit.usable(for: now)))
             return (again?.was ?? now, Fit.frame(w) ?? now)
         }
+        steps.mark("resize")
         guard let (before, after) = result else { link.send(json: ["t": "fitted", "id": Int(id), "ok": false]); return }
         fitted = (id, pid, before, wasFull)
         windowFrame = nil; frameCheckedAt = 0
