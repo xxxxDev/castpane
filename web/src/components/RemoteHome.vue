@@ -135,7 +135,7 @@ function pick(a) { allOpen.value = false;emit('app', a); }
 .remote-home-titles {flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;}
 .remote-home-name {flex:0 1 auto;min-width:0;font-size:18px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .remote-stage .remote-home-link {flex:0 0 auto;font-size:11px;color:#8e8e93;white-space:nowrap;font-variant-numeric:tabular-nums;}
-@media (max-width: 599px) {.remote-home-titles {flex-direction:column;align-items:flex-start;gap:1px;} .remote-home-name {max-width:100%;}}
+@media (max-width: 599px) {.remote-home-titles {flex-direction:column;align-items:flex-start;gap:1px;} .remote-home-name {max-width:100%;line-height:20px;} .remote-stage .remote-home-link {line-height:13px;}}
 .remote-stage .remote-home-all {flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;width:auto;height:34px;margin:0;padding:0 14px;border:0;border-radius:17px;color:#fff;font-size:14px;cursor:pointer;}
 .remote-home-notice {margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,69,58,.18);color:#fff;font-size:14px;}
 .remote-home-title {display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px;font-size:13px;color:#999;}
