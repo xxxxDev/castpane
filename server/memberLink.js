@@ -39,7 +39,7 @@ function hubOrigin(text) {
 // (server/remote.js). running(): whether its socket is there.
 function createMemberLink({ home, file = path.join(home, 'data', 'member.json'), connectHost, tokenOf, running, name = () => os.hostname().replace(/\.local$/, ''), retryMs = [1000, 60000], timeoutMs = 10000, heartbeatMs = 30000, onChange = () => {} } = {}) {
   let config = load(), ws = null, state = config ? 'connecting' : 'off', retry = null, delay = retryMs[0], session = null, poll = null, wasRunning = null, stopped = false;
-  let blockedUntil = 0, joinGen = 0, auditMinute = 0, audited = 0;
+  let blockedUntil = 0, joinGen = 0, hubNotes = false, auditMinute = 0, audited = 0;
   const mayAudit = () => { const m = Math.floor(Date.now() / 60000); if (m !== auditMinute) { auditMinute = m; audited = 0; } return ++audited <= 30; };
   const blocked = () => Date.now() < blockedUntil;
 
@@ -165,7 +165,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     if (large && msg.t !== 'clipboard-set') return s.direct?.close();
     if (LINK_MESSAGES.has(msg.t)) return linkMessage(s, msg, 'direct');
     if (!FROM_PAGE.has(msg.t)) return s.direct?.close();
-    if (deliver(s, msg) === false) endSession();
+    if (deliver(s, msg, 'direct') === false) endSession();
   }
 
   // Told to the page as the hub tells it, through the session's stream.
@@ -195,13 +195,18 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
   }
   // One page message, by the hub or the direct link, checked and given to the capture core;
   // false: the session ends.
-  function deliver(s, msg) {
+  function deliver(s, msg, via = 'hub') {
     const clean = fromPage(msg);
     if (!clean) return true;
+    // By the direct link the hub never saw it: it is told what for, without the content (a hub
+    // from before does not take it).
+    const tell = (action) => { if (via === 'direct' && hubNotes) sendJson(ws, { t: 'used', n: s.n, action }); };
+    if (clean.t === 'quit' && clean.force) tell('force-quit');
     if (clean.t === 'quit' && clean.force) audit({ source: 'remote', action: 'force-quit', bundle: clean.bundle, username: s.by, via: config?.hub || '' });
     if (clean.t.startsWith('clipboard-')) {
       if (Date.now() - s.lastClipboard < 1000) { busy(s); return true; }
       s.lastClipboard = Date.now();
+      tell(clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write');
       // Every one in the log (at most one a second already), not under the opens' cap.
       audit({ source: 'remote', action: clean.t === 'clipboard-get' ? 'clipboard-read' : 'clipboard-write', username: s.by, via: config?.hub || '', ...(clean.s ? { chars: clean.s.length } : {}) });
     }
@@ -209,6 +214,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
     if (clean.t === 'unlock') {
       if (Date.now() - (s.lastUnlock || 0) < 3000) { busy(s, '{"t":"unlocked","ok":false,"busy":true}'); return true; }
       s.lastUnlock = Date.now();
+      tell('unlock');
       audit({ source: 'remote', action: 'unlock', username: s.by, via: config?.hub || '' });
     }
     // The capture core not reading: the session ends rather than piling up.
@@ -239,7 +245,7 @@ function createMemberLink({ home, file = path.join(home, 'data', 'member.json'),
         return fromHub(session, raw.subarray(4));
       }
       let m; try { m = JSON.parse(raw.toString()); } catch { return; }
-      if (m?.t === 'welcome') { welcomed = true; delay = retryMs[0]; set('connected'); wasRunning = null; report(); return; }
+      if (m?.t === 'welcome') { welcomed = true; hubNotes = m.notes === 1; delay = retryMs[0]; set('connected'); wasRunning = null; report(); return; }
       if (m?.t === 'refused') { set('removed'); stopped = true; return; }
       if (!welcomed) return;
       if (m?.t === 'open' && Number.isInteger(m.n) && m.n >= 0 && m.n <= 0xffffffff) openSession(m.n, m.by);

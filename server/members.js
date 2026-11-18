@@ -4,8 +4,9 @@
 // screen (server/remote.js).
 //
 // Member → hub, text: {t:'join', code, name} or {t:'hello', id, secret, name} first, then
-// {t:'status', running}, {t:'opened', n}, {t:'failed', n}, {t:'closed', n}.
-// Hub → member, text: {t:'joined', id, secret}, {t:'welcome'}, {t:'refused'}, {t:'open', n,
+// {t:'status', running}, {t:'opened', n}, {t:'failed', n}, {t:'closed', n}, and {t:'used', n,
+// action} (the clipboard, an unlock or a force quit by a page's direct link, for this log).
+// Hub → member, text: {t:'joined', id, secret}, {t:'welcome', notes: 1}, {t:'refused'}, {t:'open', n,
 // by}, {t:'close', n}. Binary both ways: [n: 4 bytes][the capture core's stream].
 const fs = require('node:fs');
 const path = require('node:path');
@@ -16,6 +17,8 @@ const { audit } = require('./services/audit');
 const { resolveClientIp } = require('./services/clientIp');
 
 const CODE_MS = 10 * 60 * 1000;
+// What a member may say a page's direct link was used for (server/memberLink.js).
+const USED = new Set(['clipboard-read', 'clipboard-write', 'unlock', 'force-quit']);
 // 32 letters and digits, without I, O, 0 and 1: 8 of them are 40 bits.
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 8;
@@ -138,6 +141,7 @@ function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openM
       if (!m || typeof m !== 'object' || Array.isArray(m)) return out('bad message');
       if (m.t === 'status') { if (!link.ended) link.running = m.running === true; return; }
       if (m.t === 'opened' || m.t === 'failed' || m.t === 'closed') return link.answer(m);
+      if (m.t === 'used') return link.used(m);
       out('unknown message');
     });
     function first(raw, binary) {
@@ -163,7 +167,8 @@ function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openM
       if (m?.t === 'hello' && typeof m.id === 'string' && typeof m.secret === 'string') {
         const member = list.find((x) => x.id === m.id);
         if (!member || !sameHash(member.hash, sha(m.secret))) return refused('hello-refused');
-        send({ t: 'welcome' });
+        // notes: this hub takes the member's word of what a direct link was used for.
+        send({ t: 'welcome', notes: 1 });
         return welcome(member.id, m.name, m.direct === 1);
       }
       out('no hello');
@@ -207,7 +212,7 @@ function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openM
               cb(err);
             },
           });
-          session.n = n;
+          session.n = n; session.by = String(by || '').slice(0, 64);
           link.session = session;
           pending = { n, resolve: () => resolve(session), timer: setTimeout(() => session.destroy(), openMs) };
           send({ t: 'open', n, by: String(by || '') });
@@ -219,6 +224,16 @@ function createMembers({ file, now = () => Date.now(), helloMs = HELLO_MS, openM
         if (!s || m.n !== s.n) return;
         if (m.t === 'opened' && pending?.n === s.n) { clearTimeout(pending.timer); const p = pending; pending = null; p.resolve(); return; }
         s.destroy();
+      },
+      // What the page used by its direct link to this Mac, as the member says (it keeps the full
+      // record): in this log too, without its content, for the session open now only.
+      used(m) {
+        const s = link.session;
+        if (closed || !s || m.n !== s.n || pending?.n === s.n || !USED.has(m.action)) return;
+        // The clipboard at most once a second there: a minute's worth, no more.
+        const minute = Math.floor(now() / 60000); if (minute !== link.usedMinute) { link.usedMinute = minute; link.usedCount = 0; }
+        if (++link.usedCount > 70) return;
+        audit({ source: 'remote', action: m.action, username: s.by, member: id, machine: list.find((x) => x.id === id)?.name || '', via: 'direct' });
       },
       data(raw) {
         if (closed) return;

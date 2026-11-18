@@ -64,7 +64,9 @@ ways, each prefixed with `n` (4 bytes), so nothing from an earlier session is mi
   600 a second (more ends the link, not the session), one large message a second (one too soon
   is answered busy), only the clipboard large, its capture core at most 4 MiB behind. The
   clipboard, unlock tries, force quits and the link's opening are in the member's log; the
-  hub's Activity shows the session's opening and end only. A bad message on the link ends the
+  member also tells the hub (`{t:'used', n, action}` on its link, without the content, to a
+  hub that said `notes: 1` in its welcome), so the hub's Activity shows each one too, with who
+  and which Mac, at most 70 a minute. A bad message on the link ends the
   link, not the session.
 - The member, asked for a link, opens a UDP port for that session and asks the STUN servers
   the page chose; through the link and its candidates it learns the viewing device's public
