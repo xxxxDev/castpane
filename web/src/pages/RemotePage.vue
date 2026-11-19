@@ -675,9 +675,12 @@ function onMessage(msg) {
     const w = currentWindow.value || (msg.closed && current.value?.kind === 'window' ? current.value : null);
     const stopped = () => { notice.value = ct('畫面已停止：') + (msg.reason || ''); };
     if (msg.closed && w) {
-      notice.value = ct('這個視窗已經關閉');
-      if (appMode.value === 'app' && w.bundle) waitForWindow(w.bundle, w.id, () => leaveIfShown(w), '', 3);
-      else leaveIfShown(w);
+      // Said for a moment, then gone from the home by itself.
+      const said = ct('這個視窗已經關閉');
+      notice.value = said;
+      const home = () => { leaveIfShown(w);setTimeout(() => { if (notice.value === said) notice.value = ''; }, 4000); };
+      if (appMode.value === 'app' && w.bundle) waitForWindow(w.bundle, w.id, home, '', 3);
+      else home();
     } else if (appMode.value === 'app' && w?.bundle) { notice.value = ct('正在打開…');waitForWindow(w.bundle, w.id, stopped); }
     else stopped();
   } else if (msg.t === 'closed' && msg.reason === 'replaced') {
