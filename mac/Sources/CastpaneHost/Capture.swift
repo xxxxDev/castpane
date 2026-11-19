@@ -261,6 +261,17 @@ enum Catalog {
         }
     }
 
+    /// Whether an app has a window of its own on the screen now (not a menu bar's strip or a
+    /// point-sized one that some apps keep).
+    static func hasWindowShown(_ pid: pid_t) -> Bool {
+        guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return true }
+        return info.contains { w in
+            guard (w[kCGWindowOwnerPID as String] as? pid_t) == pid, (w[kCGWindowLayer as String] as? Int) == 0,
+                  let b = w[kCGWindowBounds as String] as? [String: CGFloat] else { return false }
+            return (b["Width"] ?? 0) >= 50 && (b["Height"] ?? 0) >= 50
+        }
+    }
+
     /// Whether a window is on the screen now (after a switch of desktops).
     static func isHere(_ id: CGWindowID) -> Bool {
         guard let info = CGWindowListCopyWindowInfo([.optionIncludingWindow], id) as? [[String: Any]] else { return false }

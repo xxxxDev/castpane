@@ -804,12 +804,13 @@ actor Session {
 
     /// As it was before the viewer: the window out of sight again, and the app that was in
     /// front back in front, which takes the Mac back to its desktop (not when it is the
-    /// window's own app, which that would show again).
+    /// window's own app, which that would show again). Not an app with no window left on the
+    /// screen (its last one closed meanwhile): opening it again makes it open a new one.
     private func restore() async {
         let pid = inFront, hid = away?.pid
         inFront = nil
         await putAway()
-        if let pid, pid != hid { Catalog.activate(pid) }
+        if let pid, pid != hid, Catalog.hasWindowShown(pid) { Catalog.activate(pid) }
     }
 
     /// The cut picture of a window kept on it as it moves or changes size, twice a second,
