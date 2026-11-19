@@ -758,8 +758,18 @@ function setPref(k, v) {
   showCurrent();
 }
 function askPermissions() { link?.send({ t: 'permissions' }); }
+// The Mac's tile shows it as last seen: the picture shown when leaving, or, left from the home
+// (no picture), its screen as the home's list last showed it.
 function saveShot() {
-  try { const c = canvas.value;if (!c || !hasPicture.value) return;const s = document.createElement('canvas');s.width = 320;s.height = Math.round(320 * c.height / c.width);s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);shots[machine] = s.toDataURL('image/jpeg', 0.6);s.width = s.height = 0;localSet(shotKey(machine), shots[machine]); } catch {}
+  try {
+    const c = canvas.value;
+    if (!c || !hasPicture.value) {
+      const d = items.value.find((x) => x.kind === 'display' && x.all) || items.value.find((x) => x.kind === 'display');
+      if (typeof d?.thumb === 'string' && d.thumb.startsWith('data:image/jpeg;base64,')) { shots[machine] = d.thumb;localSet(shotKey(machine), d.thumb); }
+      return;
+    }
+    const s = document.createElement('canvas');s.width = 320;s.height = Math.round(320 * c.height / c.width);s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);shots[machine] = s.toDataURL('image/jpeg', 0.6);s.width = s.height = 0;localSet(shotKey(machine), shots[machine]);
+  } catch {}
 }
 function disconnect() {
   if (!streaming.value && !link) return;
