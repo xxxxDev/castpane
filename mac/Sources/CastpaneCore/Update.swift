@@ -136,3 +136,46 @@ public enum ReleaseNotes {
         return out
     }
 }
+
+/// Putting a checked new copy of the app in place of the running one.
+public enum AppSwap {
+    /// Why an app in `folder` cannot safely be replaced by this user, or nil. The folder and
+    /// every folder above it must belong to this user or to root, and no one else may write
+    /// to them (the admin group may, as it may in /Applications): otherwise another account
+    /// could rename or replace what is there while the update puts the new app in.
+    public static func unsafeFolder(_ folder: URL, uid: uid_t = getuid()) -> String? {
+        let start = folder.resolvingSymlinksInPath().standardizedFileURL.path
+        guard access(start, W_OK) == 0 else { return "this account cannot write to \(start)" }
+        var path = start
+        while true {
+            var st = stat()
+            guard lstat(path, &st) == 0 else { return "\(path) cannot be read" }
+            guard st.st_mode & S_IFMT == S_IFDIR else { return "\(path) is not a folder" }
+            guard st.st_uid == uid || st.st_uid == 0 else { return "\(path) belongs to another account" }
+            if st.st_mode & S_IWOTH != 0 { return "every account can write to \(path)" }
+            if st.st_mode & S_IWGRP != 0 && st.st_gid != 80 { return "a group other than admin can write to \(path)" }
+            if path == "/" { return nil }
+            path = (path as NSString).deletingLastPathComponent
+            if path.isEmpty { path = "/" }
+        }
+    }
+
+    /// Exchanges two items in one step, so neither path is ever empty: after it `a` holds
+    /// what was at `b` and `b` what was at `a`. Both must be on the same volume.
+    public static func exchange(_ a: URL, _ b: URL) throws {
+        guard renamex_np(a.path, b.path, UInt32(RENAME_SWAP)) == 0 else {
+            let code = errno
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(code),
+                          userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code))])
+        }
+    }
+
+    /// The `CastpaneVersion` an app's Info.plist gives, read from the file itself (a Bundle
+    /// object would keep what it read the first time for the same path).
+    public static func version(ofAppAt app: URL) -> String? {
+        let plist = app.appendingPathComponent("Contents/Info.plist")
+        guard let data = try? Data(contentsOf: plist),
+              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else { return nil }
+        return dict["CastpaneVersion"] as? String
+    }
+}

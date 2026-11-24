@@ -10,8 +10,9 @@ import CastpaneCore
 /// GitHub records for it, and the app inside satisfies this app's own designated
 /// requirement (the same identifier, signed with the same certificate). An app built
 /// without a certificate (ad hoc) has no such requirement to share, so it does not update
-/// itself. The swap happens after Castpane quits, by a small script that then opens the
-/// new app; if the swap fails, the old app is put back.
+/// itself. The new app and the old one change places in one step (the app's path is never
+/// empty), only where no other account can write; Castpane then quits and a small script
+/// opens the new app and removes the old one.
 @MainActor
 final class Updater: ObservableObject {
     enum State: Equatable {
@@ -60,8 +61,8 @@ final class Updater: ObservableObject {
         if UpdateCheck.releasesURL(repo: repo) == nil { return "This build does not name a repository to update from." }
         let path = Bundle.main.bundleURL.path
         if path.contains("/AppTranslocation/") { return "Move Castpane to Applications first: macOS is running it from a temporary place." }
-        if !FileManager.default.isWritableFile(atPath: Bundle.main.bundleURL.deletingLastPathComponent().path) {
-            return "Castpane cannot replace itself in \(Bundle.main.bundleURL.deletingLastPathComponent().path); update it by hand."
+        if let why = AppSwap.unsafeFolder(Bundle.main.bundleURL.deletingLastPathComponent()) {
+            return "Castpane cannot replace itself where it is (\(why)); update it by hand."
         }
         return nil
     }
@@ -73,8 +74,9 @@ final class Updater: ObservableObject {
     func schedule(enabled: @escaping () -> Bool, includeBeta: @escaping () -> Bool) {
         self.enabled = enabled
         self.includeBeta = includeBeta
-        // What a past update left (the image, the script): it is done by now.
-        try? FileManager.default.removeItem(at: paths.home.appendingPathComponent("updates", isDirectory: true))
+        // What a past update left (the image, the old app, the script).
+        let updates = paths.home.appendingPathComponent("updates", isDirectory: true)
+        Task.detached { await Self.clearOld(in: updates) }
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.tick() } }
         Timer.scheduledTimer(withTimeInterval: 60, repeats: false) { [weak self] _ in MainActor.assumeIsolated { self?.tick() } }
@@ -132,7 +134,10 @@ final class Updater: ObservableObject {
         if case .working = state { return }
         if let reason = Self.cannotUpdate { state = .failed(reason); return }
         guard let requirement = Self.ownRequirement() else { state = .failed("Castpane could not read its own signature."); return }
-        let dir = paths.home.appendingPathComponent("updates", isDirectory: true)
+        let updates = paths.home.appendingPathComponent("updates", isDirectory: true)
+        // Each install has a folder of its own: another copy of Castpane installing at the
+        // same time, or an image a past attempt could not detach, is in another one.
+        let dir = updates.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let dest = Bundle.main.bundleURL
         // Staged in Castpane's own folder (0700), not next to the app: nobody else can put
         // anything at that path before the copy, or change it after the check.
@@ -140,7 +145,8 @@ final class Updater: ObservableObject {
         let fm = FileManager.default
         state = .working("Starting…")
         do {
-            try? fm.removeItem(at: dir)
+            await Self.clearOld(in: updates)
+            try SecureFiles.ensureDirectory(updates)
             try SecureFiles.ensureDirectory(dir)
             try SecureFiles.ensureDirectory(staged.deletingLastPathComponent())
 
@@ -182,50 +188,69 @@ final class Updater: ObservableObject {
                 try? fm.removeItem(at: staged)
                 throw Failure("the new app is not signed by the same signer as this one")
             }
-            let newVersion = Bundle(url: staged)?.object(forInfoDictionaryKey: "CastpaneVersion") as? String
+            let newVersion = AppSwap.version(ofAppAt: staged)
             guard newVersion == update.version else {
                 try? fm.removeItem(at: staged)
                 throw Failure("the new app says it is \(newVersion ?? "no version"), not \(update.version)")
             }
 
             state = .working("Restarting into Castpane \(update.version)…")
+            if let why = AppSwap.unsafeFolder(dest.deletingLastPathComponent()) { throw Failure("Castpane cannot replace itself where it is (\(why))") }
+            do { try AppSwap.exchange(staged, dest) } catch {
+                throw Failure("the new app could not be put in place (\(error.localizedDescription)); update it by hand")
+            }
+            // From here the new app is in place and the old one waits in `staged`: quit
+            // whatever happens, and the script (or the next launch) removes the old one.
             let script = dir.appendingPathComponent("apply.sh")
-            try Self.applyScript.write(to: script, atomically: true, encoding: .utf8)
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: "/bin/sh")
-            p.arguments = [script.path, String(ProcessInfo.processInfo.processIdentifier), dest.path, staged.path, relaunch ? "open" : "no"]
-            p.standardInput = FileHandle.nullDevice
-            p.standardOutput = FileHandle.nullDevice
-            p.standardError = FileHandle.nullDevice
-            try p.run()
+            if (try? Self.applyScript.write(to: script, atomically: true, encoding: .utf8)) != nil {
+                let p = Process()
+                p.executableURL = URL(fileURLWithPath: "/bin/sh")
+                p.arguments = [script.path, String(ProcessInfo.processInfo.processIdentifier), dest.path, dir.path, relaunch ? "open" : "no"]
+                p.standardInput = FileHandle.nullDevice
+                p.standardOutput = FileHandle.nullDevice
+                p.standardError = FileHandle.nullDevice
+                try? p.run()
+            }
             // Quit from the run loop, not from inside this task: terminate waits for
             // applicationShouldTerminate's own task on the main actor, which this one would
             // still hold (0.1.3 and 0.1.4 stayed at "Restarting into…").
             if quit { NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0) } else { exit(0) }
         } catch {
-            try? fm.removeItem(at: staged)
+            try? fm.removeItem(at: dir)
             state = .failed("Update not installed: \((error as? Failure)?.text ?? error.localizedDescription).")
         }
     }
 
-    /// Waits for Castpane to quit, swaps the staged app in (the old one is put back if a
-    /// step fails) and opens it. The paths come as arguments, never inside the script.
+    /// Waits for Castpane to quit, removes this install's folder (the old app is in it) and
+    /// opens the new app. The paths come as arguments, never inside the script.
     private static let applyScript = """
     #!/bin/sh
-    pid=$1; dest=$2; staged=$3; reopen=$4
+    pid=$1; dest=$2; dir=$3; reopen=$4
     i=0
-    while kill -0 "$pid" 2>/dev/null; do i=$((i+1)); [ "$i" -gt 600 ] && exit 1; sleep 0.1; done
-    [ -d "$staged" ] && [ ! -L "$staged" ] || exit 1
-    # The old app waits in Castpane's own folder (beside the staged one) until the new one is in.
-    old="$(dirname "$staged")/previous.app"
-    rm -rf "$old"
-    if mv "$dest" "$old"; then
-      if mv "$staged" "$dest"; then rm -rf "$old"; else mv "$old" "$dest"; fi
-    fi
-    rm -rf "$staged"
+    while kill -0 "$pid" 2>/dev/null; do i=$((i+1)); [ "$i" -gt 600 ] && break; sleep 0.1; done
+    rm -rf "$dir"
     [ "$reopen" = "open" ] && open "$dest"
     exit 0
     """
+
+    /// Removes what past installs left in `updates` (an hour old or more, so an install
+    /// another copy of Castpane is making now stays), detaching an image still mounted there.
+    nonisolated static func clearOld(in updates: URL) async {
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(at: updates, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
+        for item in items {
+            let changed = (try? item.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            guard Date().timeIntervalSince(changed) >= 3600 else { continue }
+            // An install's own mount point, or one an earlier version kept at updates/mount.
+            for mount in [item.appendingPathComponent("mount", isDirectory: true), item] {
+                var here = stat(), above = stat()
+                if lstat(mount.path, &here) == 0, lstat(mount.deletingLastPathComponent().path, &above) == 0, here.st_dev != above.st_dev {
+                    try? await run("/usr/bin/hdiutil", ["detach", "-force", mount.path])
+                }
+            }
+            try? fm.removeItem(at: item)
+        }
+    }
 
     nonisolated struct Failure: Error { let text: String; init(_ t: String) { text = t } }
 
