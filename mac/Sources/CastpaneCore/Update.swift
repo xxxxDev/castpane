@@ -144,7 +144,7 @@ public enum AppSwap {
     /// to them (the admin group may, as it may in /Applications): otherwise another account
     /// could rename or replace what is there while the update puts the new app in.
     public static func unsafeFolder(_ folder: URL, uid: uid_t = getuid()) -> String? {
-        let start = folder.resolvingSymlinksInPath().standardizedFileURL.path
+        let start = resolved(folder).path
         guard access(start, W_OK) == 0 else { return "this account cannot write to \(start)" }
         var path = start
         while true {
@@ -159,6 +159,25 @@ public enum AppSwap {
             if path.isEmpty { path = "/" }
         }
     }
+
+    /// Why the app at `app` cannot safely be replaced by this user with a copy staged in
+    /// `staging`, or nil. The app (symbolic links resolved: that is the path to exchange) must
+    /// be this user's own folder, its folder safe (`unsafeFolder`), and on the same volume as
+    /// `staging`, since the exchange cannot cross volumes.
+    public static func unsafeApp(_ app: URL, staging: URL, uid: uid_t = getuid()) -> String? {
+        let path = resolved(app).path
+        var st = stat()
+        guard lstat(path, &st) == 0, st.st_mode & S_IFMT == S_IFDIR else { return "\(path) is not a folder" }
+        guard st.st_uid == uid else { return "\(path) belongs to another account" }
+        if let why = unsafeFolder(resolved(app).deletingLastPathComponent(), uid: uid) { return why }
+        var here = stat(), there = stat()
+        guard stat(staging.path, &there) == 0, lstat((path as NSString).deletingLastPathComponent, &here) == 0 else { return "\(staging.path) cannot be read" }
+        guard here.st_dev == there.st_dev else { return "it is on another volume than \(staging.path)" }
+        return nil
+    }
+
+    /// `url` with symbolic links resolved: the path the checks and the exchange both use.
+    public static func resolved(_ url: URL) -> URL { url.resolvingSymlinksInPath().standardizedFileURL }
 
     /// Exchanges two items in one step, so neither path is ever empty: after it `a` holds
     /// what was at `b` and `b` what was at `a`. Both must be on the same volume.

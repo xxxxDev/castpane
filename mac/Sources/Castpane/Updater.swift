@@ -61,7 +61,7 @@ final class Updater: ObservableObject {
         if UpdateCheck.releasesURL(repo: repo) == nil { return "This build does not name a repository to update from." }
         let path = Bundle.main.bundleURL.path
         if path.contains("/AppTranslocation/") { return "Move Castpane to Applications first: macOS is running it from a temporary place." }
-        if let why = AppSwap.unsafeFolder(Bundle.main.bundleURL.deletingLastPathComponent()) {
+        if let why = AppSwap.unsafeApp(Bundle.main.bundleURL, staging: Paths.standard().home) {
             return "Castpane cannot replace itself where it is (\(why)); update it by hand."
         }
         return nil
@@ -138,7 +138,8 @@ final class Updater: ObservableObject {
         // Each install has a folder of its own: another copy of Castpane installing at the
         // same time, or an image a past attempt could not detach, is in another one.
         let dir = updates.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let dest = Bundle.main.bundleURL
+        // The path the checks looked at is the one exchanged and opened.
+        let dest = AppSwap.resolved(Bundle.main.bundleURL)
         // Staged in Castpane's own folder (0700), not next to the app: nobody else can put
         // anything at that path before the copy, or change it after the check.
         let staged = dir.appendingPathComponent("new", isDirectory: true).appendingPathComponent("Castpane.app", isDirectory: true)
@@ -195,7 +196,7 @@ final class Updater: ObservableObject {
             }
 
             state = .working("Restarting into Castpane \(update.version)…")
-            if let why = AppSwap.unsafeFolder(dest.deletingLastPathComponent()) { throw Failure("Castpane cannot replace itself where it is (\(why))") }
+            if let why = AppSwap.unsafeApp(dest, staging: updates) { throw Failure("Castpane cannot replace itself where it is (\(why))") }
             do { try AppSwap.exchange(staged, dest) } catch {
                 throw Failure("the new app could not be put in place (\(error.localizedDescription)); update it by hand")
             }
@@ -222,12 +223,14 @@ final class Updater: ObservableObject {
     }
 
     /// Waits for Castpane to quit, removes this install's folder (the old app is in it) and
-    /// opens the new app. The paths come as arguments, never inside the script.
+    /// opens the new app. If Castpane is still running after ten minutes it touches nothing:
+    /// the new app is in place already, and the next launch removes the old one. The paths
+    /// come as arguments, never inside the script.
     private static let applyScript = """
     #!/bin/sh
     pid=$1; dest=$2; dir=$3; reopen=$4
     i=0
-    while kill -0 "$pid" 2>/dev/null; do i=$((i+1)); [ "$i" -gt 600 ] && break; sleep 0.1; done
+    while kill -0 "$pid" 2>/dev/null; do i=$((i+1)); [ "$i" -gt 6000 ] && exit 0; sleep 0.1; done
     rm -rf "$dir"
     [ "$reopen" = "open" ] && open "$dest"
     exit 0
